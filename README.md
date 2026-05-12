@@ -85,7 +85,7 @@ because the manifests use relative plugin paths.
 ### Claude Code
 
 ```text
-/plugin marketplace add OWNER/REPO@v0.4.7
+/plugin marketplace add jellestoel/auditlanes@v0.4.7
 /plugin install auditlanes@auditlanes
 /reload-plugins
 /auditlanes:scan .
@@ -94,7 +94,7 @@ because the manifests use relative plugin paths.
 ### Codex
 
 ```bash
-codex plugin marketplace add OWNER/REPO --ref v0.4.7
+codex plugin marketplace add jellestoel/auditlanes --ref v0.4.7
 codex
 ```
 
