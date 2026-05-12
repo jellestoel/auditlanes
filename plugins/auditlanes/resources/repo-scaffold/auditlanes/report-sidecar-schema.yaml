@@ -1,0 +1,522 @@
+version: 2
+name: auditlanes-report-sidecar
+format: json
+
+schema_contract:
+  additional_properties: false
+  required_top_level_fields:
+    - schema_version
+    - sidecar_id
+    - generated_at
+    - run_id
+    - batch_id
+    - family
+    - mode
+    - profile
+    - baseline_commit
+    - reviewed_artifacts
+    - reviewed_files_routes_helpers
+    - coverage_units_touched
+    - confirmed_findings
+    - candidate_findings
+    - rejected_claims
+    - clone_maps
+    - runtime_updates
+    - chain_candidates
+    - coverage_gaps
+    - profile_feedback
+    - next_batch_recommendations
+
+reference_semantics:
+  - "Before reducer assignment, finding references may use provisional_finding_id, candidate_id, or lead_id."
+  - "After reducer assignment, prefer reducer stable finding_id and root_cause_id."
+  - "Family sidecars must not invent final stable IDs."
+
+enums:
+  family:
+    values_from: "selected_profile.lanes plus selected_profile.specialists"
+  owner_family:
+    values_from: "selected_profile.lanes"
+  mode:
+    - canonical-sweep
+    - canonical-gap-fill
+    - clonehunt
+    - runtime-safe
+    - post-fix-resweep
+    - exploit-synthesis
+    - parked
+  finding_status:
+    - lead
+    - candidate
+    - confirmed-static
+    - runtime-confirmed
+    - blocked
+    - rejected
+    - duplicate
+    - fixed
+    - reswept-open
+    - reswept-closed
+  confirmed_finding_status:
+    - confirmed-static
+    - runtime-confirmed
+    - reswept-open
+    - reswept-closed
+  severity:
+    - critical
+    - high
+    - medium
+    - low
+    - info
+  confidence:
+    - certain
+    - probable
+    - speculative
+  confirmed_confidence:
+    - certain
+    - probable
+  runtime_status:
+    - confirmed-at-runtime
+    - not-reproduced
+    - blocked-by-ingress-or-environment
+    - unsafe-to-validate-without-separate-approval
+  evidence_type:
+    - entrypoint
+    - missing-authn-check
+    - missing-authz-check
+    - insufficient-role-check
+    - missing-ownership-check
+    - unsafe-data-sink
+    - integration-trust-boundary
+    - platform-config
+    - dependency-or-supply-chain
+    - runtime-observation
+    - route-definition
+    - framework-convention
+    - repository-structure
+    - dependency-manifest
+    - ci-workflow
+    - secret-pattern-redacted
+    - config-default
+    - middleware-registration
+    - policy-registration
+    - other
+  profile_feedback_urgency:
+    - high
+    - medium
+    - low
+
+top_level_fields:
+  schema_version:
+    type: integer
+  sidecar_id:
+    type: string
+  generated_at:
+    type: string
+  run_id:
+    type: string
+  batch_id:
+    type: string
+  family:
+    type: enum
+    values_from: family
+  mode:
+    type: enum
+    values_from: mode
+  profile:
+    type: string
+  profile_version:
+    type: string_or_null
+  baseline_commit:
+    type: string_or_null
+  reviewed_artifacts:
+    type: string_list
+  reviewed_files_routes_helpers:
+    type: string_list
+  shared_context_inputs:
+    type: string_list
+  coverage_units_touched:
+    type: string_list
+  coverage_units_not_touched:
+    type: string_list
+  patterns_searched:
+    type: string_list
+  intentionally_excluded:
+    type: object_list
+    item_schema: intentionally_excluded_item
+  confirmed_findings:
+    type: object_list
+    item_schema: confirmed_finding
+  candidate_findings:
+    type: object_list
+    item_schema: candidate_finding
+  rejected_claims:
+    type: object_list
+    item_schema: rejected_claim
+  clone_maps:
+    type: object_list
+    item_schema: clone_map
+  runtime_updates:
+    type: object_list
+    item_schema: runtime_update
+  chain_candidates:
+    type: object_list
+    item_schema: chain_candidate
+  coverage_gaps:
+    type: object_list
+    item_schema: coverage_gap
+  profile_feedback:
+    type: object_list
+    item_schema: profile_feedback
+    notes:
+      - "The reporting family may propose cross-lane scope corrections here."
+      - "Use affected_families when the suggested profile change impacts lanes other than the reporting family."
+  next_batch_recommendations:
+    type: string_list
+
+object_schemas:
+  evidence_ref:
+    additional_properties: false
+    required:
+      - path
+      - line_start
+      - evidence_type
+      - rationale
+    properties:
+      path:
+        type: string
+        custom_validation:
+          - "must be repository-relative"
+          - "must not be absolute or contain .."
+          - "must not point into auditlanes/out/**"
+      line_start:
+        type: integer_or_null
+        minimum: 1
+        notes:
+          - "Use null for repository-structure evidence that has no meaningful source line."
+      line_end:
+        type: integer_or_null
+        minimum: 1
+        custom_validation:
+          - "when both line_start and line_end are integers, line_end must be >= line_start"
+      symbol:
+        type: string_or_null
+      evidence_type:
+        type: enum
+        values_from: evidence_type
+      snippet_hash:
+        type: string_or_null
+      rationale:
+        type: string
+
+  intentionally_excluded_item:
+    additional_properties: false
+    required:
+      - path
+      - reason
+    properties:
+      path:
+        type: string
+      reason:
+        type: string
+      scope_source:
+        type: string_or_null
+
+  confirmed_finding:
+    additional_properties: false
+    required:
+      - provisional_finding_id
+      - dedupe_key
+      - owner_family
+      - status
+      - severity
+      - confidence
+      - summary
+      - entrypoint
+      - security_invariant
+      - missing_guard
+      - attacker_precondition
+      - impact_boundary
+      - files
+      - evidence_refs
+      - severity_rationale
+      - why_confirmed
+      - introduced_after_batch_01
+    properties:
+      provisional_finding_id:
+        type: string
+      dedupe_key:
+        type: object
+        item_schema: finding_dedupe_key
+        must_mirror_parent_fields:
+          - owner_family
+          - security_invariant
+          - missing_guard
+          - entrypoint
+          - impact_boundary
+      finding_id:
+        type: string_or_null
+      root_cause_id:
+        type: string_or_null
+      owner_family:
+        type: enum
+        values_from: owner_family
+      status:
+        type: enum
+        values_from: confirmed_finding_status
+      severity:
+        type: enum
+        values_from: severity
+      confidence:
+        type: enum
+        values_from: confirmed_confidence
+      summary:
+        type: string
+      entrypoint:
+        type: string
+      security_invariant:
+        type: string
+      missing_guard:
+        type: string
+      attacker_precondition:
+        type: string
+      impact_boundary:
+        type: string
+      files:
+        type: string_list
+        min_items: 1
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+        min_items: 1
+      report_refs:
+        type: string_list
+      lead_source_refs:
+        type: string_list
+      severity_rationale:
+        type: string
+      clone_of:
+        type: string_or_null
+      related_findings:
+        type: string_list
+      why_confirmed:
+        type: string
+      introduced_after_batch_01:
+        type: boolean
+
+  finding_dedupe_key:
+    additional_properties: false
+    notes:
+      - "Custom validation requires this object to be a verbatim mirror of the parent confirmed_finding identity fields."
+    required:
+      - owner_family
+      - security_invariant
+      - missing_guard
+      - entrypoint
+      - impact_boundary
+    properties:
+      owner_family:
+        type: enum
+        values_from: owner_family
+      security_invariant:
+        type: string
+      missing_guard:
+        type: string
+      entrypoint:
+        type: string
+      impact_boundary:
+        type: string
+
+  candidate_finding:
+    additional_properties: false
+    required:
+      - candidate_id
+      - candidate_dedupe_key
+      - proposed_owner_family
+      - severity
+      - confidence
+      - summary
+      - blocker_to_confirmation
+      - files
+      - evidence_refs
+    properties:
+      candidate_id:
+        type: string
+      candidate_dedupe_key:
+        type: object
+        item_schema: candidate_dedupe_key
+        must_mirror_parent_fields:
+          - proposed_owner_family
+          - summary
+          - files
+          - suspected_missing_guard
+          - impact_boundary
+      proposed_owner_family:
+        type: enum
+        values_from: owner_family
+      severity:
+        type: enum
+        values_from: severity
+      confidence:
+        type: enum
+        values_from: confidence
+      summary:
+        type: string
+      entrypoint:
+        type: string_or_null
+      impact_boundary:
+        type: string_or_null
+      suspected_missing_guard:
+        type: string_or_null
+      blocker_to_confirmation:
+        type: string
+      files:
+        type: string_list
+        min_items: 1
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+        min_items: 1
+      lead_source_refs:
+        type: string_list
+
+  candidate_dedupe_key:
+    additional_properties: false
+    notes:
+      - "Custom validation requires this object to be a verbatim mirror of the parent candidate_finding identity fields."
+    required:
+      - proposed_owner_family
+      - summary
+      - files
+      - suspected_missing_guard
+      - impact_boundary
+    properties:
+      proposed_owner_family:
+        type: enum
+        values_from: owner_family
+      summary:
+        type: string
+      files:
+        type: string_list
+      suspected_missing_guard:
+        type: string_or_null
+      impact_boundary:
+        type: string_or_null
+
+  rejected_claim:
+    additional_properties: false
+    required:
+      - claim_id
+      - reason
+    properties:
+      claim_id:
+        type: string
+      reason:
+        type: string
+      subsumed_by:
+        type: string_or_null
+
+  runtime_update:
+    additional_properties: false
+    required:
+      - finding_id
+      - runtime_status
+      - request_posture
+      - result
+    properties:
+      finding_id:
+        type: string
+      runtime_status:
+        type: enum
+        values_from: runtime_status
+      request_posture:
+        type: string
+      result:
+        type: string
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+
+  clone_map:
+    additional_properties: false
+    required:
+      - canonical_exemplar
+      - repeated_pattern
+      - widespread_pattern
+      - estimated_clone_count
+      - clone_locations
+    properties:
+      canonical_exemplar:
+        type: string
+      repeated_pattern:
+        type: string
+      widespread_pattern:
+        type: boolean
+      estimated_clone_count:
+        type: integer_or_null
+      clone_locations:
+        type: object_list
+        item_schema: evidence_ref
+      severity_shift:
+        type: string_or_null
+
+  chain_candidate:
+    additional_properties: false
+    required:
+      - chain_candidate_id
+      - component_findings
+      - why_chain_matters
+    properties:
+      chain_candidate_id:
+        type: string
+      component_findings:
+        type: string_list
+      why_chain_matters:
+        type: string
+      confidence:
+        type: enum
+        values_from: confidence
+
+  coverage_gap:
+    additional_properties: false
+    required:
+      - coverage_unit_id
+      - reason
+    properties:
+      coverage_unit_id:
+        type: string
+      reason:
+        type: string
+      suggested_next_mode:
+        type: string_or_null
+
+  profile_feedback:
+    additional_properties: false
+    notes:
+      - "family is the reporting family, not necessarily the only affected lane."
+      - "affected_families is optional and should list lanes affected by cross-lane feedback."
+    required:
+      - profile_gap_id
+      - family
+      - observed_issue
+      - suggested_change
+      - evidence_refs
+      - urgency
+    properties:
+      profile_gap_id:
+        type: string
+      family:
+        type: enum
+        values_from: owner_family
+      affected_families:
+        type: string_list
+      observed_issue:
+        type: string
+      suggested_change:
+        type: string
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+        min_items: 1
+      urgency:
+        type: enum
+        values_from: profile_feedback_urgency

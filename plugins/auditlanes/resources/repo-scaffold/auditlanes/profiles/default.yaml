@@ -1,0 +1,99 @@
+version: 1
+name: auditlanes-default-profile
+
+project:
+  name: "${PROJECT_NAME}"
+  repo_type:
+    - auto-detect
+
+source_roots:
+  - "src"
+  - "app"
+  - "apps"
+  - "services"
+  - "packages"
+  - "lib"
+  - "server"
+  - "client"
+
+config_roots:
+  - ".github"
+  - ".gitlab-ci.yml"
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - "deploy"
+  - "deployment"
+  - "infra"
+  - "terraform"
+  - "k8s"
+  - "pyproject.toml"
+  - "requirements.txt"
+  - "package.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+  - "package-lock.json"
+  - "go.mod"
+  - "Cargo.toml"
+  - "pom.xml"
+  - "build.gradle"
+
+exclude_roots:
+  - ".git"
+  - "auditlanes/out"
+  - "node_modules"
+  - "vendor"
+  - ".venv"
+  - "venv"
+  - "__pycache__"
+  - "dist"
+  - "build"
+  - ".tox"
+  - ".mypy_cache"
+  - ".pytest_cache"
+  - ".next"
+  - ".nuxt"
+  - "coverage"
+
+discovery:
+  languages: auto
+  frameworks: auto
+  route_enumeration: auto
+  dependency_manifests: auto
+  ci_cd_config: auto
+  infrastructure_as_code: auto
+
+security_model:
+  authn:
+    mechanisms:
+      - auto-detect
+  authz:
+    role_sources:
+      - auto-detect
+    object_ownership_sources:
+      - auto-detect
+  sensitive_data:
+    entities:
+      - auto-detect
+  external_integrations:
+    providers:
+      - auto-detect
+
+family_overrides:
+  session-auth:
+    seed_paths: []
+    priority_patterns: []
+  object-auth:
+    seed_paths: []
+    priority_patterns: []
+  role-matrix:
+    seed_paths: []
+    priority_patterns: []
+  data-surfaces:
+    seed_paths: []
+    priority_patterns: []
+  integration-trust:
+    seed_paths: []
+    priority_patterns: []
+  platform-posture:
+    seed_paths: []
+    priority_patterns: []

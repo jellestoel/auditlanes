@@ -1,0 +1,36 @@
+{
+  "schema_version": 2,
+  "sidecar_id": "sidecar-role-matrix-nosignal-001",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "run_id": "run-good",
+  "batch_id": "batch-01",
+  "family": "role-matrix",
+  "mode": "canonical-sweep",
+  "profile": "security",
+  "profile_version": "0.4.7",
+  "baseline_commit": null,
+  "reviewed_artifacts": [
+    "src/api/roles.py"
+  ],
+  "reviewed_files_routes_helpers": [
+    "src/api/roles.py:1"
+  ],
+  "shared_context_inputs": [],
+  "coverage_units_touched": [
+    "role-matrix.fixture"
+  ],
+  "coverage_units_not_touched": [],
+  "patterns_searched": [
+    "role"
+  ],
+  "intentionally_excluded": [],
+  "confirmed_findings": [],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "next_batch_recommendations": []
+}

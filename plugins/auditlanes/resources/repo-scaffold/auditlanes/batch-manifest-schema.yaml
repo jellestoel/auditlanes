@@ -1,0 +1,113 @@
+version: 1
+name: auditlanes-batch-manifest
+format: yaml
+
+required_top_level_fields:
+  - schema_version
+  - run_id
+  - batch_id
+  - generated_at
+  - producer
+  - manifest_status
+  - expected_families
+  - families
+
+manifest_status_values:
+  - completed
+  - completed-with-failures
+  - incomplete
+
+family_status_values:
+  - ran
+  - parked
+  - failed
+  - missing
+
+family_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+  - post-fix-resweep
+  - exploit-synthesis
+  - parked
+
+family_item:
+  additional_properties: false
+  required:
+    - family
+    - status
+    - mode
+  properties:
+    family:
+      type: string
+    status:
+      type: enum
+      values_from: family_status_values
+    mode:
+      type: enum
+      values_from: family_modes
+    markdown:
+      type: string
+      required_when:
+        status: ran
+    json:
+      type: string
+      required_when:
+        status: ran
+    carried_forward_from:
+      type: string_or_null
+      required_when:
+        status: parked
+    failure_reason:
+      type: string_or_null
+      required_when:
+        status:
+          - failed
+          - missing
+
+example:
+  schema_version: 1
+  run_id: "${RUN_ID}"
+  batch_id: batch-02
+  generated_at: "2026-05-11T00:00:00Z"
+  producer: "orchestrator"
+  manifest_status: completed
+  expected_families:
+    - session-auth
+    - object-auth
+    - role-matrix
+    - data-surfaces
+    - integration-trust
+    - platform-posture
+  families:
+    - family: session-auth
+      status: ran
+      mode: clonehunt
+      markdown: "${RUN_DIR}/reports/batch-02/session-auth/report.md"
+      json: "${RUN_DIR}/reports/batch-02/session-auth/report.json"
+    - family: platform-posture
+      status: parked
+      mode: parked
+      carried_forward_from: batch-01
+
+example_exploit_synthesis:
+  schema_version: 1
+  run_id: "${RUN_ID}"
+  batch_id: batch-04
+  generated_at: "2026-05-11T00:00:00Z"
+  producer: "orchestrator"
+  manifest_status: completed
+  expected_families:
+    - exploit-synthesis
+  families:
+    - family: exploit-synthesis
+      status: ran
+      mode: exploit-synthesis
+      markdown: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.md"
+      json: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.json"
+
+write_policy:
+  - "The orchestrator writes an in-progress manifest before a batch starts when possible."
+  - "The orchestrator writes or atomically replaces the final manifest after the batch finishes."
+  - "The final manifest records status for every expected work item."

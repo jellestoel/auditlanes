@@ -1,0 +1,16 @@
+{
+  "name": "auditlanes",
+  "version": "0.4.7",
+  "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
+  "skills": "./skills/",
+  "author": {
+    "name": "AuditLanes"
+  },
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "audit",
+    "vulnerability-review",
+    "agent-workflow"
+  ]
+}

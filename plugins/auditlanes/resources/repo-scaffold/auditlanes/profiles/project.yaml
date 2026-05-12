@@ -1,0 +1,48 @@
+version: 1
+name: auditlanes-project-profile
+
+project:
+  name: "${PROJECT_NAME}"
+  repo_type:
+    - auto-detect
+
+notes:
+  - "Optional operator-maintained profile."
+  - "Keep this file factual and concise; calibration must still cite code/config evidence."
+
+source_roots: []
+config_roots: []
+exclude_roots: []
+
+security_model:
+  authn:
+    known_mechanisms: []
+  authz:
+    known_role_sources: []
+    known_object_ownership_sources: []
+  sensitive_data:
+    known_entities: []
+  external_integrations:
+    known_providers: []
+
+high_risk_workflows: []
+
+family_overrides:
+  session-auth:
+    seed_paths: []
+    priority_patterns: []
+  object-auth:
+    seed_paths: []
+    priority_patterns: []
+  role-matrix:
+    seed_paths: []
+    priority_patterns: []
+  data-surfaces:
+    seed_paths: []
+    priority_patterns: []
+  integration-trust:
+    seed_paths: []
+    priority_patterns: []
+  platform-posture:
+    seed_paths: []
+    priority_patterns: []

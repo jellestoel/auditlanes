@@ -1,0 +1,19 @@
+version: 1
+profile: security
+lanes:
+  - id: session-auth
+    owns: "Session, authentication, token, cookie, CSRF, and account lifecycle controls."
+  - id: object-auth
+    owns: "Object ownership, tenant scoping, IDOR risk, and resource-level authorization."
+  - id: role-matrix
+    owns: "Roles, permissions, admin gates, staff boundaries, and policy consistency."
+  - id: data-surfaces
+    owns: "Uploads, downloads, exports, rendering, search, file/blob access, and sensitive data exposure."
+  - id: integration-trust
+    owns: "Webhooks, callbacks, third-party APIs, queues, OAuth/OIDC/SAML, and external trust boundaries."
+  - id: platform-posture
+    owns: "Secrets, dependency posture, CI/CD, containers, IaC, deployment configuration, logging, and headers."
+specialists:
+  - id: exploit-synthesis
+    owns: "Cross-lane chain analysis and impact synthesis after canonical lane work."
+    mode: exploit-synthesis

@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/report-sidecar.schema.json",
+  "title": "AuditLanes report sidecar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sidecar_id",
+    "generated_at",
+    "run_id",
+    "batch_id",
+    "family",
+    "mode",
+    "profile",
+    "baseline_commit",
+    "reviewed_artifacts",
+    "reviewed_files_routes_helpers",
+    "coverage_units_touched",
+    "confirmed_findings",
+    "candidate_findings",
+    "rejected_claims",
+    "clone_maps",
+    "runtime_updates",
+    "chain_candidates",
+    "coverage_gaps",
+    "profile_feedback",
+    "next_batch_recommendations"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "sidecar_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "minLength": 1, "format": "date-time" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "batch_id": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "family": { "$ref": "#/$defs/family" },
+    "mode": { "$ref": "#/$defs/mode" },
+    "profile": { "$ref": "#/$defs/profileId" },
+    "profile_version": { "type": ["string", "null"] },
+    "baseline_commit": { "type": ["string", "null"] },
+    "reviewed_artifacts": { "$ref": "#/$defs/stringList" },
+    "reviewed_files_routes_helpers": { "$ref": "#/$defs/stringList" },
+    "shared_context_inputs": { "$ref": "#/$defs/stringList" },
+    "coverage_units_touched": { "$ref": "#/$defs/stringList" },
+    "coverage_units_not_touched": { "$ref": "#/$defs/stringList" },
+    "patterns_searched": { "$ref": "#/$defs/stringList" },
+    "intentionally_excluded": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentionallyExcluded" }
+    },
+    "confirmed_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/confirmedFinding" }
+    },
+    "candidate_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateFinding" }
+    },
+    "rejected_claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedClaim" }
+    },
+    "clone_maps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/cloneMap" }
+    },
+    "runtime_updates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runtimeUpdate" }
+    },
+    "chain_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/chainCandidate" }
+    },
+    "coverage_gaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/coverageGap" }
+    },
+    "profile_feedback": {
+      "type": "array",
+      "description": "Profile-scope feedback proposed by the reporting family. Feedback may be cross-lane: use affected_families when the suggested scope change impacts lanes other than the reporting family.",
+      "items": { "$ref": "#/$defs/profileFeedback" }
+    },
+    "next_batch_recommendations": { "$ref": "#/$defs/stringList" }
+  },
+  "$defs": {
+    "family": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "ownerFamily": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "profileId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "mode": {
+      "enum": [
+        "canonical-sweep",
+        "canonical-gap-fill",
+        "clonehunt",
+        "runtime-safe",
+        "post-fix-resweep",
+        "exploit-synthesis",
+        "parked"
+      ]
+    },
+    "severity": {
+      "enum": ["critical", "high", "medium", "low", "info"]
+    },
+    "confidence": {
+      "enum": ["certain", "probable", "speculative"]
+    },
+    "confirmedConfidence": {
+      "enum": ["certain", "probable"]
+    },
+    "confirmedStatus": {
+      "enum": ["confirmed-static", "runtime-confirmed", "reswept-open", "reswept-closed"]
+    },
+    "runtimeStatus": {
+      "enum": [
+        "confirmed-at-runtime",
+        "not-reproduced",
+        "blocked-by-ingress-or-environment",
+        "unsafe-to-validate-without-separate-approval"
+      ]
+    },
+    "evidenceType": {
+      "enum": [
+        "entrypoint",
+        "missing-authn-check",
+        "missing-authz-check",
+        "insufficient-role-check",
+        "missing-ownership-check",
+        "unsafe-data-sink",
+        "integration-trust-boundary",
+        "platform-config",
+        "dependency-or-supply-chain",
+        "runtime-observation",
+        "route-definition",
+        "framework-convention",
+        "repository-structure",
+        "dependency-manifest",
+        "ci-workflow",
+        "secret-pattern-redacted",
+        "config-default",
+        "middleware-registration",
+        "policy-registration",
+        "other"
+      ]
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "line_start", "evidence_type", "rationale"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "line_start": { "type": ["integer", "null"], "minimum": 1 },
+        "line_end": { "type": ["integer", "null"], "minimum": 1 },
+        "symbol": { "type": ["string", "null"] },
+        "evidence_type": { "$ref": "#/$defs/evidenceType" },
+        "snippet_hash": { "type": ["string", "null"] },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "intentionallyExcluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "scope_source": { "type": ["string", "null"] }
+      }
+    },
+    "findingDedupeKey": {
+      "type": "object",
+      "description": "Reducer identity key for confirmed findings. Custom validation requires these fields to mirror the parent confirmed finding fields exactly: owner_family, security_invariant, missing_guard, entrypoint, impact_boundary.",
+      "additionalProperties": false,
+      "required": ["owner_family", "security_invariant", "missing_guard", "entrypoint", "impact_boundary"],
+      "properties": {
+        "owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "security_invariant": { "type": "string", "minLength": 1 },
+        "missing_guard": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": "string", "minLength": 1 },
+        "impact_boundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "confirmedFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provisional_finding_id",
+        "dedupe_key",
+        "owner_family",
+        "status",
+        "severity",
+        "confidence",
+        "summary",
+        "entrypoint",
+        "security_invariant",
+        "missing_guard",
+        "attacker_precondition",
+        "impact_boundary",
+        "files",
+        "evidence_refs",
+        "severity_rationale",
+        "why_confirmed",
+        "introduced_after_batch_01"
+      ],
+      "properties": {
+        "provisional_finding_id": { "type": "string", "minLength": 1 },
+        "dedupe_key": {
+          "description": "Must be a verbatim mirror of the parent confirmed finding identity fields. The custom validator enforces equality with owner_family, security_invariant, missing_guard, entrypoint, and impact_boundary.",
+          "$ref": "#/$defs/findingDedupeKey"
+        },
+        "finding_id": { "type": ["string", "null"] },
+        "root_cause_id": { "type": ["string", "null"] },
+        "owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "status": { "$ref": "#/$defs/confirmedStatus" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "$ref": "#/$defs/confirmedConfidence" },
+        "summary": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": "string", "minLength": 1 },
+        "security_invariant": { "type": "string", "minLength": 1 },
+        "missing_guard": { "type": "string", "minLength": 1 },
+        "attacker_precondition": { "type": "string", "minLength": 1 },
+        "impact_boundary": { "type": "string", "minLength": 1 },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "report_refs": { "$ref": "#/$defs/stringList" },
+        "lead_source_refs": { "$ref": "#/$defs/stringList" },
+        "severity_rationale": { "type": "string", "minLength": 1 },
+        "clone_of": { "type": ["string", "null"] },
+        "related_findings": { "$ref": "#/$defs/stringList" },
+        "why_confirmed": { "type": "string", "minLength": 1 },
+        "introduced_after_batch_01": { "type": "boolean" }
+      }
+    },
+    "candidateDedupeKey": {
+      "type": "object",
+      "description": "Reducer identity key for candidates. Custom validation requires these fields to mirror the parent candidate fields exactly: proposed_owner_family, summary, files, suspected_missing_guard, impact_boundary.",
+      "additionalProperties": false,
+      "required": ["proposed_owner_family", "summary", "files", "suspected_missing_guard", "impact_boundary"],
+      "properties": {
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "summary": { "type": "string", "minLength": 1 },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "suspected_missing_guard": { "type": ["string", "null"] },
+        "impact_boundary": { "type": ["string", "null"] }
+      }
+    },
+    "candidateFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "candidate_dedupe_key",
+        "proposed_owner_family",
+        "severity",
+        "confidence",
+        "summary",
+        "blocker_to_confirmation",
+        "files",
+        "evidence_refs"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "candidate_dedupe_key": {
+          "description": "Must be a verbatim mirror of the parent candidate fields. The custom validator enforces equality with proposed_owner_family, summary, files, suspected_missing_guard, and impact_boundary.",
+          "$ref": "#/$defs/candidateDedupeKey"
+        },
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "summary": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": ["string", "null"] },
+        "impact_boundary": { "type": ["string", "null"] },
+        "suspected_missing_guard": { "type": ["string", "null"] },
+        "blocker_to_confirmation": { "type": "string", "minLength": 1 },
+        "files": { "$ref": "#/$defs/stringList" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "lead_source_refs": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "rejectedClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "reason"],
+      "properties": {
+        "claim_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "subsumed_by": { "type": ["string", "null"] }
+      }
+    },
+    "runtimeUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "runtime_status", "request_posture", "result"],
+      "properties": {
+        "finding_id": { "type": "string" },
+        "runtime_status": { "$ref": "#/$defs/runtimeStatus" },
+        "request_posture": { "type": "string" },
+        "result": { "type": "string" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        }
+      }
+    },
+    "cloneMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical_exemplar", "repeated_pattern", "widespread_pattern", "estimated_clone_count", "clone_locations"],
+      "properties": {
+        "canonical_exemplar": { "type": "string" },
+        "repeated_pattern": { "type": "string" },
+        "widespread_pattern": { "type": "boolean" },
+        "estimated_clone_count": { "type": ["integer", "null"] },
+        "clone_locations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "severity_shift": { "type": ["string", "null"] }
+      }
+    },
+    "chainCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_candidate_id", "component_findings", "why_chain_matters"],
+      "properties": {
+        "chain_candidate_id": { "type": "string" },
+        "component_findings": { "$ref": "#/$defs/stringList" },
+        "why_chain_matters": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "coverageGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_unit_id", "reason"],
+      "properties": {
+        "coverage_unit_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "suggested_next_mode": { "type": ["string", "null"] }
+      }
+    },
+    "profileFeedback": {
+      "type": "object",
+      "description": "Feedback that the calibrated profile missed, over-scoped, or misassigned part of the project. The family field is the reporting family; affected_families lists lanes whose future scope may need reducer review.",
+      "additionalProperties": false,
+      "required": ["profile_gap_id", "family", "observed_issue", "suggested_change", "evidence_refs", "urgency"],
+      "properties": {
+        "profile_gap_id": { "type": "string" },
+        "family": {
+          "description": "The family reporting the profile gap.",
+          "$ref": "#/$defs/ownerFamily"
+        },
+        "affected_families": {
+          "description": "Optional lanes affected by the suggested scope/profile change. Use this for cross-lane profile feedback.",
+          "$ref": "#/$defs/stringList"
+        },
+        "observed_issue": { "type": "string" },
+        "suggested_change": { "type": "string" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        },
+        "urgency": { "enum": ["high", "medium", "low"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "auditlanes",
+  "version": "0.4.7",
+  "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
+  "author": {
+    "name": "AuditLanes"
+  },
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "audit",
+    "vulnerability-review",
+    "agent-workflow"
+  ],
+  "skills": "./codex-skills/",
+  "interface": {
+    "displayName": "AuditLanes",
+    "shortDescription": "Structured multi-lane codebase audits",
+    "longDescription": "Coordinates calibrated audit lanes, structured JSON sidecars, reducer state, and final audit reports. Security is the stable bundled profile; other profiles are metadata or planned.",
+    "developerName": "AuditLanes",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Run an AuditLanes security audit for this repo.",
+      "Show the available AuditLanes audit profiles for this repo.",
+      "Validate the latest AuditLanes run."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

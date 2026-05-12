@@ -1,0 +1,42 @@
+version: 1
+name: auditlanes-profile-catalog
+
+default_profile: security
+
+profiles:
+  - id: security
+    status: stable
+    implemented: true
+    description: "Full security scan profile with authentication, authorization, data surface, integration, and platform lanes."
+    profile_root: "resources/profiles/security"
+    profile_file: "resources/profiles/security/profile.yaml"
+    lanes_file: "resources/profiles/security/lanes.yaml"
+    scaffold_root: "resources/repo-scaffold/auditlanes"
+  - id: architecture
+    status: experimental
+    implemented: false
+    description: "Architecture and maintainability audit profile metadata. Not yet a stable runnable profile."
+    profile_root: "resources/profiles/architecture"
+    profile_file: "resources/profiles/architecture/profile.yaml"
+    lanes_file: "resources/profiles/architecture/lanes.yaml"
+  - id: performance
+    status: planned
+    implemented: false
+    description: "Performance and scalability audit profile."
+  - id: reliability
+    status: planned
+    implemented: false
+    description: "Reliability and resilience audit profile."
+  - id: migration
+    status: planned
+    implemented: false
+    description: "Migration readiness audit profile."
+  - id: privacy
+    status: planned
+    implemented: false
+    description: "Privacy and data governance audit profile."
+
+rules:
+  - "AuditLanes v0.4.7 bundles only the security profile as a stable runnable profile."
+  - "Experimental profile metadata may exist to exercise core/profile loading, but it is not a stable audit mode."
+  - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."

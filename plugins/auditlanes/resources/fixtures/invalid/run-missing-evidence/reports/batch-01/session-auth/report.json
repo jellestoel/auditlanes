@@ -1,0 +1,56 @@
+{
+  "schema_version": 2,
+  "sidecar_id": "sidecar-session-auth-invalid-001",
+  "generated_at": "2026-05-11T00:00:00Z",
+  "run_id": "run-missing-evidence",
+  "batch_id": "batch-01",
+  "family": "session-auth",
+  "mode": "canonical-sweep",
+  "profile": "security",
+  "baseline_commit": null,
+  "reviewed_artifacts": [
+    "src/api/session.py"
+  ],
+  "reviewed_files_routes_helpers": [
+    "src/api/session.py:1"
+  ],
+  "coverage_units_touched": [
+    "session-auth.login"
+  ],
+  "confirmed_findings": [
+    {
+      "provisional_finding_id": "PF-session-auth-001",
+      "dedupe_key": {
+        "owner_family": "session-auth",
+        "security_invariant": "Session-bearing routes must require a valid authenticated session.",
+        "missing_guard": "missing require_session guard",
+        "entrypoint": "SessionView.post",
+        "impact_boundary": "unauthenticated session mutation"
+      },
+      "owner_family": "session-auth",
+      "status": "confirmed-static",
+      "severity": "medium",
+      "confidence": "probable",
+      "summary": "Session mutation handler lacks an explicit session guard.",
+      "entrypoint": "SessionView.post",
+      "security_invariant": "Session-bearing routes must require a valid authenticated session.",
+      "missing_guard": "missing require_session guard",
+      "attacker_precondition": "Attacker can reach the route without a valid session.",
+      "impact_boundary": "unauthenticated session mutation",
+      "files": [
+        "src/api/session.py"
+      ],
+      "severity_rationale": "The issue affects authentication state but the fixture does not establish account takeover.",
+      "why_confirmed": "The entrypoint and missing guard are directly evidenced in code.",
+      "introduced_after_batch_01": false
+    }
+  ],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "next_batch_recommendations": []
+}

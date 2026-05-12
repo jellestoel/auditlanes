@@ -1,0 +1,259 @@
+version: 2
+name: auditlanes-reducer
+
+mission: "Normalize family reports into structured state, suppress duplicates, apply profile feedback, assign next modes, and prepare the next batch."
+
+ingests:
+  reports_dir: "${RUN_DIR}/reports/${BATCH_ID}"
+  batch_manifest: "${RUN_DIR}/reports/${BATCH_ID}/manifest.yaml"
+  structured_reports_glob: "${RUN_DIR}/reports/${BATCH_ID}/*/report.json"
+  markdown_reports_glob: "${RUN_DIR}/reports/${BATCH_ID}/*/report.md"
+  run_metadata: "${RUN_DIR}/state/run-metadata.yaml"
+  project_security_profile: "${RUN_DIR}/state/project-security-profile.yaml"
+  family_scope_map: "${RUN_DIR}/state/family-scope-map.yaml"
+  finding_inventory: "${RUN_DIR}/state/finding-inventory.jsonl"
+  rejected_inventory: "${RUN_DIR}/state/rejected-claims.jsonl"
+  coverage_inventory: "${RUN_DIR}/state/coverage-units.jsonl"
+  chain_inventory: "${RUN_DIR}/state/chain-inventory.jsonl"
+  profile_feedback_inventory: "${RUN_DIR}/state/profile-feedback.jsonl"
+  family_catalog: "${PROTOCOL_ROOT}/agentteams.yaml"
+  state_model: "${PROTOCOL_ROOT}/state-model.yaml"
+  final_report_template: "${PROTOCOL_ROOT}/final-report-template.md"
+  protocol_identity: "${PROTOCOL_ROOT}/protocol-identity.yaml"
+
+rules:
+  - "One family owns the root cause of each finding."
+  - "Runtime-safe results update an existing finding unless a new root cause is clearly different."
+  - "Clone findings must link to a canonical exemplar when possible."
+  - "Late canonicals are allowed and must set introduced_after_batch_01=true."
+  - "Rejected claims remain in structured state to avoid rediscovery loops."
+  - "Coverage state is updated after every batch."
+  - "JSON sidecars are the primary reducer input. Markdown is narrative support only."
+  - "Parked families do not emit fresh reports; reducer carries forward prior state unchanged."
+  - "Batch manifest is authoritative for distinguishing ran, parked, failed, and missing family outputs."
+  - "Family profile feedback is advisory until the reducer accepts it and updates family-scope-map.yaml."
+  - "Do not import confirmed findings from invalid sidecars."
+  - "Import narrative-only claims as candidates at most."
+  - "When markdown and JSON disagree, trust JSON for state and record the mismatch in run-events.jsonl."
+
+batch_manifest_contract:
+  family_status_values:
+    - ran
+    - parked
+    - failed
+    - missing
+  required_top_level_fields:
+    - schema_version
+    - run_id
+    - batch_id
+    - generated_at
+    - producer
+    - manifest_status
+    - expected_families
+    - families
+  required_family_fields:
+    - family
+    - status
+    - mode
+  optional_family_fields:
+    - markdown
+    - json
+    - carried_forward_from
+    - failure_reason
+  example:
+    schema_version: 1
+    run_id: "${RUN_ID}"
+    batch_id: batch-02
+    generated_at: "2026-05-11T00:00:00Z"
+    producer: "orchestrator"
+    manifest_status: completed
+    expected_families:
+      - session-auth
+      - object-auth
+      - role-matrix
+      - data-surfaces
+      - integration-trust
+      - platform-posture
+    families:
+      - family: session-auth
+        status: ran
+        mode: clonehunt
+        markdown: "${RUN_DIR}/reports/batch-02/session-auth/report.md"
+        json: "${RUN_DIR}/reports/batch-02/session-auth/report.json"
+      - family: platform-posture
+        status: parked
+        mode: parked
+        carried_forward_from: batch-01
+
+sidecar_validation:
+  invalid_sidecar_behavior:
+    - "Do not import confirmed findings from invalid sidecars."
+    - "Import narrative-only claims as candidates at most."
+    - "Record sidecar validation failure in run metadata or reducer notes."
+    - "Require reducer to emit a correction directive for the next batch."
+  missing_json_behavior:
+    - "If manifest status is parked, carry forward prior structured state."
+    - "If manifest status is ran, failed, or missing, record a reducer failure and do not import confirmed findings for that family."
+  weak_evidence_behavior:
+    - "Downgrade confirmed-static claims without file or line evidence to candidate."
+    - "Reject claims that rely only on project docs or comments without code/config evidence."
+
+state_write_policy:
+  - "Reducer writes state files atomically via temp file plus rename."
+  - "Reducer records a reducer-run event with input hashes for every batch."
+  - "Reducer is idempotent for the same batch manifest and unchanged report sidecars."
+  - "Reducer may rebuild JSONL inventories from prior state plus current batch, but must not blindly append duplicate records."
+  - "Reducer records lane failures, invalid sidecars, missing outputs, and markdown/JSON mismatches in ${RUN_DIR}/state/run-events.jsonl."
+
+status_transitions:
+  lead:
+    allowed_next:
+      - candidate
+      - confirmed-static
+      - rejected
+  candidate:
+    allowed_next:
+      - confirmed-static
+      - blocked
+      - rejected
+      - duplicate
+  confirmed-static:
+    allowed_next:
+      - runtime-confirmed
+      - fixed
+      - duplicate
+      - reswept-open
+      - reswept-closed
+  runtime-confirmed:
+    allowed_next:
+      - fixed
+      - duplicate
+      - reswept-open
+      - reswept-closed
+
+confirmation_standard:
+  confirmed-static:
+    required:
+      - "entrypoint is identified"
+      - "security invariant is stated"
+      - "missing or insufficient guard is evidenced"
+      - "attacker precondition is stated"
+      - "impact boundary is stated"
+      - "at least one file/line evidence reference exists"
+      - "existing middleware, policy, or config does not already block the path"
+  candidate:
+    when:
+      - "needs runtime confirmation"
+      - "ownership unclear"
+      - "guard may exist indirectly"
+      - "impact depends on deployment configuration"
+
+stable_id_policy:
+  version: 1
+  hash_algorithm: "sha256"
+  hash_length:
+    default_hex_chars: 12
+    collision_hex_chars:
+      - 16
+      - 24
+      - 32
+  normalization:
+    - "Use repo-relative POSIX paths."
+    - "Trim leading and trailing whitespace from string inputs."
+    - "Collapse internal whitespace in prose fields to a single space."
+    - "Lowercase enum values before hashing."
+    - "Sort list fields before hashing unless the field is explicitly order-sensitive."
+    - "Use empty string for null optional hash inputs."
+    - "On collision, extend the hash length before changing any semantic ID inputs."
+  root_cause_id:
+    format: "RC-{owner_family}-{short_hash}"
+    hash_inputs:
+      - owner_family
+      - security_invariant
+      - missing_guard
+      - impact_boundary
+  finding_id:
+    format: "F-{owner_family}-{short_hash}"
+    hash_inputs:
+      - root_cause_id
+      - entrypoint
+      - files
+      - impact_boundary
+  clone_id:
+    format: "CL-{canonical_finding_id}-{short_hash}"
+    hash_inputs:
+      - canonical_finding_id
+      - clone_entrypoint
+      - clone_locations
+
+reducer_steps:
+  - "Parse batch manifest before reading family reports."
+  - "Parse machine-readable family sidecars for families with status=ran."
+  - "Validate sidecars against ${PROTOCOL_ROOT}/report-sidecar-schema.yaml."
+  - "Parse markdown reports only for narrative support and mismatch detection."
+  - "Hash batch manifest and sidecar inputs and record them in run-events.jsonl."
+  - "Normalize records into finding, candidate, rejected-claim, coverage, profile-feedback, and chain entries."
+  - "Assign final finding_id and root_cause_id values from provisional IDs and dedupe keys."
+  - "Merge repeated candidates using candidate_dedupe_key before emitting next-batch directives."
+  - "Preserve family-provided provisional_finding_id values only as report-local references."
+  - "Mark duplicate_of, clone_of, related_findings, and runtime_status."
+  - "Apply clone-depth limits while preserving exemplar evidence and spread estimates."
+  - "Update coverage unit statuses."
+  - "Accept, reject, or defer profile_feedback and update family-scope-map.yaml only when accepted."
+  - "Emit next-batch mode directives per family."
+  - "Emit cross-family chain candidates when multiple family findings compose a meaningful exploit chain."
+  - "Emit shared-context-summary.md containing compressed high-signal canonicals across families."
+
+next_mode_decision_rules:
+  canonical-gap-fill:
+    when:
+      - "family still has major untouched coverage units"
+      - "batch introduced a late canonical"
+      - "accepted profile feedback expands the family scope"
+  clonehunt:
+    when:
+      - "family has a stable canonical and broad unresolved sibling risk"
+      - "family has not already saturated the widespread clone threshold"
+  runtime-safe:
+    allowed_only_when:
+      - "run_metadata.runtime_approval.enabled == true"
+      - "run_metadata.runtime_approval.target_environment is not null"
+      - "run_metadata.runtime_approval.network_allowed == true when validation requires network access"
+    otherwise:
+      - "do not assign runtime-safe"
+      - "assign parked, clonehunt, or canonical-gap-fill instead"
+    when:
+      - "family has one or more high-confidence findings that would materially benefit from safe validation"
+  parked:
+    when:
+      - "family lacks high-signal next work for the upcoming batch"
+    behavior:
+      - "skip family run in next batch"
+      - "carry forward prior structured state"
+      - "record parked status in the next batch manifest"
+  post-fix-resweep:
+    when:
+      - "remediation is present and the family owns still-open or recently-fixed findings"
+
+required_outputs:
+  - "${RUN_DIR}/state/finding-inventory.jsonl"
+  - "${RUN_DIR}/state/rejected-claims.jsonl"
+  - "${RUN_DIR}/state/coverage-units.jsonl"
+  - "${RUN_DIR}/state/chain-inventory.jsonl"
+  - "${RUN_DIR}/state/profile-feedback.jsonl"
+  - "${RUN_DIR}/state/family-directives.yaml"
+  - "${RUN_DIR}/state/family-scope-map.yaml"
+  - "${RUN_DIR}/state/profile-adjustments.yaml"
+  - "${RUN_DIR}/state/shared-context-summary.md"
+  - "${RUN_DIR}/state/run-events.jsonl"
+
+finalization_rules:
+  pre_fix_report:
+    when: "after reducer-04"
+    outputs:
+      - "${RUN_DIR}/final/pre-fix-findings.md"
+      - "${RUN_DIR}/final/pre-fix-summary.md"
+  post_fix_addendum:
+    when: "after reducer-05"
+    outputs:
+      - "${RUN_DIR}/final/post-fix-verification.md"

@@ -1,0 +1,54 @@
+version: 2
+name: auditlanes-preflight
+
+mission: "Initialize run state and structured ledgers from the calibrated project profile before concurrent family work begins."
+
+inputs:
+  repo_root: "."
+  lead_sources:
+    - "auditlanes-codex"
+    - "auditlanes-claude"
+    - "secreport"
+  family_catalog: "${PROTOCOL_ROOT}/agentteams.yaml"
+  project_security_profile: "${RUN_DIR}/state/project-security-profile.yaml"
+  attack_surface_inventory: "${RUN_DIR}/state/attack-surface-inventory.jsonl"
+  family_scope_map: "${RUN_DIR}/state/family-scope-map.yaml"
+  excluded_roots: "${RUN_DIR}/state/excluded-roots.yaml"
+  state_model: "${PROTOCOL_ROOT}/state-model.yaml"
+  execution_safety_policy: "${PROTOCOL_ROOT}/execution-safety-policy.md"
+  lead_source_contract: "${PROTOCOL_ROOT}/lead-source-contract.yaml"
+  protocol_identity: "${PROTOCOL_ROOT}/protocol-identity.yaml"
+
+tasks:
+  - "Verify the run directory created by run-init exists under ${RUN_DIR}"
+  - "Augment run metadata created by run-init with branch or environment details discovered during preflight"
+  - "Validate that project calibration outputs exist before initializing family work"
+  - "Initialize empty structured ledgers from the state model"
+  - "Import calibrated attack-surface inventory into coverage units"
+  - "Seed coverage units for each family from family-scope-map.yaml"
+  - "Mark ambiguous or unowned source roots from calibration for early review"
+  - "Record excluded roots so family agents do not rescan generated, vendor, cache, or prior-output content"
+  - "Import prior confirmed/candidate/rejected claims from lead sources as lead records only"
+  - "Initialize an empty shared-context-summary.md"
+  - "Initialize an empty profile-feedback.jsonl"
+  - "Initialize an empty run-events.jsonl for reducer and lane operational events"
+  - "Initialize family-directives.yaml with batch-01 canonical-sweep directives for all six canonical families"
+
+required_outputs:
+  - "${RUN_DIR}/state/run-metadata.yaml"
+  - "${RUN_DIR}/state/coverage-units.jsonl"
+  - "${RUN_DIR}/state/finding-inventory.jsonl"
+  - "${RUN_DIR}/state/rejected-claims.jsonl"
+  - "${RUN_DIR}/state/chain-inventory.jsonl"
+  - "${RUN_DIR}/state/profile-feedback.jsonl"
+  - "${RUN_DIR}/state/run-events.jsonl"
+  - "${RUN_DIR}/state/family-directives.yaml"
+  - "${RUN_DIR}/state/shared-context-summary.md"
+
+notes:
+  - "Preflight is serial and reducer-owned."
+  - "Coverage units should be concrete enough to measure progress later."
+  - "Lead imports must not become confirmed findings without fresh review."
+  - "Calibration output is the scope authority for batch 1."
+  - "Batch 1 always runs all six canonical families; low-applicability families emit short no-signal reports unless explicitly disabled by operator policy."
+  - "Repo docs may be used as hints only when calibration cited code, config, manifest, or repository-structure evidence."

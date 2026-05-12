@@ -1,0 +1,72 @@
+{
+  "schema_version": 2,
+  "sidecar_id": "sidecar-object-auth-candidate-001",
+  "generated_at": "2026-05-11T00:00:01Z",
+  "run_id": "run-candidate-dupes",
+  "batch_id": "batch-01",
+  "family": "object-auth",
+  "mode": "canonical-sweep",
+  "profile": "security",
+  "profile_version": "0.4.7",
+  "baseline_commit": null,
+  "reviewed_artifacts": [
+    "src/api/orders.py"
+  ],
+  "reviewed_files_routes_helpers": [
+    "src/api/orders.py:10"
+  ],
+  "shared_context_inputs": [],
+  "coverage_units_touched": [
+    "object-auth.orders"
+  ],
+  "coverage_units_not_touched": [],
+  "patterns_searched": [
+    "order_id"
+  ],
+  "intentionally_excluded": [],
+  "confirmed_findings": [],
+  "candidate_findings": [
+    {
+      "candidate_id": "CAND-object-auth-001",
+      "candidate_dedupe_key": {
+        "proposed_owner_family": "object-auth",
+        "summary": "Order lookup may trust caller-supplied order id.",
+        "files": [
+          "src/api/orders.py"
+        ],
+        "suspected_missing_guard": "missing ownership check",
+        "impact_boundary": "cross-account order read"
+      },
+      "proposed_owner_family": "object-auth",
+      "severity": "medium",
+      "confidence": "probable",
+      "summary": "Order lookup may trust caller-supplied order id.",
+      "entrypoint": "OrderView.get",
+      "impact_boundary": "cross-account order read",
+      "suspected_missing_guard": "missing ownership check",
+      "blocker_to_confirmation": "Indirect policy helper needs review.",
+      "files": [
+        "src/api/orders.py"
+      ],
+      "evidence_refs": [
+        {
+          "path": "src/api/orders.py",
+          "line_start": 12,
+          "line_end": 34,
+          "symbol": "OrderView.get",
+          "evidence_type": "missing-ownership-check",
+          "snippet_hash": "sha256:candidate2",
+          "rationale": "The object-auth lane saw the same unresolved ownership guard question."
+        }
+      ],
+      "lead_source_refs": []
+    }
+  ],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "next_batch_recommendations": []
+}

@@ -1,0 +1,257 @@
+version: 0.4.7
+name: auditlanes
+
+target_directory: "auditlanes"
+
+resource_roots:
+  core: "resources/core"
+  profile_catalog: "resources/profiles/catalog.yaml"
+  profiles: "resources/profiles"
+  repo_scaffold: "resources/repo-scaffold/auditlanes"
+  adapters: "resources/adapters"
+
+product_shape:
+  protocol: "AuditLanes profile-aware protocol beta; security is the stable bundled profile"
+  preferred_interface: "host-specific Claude Code and Codex plugin skills"
+  current_release:
+    - "Claude Code and Codex plugin manifests"
+    - "host-specific Claude Code and Codex skill entrypoints"
+    - "bundled security profile"
+    - "profile-derived lane validation"
+    - "experimental architecture profile metadata"
+    - "agent/reducer contract files"
+    - "executable JSON Schema for report sidecars and batch manifests"
+    - "minimal validate-run script"
+    - "minimal deterministic reduce-run script"
+    - "sample validation fixtures and compatibility tests"
+    - "optional repo-local scaffold payload"
+  planned_companion_cli:
+    - "install"
+    - "doctor"
+    - "upgrade"
+    - "clean"
+    - "validate-run"
+    - "prompt"
+
+default_install:
+  default_profile: "security"
+  plugin_scope: "user"
+  repo_footprint: "none until a scan writes auditlanes/out or the operator requests repo-local scaffolding"
+  root_adapters: "optional"
+  raw_skill: "development fallback"
+  project_skill: "optional fallback"
+
+execution_modes:
+  default: "single-session"
+  preferred_for_large_claude_code_runs: "agent-team"
+  claude_code_agent_team_enable_hint: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude"
+  supported:
+    - "single-session"
+    - "subagent"
+    - "agent-team"
+  notes:
+    - "single-session runs family lanes sequentially and is the reliable default."
+    - "subagent mode may isolate family reviews when the host agent supports it."
+    - "agent-team mode means native Claude Code agent teams with a lead, teammates, shared task list, and direct teammate messaging."
+    - "agent-team mode has a hard activation gate before run-init; lead-session todo lists or subagent tasks are not accepted as a native team."
+    - "When requested agent-team mode is unavailable, the lead must stop and ask before falling back."
+    - "Subagent and agent-team modes must not broaden the parent session sandbox, approval, runtime, or network posture."
+
+validator_status:
+  current_release: "minimal-script"
+  executable_schemas:
+    - "resources/schemas/report-sidecar.schema.json"
+    - "resources/schemas/batch-manifest.schema.json"
+  script: "scripts/validate_run.py"
+  note: "A packaged auditlanes CLI command is still planned; v0.4.7 ships a direct profile-aware validator script."
+
+reducer_status:
+  current_release: "minimal-script"
+  script: "scripts/reduce_run.py"
+  implemented:
+    - "stable finding and root-cause IDs"
+    - "atomic state rewrites"
+    - "candidate dedupe"
+    - "reducer event log"
+    - "same-ID status transition guard"
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.7 reduces valid sidecars into deterministic state files."
+
+profile_status:
+  implemented:
+    - "security"
+  experimental_metadata:
+    - "architecture"
+  planned:
+    - "performance"
+    - "reliability"
+    - "migration"
+    - "privacy"
+
+managed_files:
+  - "AGENT.md"
+  - "README.md"
+  - "orchestrator.yaml"
+  - "run-init.yaml"
+  - "project-calibration.yaml"
+  - "variables.yaml"
+  - "agentteams.yaml"
+  - "preflight.yaml"
+  - "reducer.yaml"
+  - "state-model.yaml"
+  - "report-sidecar-schema.yaml"
+  - "batch-manifest-schema.yaml"
+  - "report-template.md"
+  - "final-report-template.md"
+  - "protocol-identity.yaml"
+  - "lead-source-contract.yaml"
+  - "runtime-policy.md"
+  - "execution-safety-policy.md"
+  - "profiles/default.yaml"
+  - "out/.gitignore"
+
+mutable_files:
+  - "profiles/project.yaml"
+
+generated_roots:
+  - "out/"
+
+plugin_files:
+  - "LICENSE"
+  - "package-manifest.yaml"
+  - ".claude-plugin/plugin.json"
+  - ".codex-plugin/plugin.json"
+  - "skills/scan/SKILL.md"
+  - "codex-skills/auditlanes/SKILL.md"
+  - "resources/core/profile-loading.md"
+  - "resources/profiles/catalog.yaml"
+  - "resources/profiles/security/profile.yaml"
+  - "resources/profiles/security/lanes.yaml"
+  - "resources/profiles/architecture/profile.yaml"
+  - "resources/profiles/architecture/lanes.yaml"
+  - "resources/profiles/architecture/README.md"
+  - "resources/schemas/report-sidecar.schema.json"
+  - "resources/schemas/batch-manifest.schema.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/manifest.yaml"
+  - "resources/fixtures/valid/run-good/reports/batch-01/session-auth/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/session-auth/report.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/object-auth/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/object-auth/report.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/role-matrix/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/role-matrix/report.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/data-surfaces/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/data-surfaces/report.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/integration-trust/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/integration-trust/report.json"
+  - "resources/fixtures/valid/run-good/reports/batch-01/platform-posture/report.md"
+  - "resources/fixtures/valid/run-good/reports/batch-01/platform-posture/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/manifest.yaml"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/session-auth/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/session-auth/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/object-auth/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/object-auth/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/role-matrix/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/role-matrix/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/data-surfaces/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/data-surfaces/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/integration-trust/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/integration-trust/report.json"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/platform-posture/report.md"
+  - "resources/fixtures/valid/run-candidate-dupes/reports/batch-01/platform-posture/report.json"
+  - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/manifest.yaml"
+  - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/session-auth/report.md"
+  - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/session-auth/report.json"
+  - "scripts/validate_run.py"
+  - "scripts/reduce_run.py"
+  - "tests/test_validate_run.py"
+  - "tests/test_sidecar_compat.py"
+  - "tests/test_reducer_idempotency.py"
+  - "tests/test_reduce_run.py"
+  - "tests/test_claude_skill_contract.py"
+  - "tests/test_scaffold_yaml.py"
+  - "resources/adapters/AGENTS.md"
+  - "resources/adapters/AGENTS.override.md"
+  - "resources/adapters/CLAUDE.md"
+  - "resources/adapters/CLAUDE.local.md"
+  - "resources/adapters/claude-skill/SKILL.md"
+  - "resources/adapters/codex-skill/SKILL.md"
+  - "resources/repo-scaffold/auditlanes/AGENT.md"
+  - "resources/repo-scaffold/auditlanes/README.md"
+  - "resources/repo-scaffold/auditlanes/orchestrator.yaml"
+  - "resources/repo-scaffold/auditlanes/run-init.yaml"
+  - "resources/repo-scaffold/auditlanes/project-calibration.yaml"
+  - "resources/repo-scaffold/auditlanes/variables.yaml"
+  - "resources/repo-scaffold/auditlanes/agentteams.yaml"
+  - "resources/repo-scaffold/auditlanes/preflight.yaml"
+  - "resources/repo-scaffold/auditlanes/reducer.yaml"
+  - "resources/repo-scaffold/auditlanes/state-model.yaml"
+  - "resources/repo-scaffold/auditlanes/report-sidecar-schema.yaml"
+  - "resources/repo-scaffold/auditlanes/batch-manifest-schema.yaml"
+  - "resources/repo-scaffold/auditlanes/report-template.md"
+  - "resources/repo-scaffold/auditlanes/final-report-template.md"
+  - "resources/repo-scaffold/auditlanes/protocol-identity.yaml"
+  - "resources/repo-scaffold/auditlanes/lead-source-contract.yaml"
+  - "resources/repo-scaffold/auditlanes/runtime-policy.md"
+  - "resources/repo-scaffold/auditlanes/execution-safety-policy.md"
+  - "resources/repo-scaffold/auditlanes/profiles/default.yaml"
+  - "resources/repo-scaffold/auditlanes/profiles/project.yaml"
+  - "resources/repo-scaffold/auditlanes/out/.gitignore"
+
+adapter_templates:
+  codex:
+    committed: "resources/adapters/AGENTS.md"
+    local: "resources/adapters/AGENTS.override.md"
+  claude:
+    committed: "resources/adapters/CLAUDE.md"
+    local: "resources/adapters/CLAUDE.local.md"
+  skills:
+    codex: "resources/adapters/codex-skill/SKILL.md"
+    claude: "resources/adapters/claude-skill/SKILL.md"
+
+claude_plugin:
+  manifest: ".claude-plugin/plugin.json"
+  primary_skill: "skills/scan/SKILL.md"
+  slash_command: "/auditlanes:scan"
+  bundled_protocol_root: "resources/repo-scaffold/auditlanes"
+  install_hint: "/plugin install auditlanes@<marketplace>"
+  reload_hint: "/reload-plugins"
+
+codex_plugin:
+  manifest: ".codex-plugin/plugin.json"
+  primary_skill: "codex-skills/auditlanes/SKILL.md"
+  bundled_protocol_root: "resources/repo-scaffold/auditlanes"
+  install_hint: "codex plugin marketplace add <marketplace>, then install or enable AuditLanes from the plugin browser"
+
+cli:
+  status: "planned-packaged-cli"
+  available_commands:
+    - "python3 plugins/auditlanes/scripts/validate_run.py <run_dir>"
+    - "python3 plugins/auditlanes/scripts/reduce_run.py <run_dir>"
+  planned_commands:
+    - "auditlanes plugin hint"
+    - "auditlanes install-claude-plugin --scope user"
+    - "auditlanes install-codex-plugin --scope user"
+    - "auditlanes install-claude-skill --scope user"
+    - "auditlanes init . --minimal"
+    - "auditlanes doctor ."
+    - "auditlanes validate-run auditlanes/out/runs/<run_id>"
+    - "auditlanes clean . --keep-reports"
+    - "auditlanes upgrade ."
+
+known_limitations:
+  - "v0.4.7 bundles only the security profile as a stable runnable profile."
+  - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable against the security report schema."
+  - "YAML contract files remain agent/reducer guidance; executable JSON Schema currently covers report sidecars and batch manifests; validate_run.py adds profile-specific semantic checks."
+  - "The reducer implementation imports confirmed findings, candidates, rejected claims, profile feedback, and chain candidates; it does not yet process coverage, runtime updates, clone maps, next-batch directives, final reports, or scope mutation."
+  - "A packaged auditlanes CLI command is not included in this repository snapshot."
+  - "Stable non-security profiles require profile-specific report contracts and reducer semantics before use."
+
+upgrade_rules:
+  - "Replace managed files that are unchanged from the previously installed version."
+  - "Write .new files or show diffs for locally edited managed files."
+  - "Never overwrite profiles/project.yaml."
+  - "Never touch auditlanes/out/."
+  - "Update root adapter managed blocks idempotently."
+
+release_rules:
+  - "Bump .claude-plugin/plugin.json version and .codex-plugin/plugin.json version on every published marketplace release."
+  - "Keep package-manifest.yaml version aligned with platform plugin manifest versions."

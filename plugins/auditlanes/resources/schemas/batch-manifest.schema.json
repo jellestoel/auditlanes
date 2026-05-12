@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/batch-manifest.schema.json",
+  "title": "AuditLanes batch manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "batch_id",
+    "generated_at",
+    "producer",
+    "manifest_status",
+    "expected_families",
+    "families"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "batch_id": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "generated_at": { "type": "string", "minLength": 1, "format": "date-time" },
+    "producer": { "type": "string", "minLength": 1 },
+    "manifest_status": {
+      "enum": ["completed", "completed-with-failures", "incomplete"]
+    },
+    "expected_families": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "families": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/familyItem" }
+    }
+  },
+  "$defs": {
+    "mode": {
+      "enum": [
+        "canonical-sweep",
+        "canonical-gap-fill",
+        "clonehunt",
+        "runtime-safe",
+        "post-fix-resweep",
+        "exploit-synthesis",
+        "parked"
+      ]
+    },
+    "status": {
+      "enum": ["ran", "parked", "failed", "missing"]
+    },
+    "familyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "status", "mode"],
+      "properties": {
+        "family": { "type": "string", "minLength": 1 },
+        "status": { "$ref": "#/$defs/status" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "markdown": { "type": "string" },
+        "json": { "type": "string" },
+        "carried_forward_from": { "type": ["string", "null"] },
+        "failure_reason": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

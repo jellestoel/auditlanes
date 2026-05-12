@@ -1,0 +1,7 @@
+version: 1
+id: security
+status: stable
+implemented: true
+lane_source: lanes.yaml
+description: "Authentication, authorization, data exposure, trust boundary, and platform security audit profile."
+default_execution_mode: single-session

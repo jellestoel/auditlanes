@@ -1,0 +1,19 @@
+version: 1
+profile: architecture
+lanes:
+  - id: module-boundaries
+    owns: "Layering, package boundaries, import direction, and dependency cycles."
+  - id: dependency-graph
+    owns: "Internal/external dependency shape, coupling hotspots, and dependency ownership."
+  - id: domain-model
+    owns: "Entity modeling, duplicated concepts, aggregate boundaries, and domain vocabulary drift."
+  - id: api-contracts
+    owns: "Public interfaces, route contracts, RPC/GraphQL contracts, and client/server drift."
+  - id: state-and-side-effects
+    owns: "Mutation paths, transaction boundaries, global state, and hidden side effects."
+  - id: platform-and-build
+    owns: "Build system, packaging, generated artifacts, deployment shape, and local developer workflow."
+specialists:
+  - id: architecture-synthesis
+    owns: "Cross-lane architecture risk synthesis."
+    mode: impact-synthesis

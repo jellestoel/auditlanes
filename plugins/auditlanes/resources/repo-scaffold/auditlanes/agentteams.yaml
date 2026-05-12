@@ -1,0 +1,306 @@
+version: 3
+catalog: auditlanes-agentteams
+
+shared_report_contract:
+  template: "${PROTOCOL_ROOT}/report-template.md"
+  requirements:
+    - "Each non-parked run must emit report.md and report.json."
+    - "report.md is a required family audit artifact, not an optional summary file."
+    - "Each finding must declare owner_family, provisional_finding_id, dedupe_key, status, severity, confidence, and evidence_refs."
+    - "confirmed finding dedupe_key values must mirror the parent finding owner_family, security_invariant, missing_guard, entrypoint, and impact_boundary fields exactly."
+    - "candidate_dedupe_key values must mirror the parent candidate proposed_owner_family, summary, files, suspected_missing_guard, and impact_boundary fields exactly."
+    - "Families may leave finding_id and root_cause_id null; reducer owns final stable IDs."
+    - "Each finding must reference calibrated scope, coverage units, or an explicit profile gap."
+    - "Clonehunt work must reference a canonical exemplar when possible."
+    - "Runtime-safe work updates an existing finding unless a new root cause is clearly discovered."
+    - "Coverage gaps must be explicit, not implied."
+    - "If more than 10 clones of the same canonical exist, report at most 5 exemplars and mark the pattern as widespread."
+    - "Profile corrections must be reported as profile_feedback, not silently applied by family agents."
+    - "For cross-lane profile feedback, family is the reporting family and affected_families lists impacted lanes."
+
+scope_sources:
+  generic_catalog: "${PROTOCOL_ROOT}/agentteams.yaml"
+  generated_project_profile: "${RUN_DIR}/state/project-security-profile.yaml"
+  generated_family_scope_map: "${RUN_DIR}/state/family-scope-map.yaml"
+  project_profile_template: "${PROTOCOL_ROOT}/profiles/project.yaml"
+  optional_operator_project_profile: "${TARGET_ROOT}/auditlanes/profiles/project.yaml"
+
+ownership_rules:
+  principle: "One family owns the root cause. Other families may attach clone, chain, profile-feedback, or runtime context."
+  reference_types:
+    - "canonical"
+    - "clone"
+    - "related"
+    - "runtime-update"
+    - "chain-link"
+    - "profile-feedback"
+  root_cause_boundaries:
+    session-auth: "Identity establishment, session validity, token/cookie posture, CSRF enforcement, browser-readable auth material, session lifecycle, and authentication boundary bypass."
+    object-auth: "Caller-supplied identity, tenant, account, organization, or object selection trusted without adequate target-object authorization."
+    role-matrix: "Role, permission, policy, or capability gating failures where the broken invariant is who may access the route, command, mutation, or action."
+    data-surfaces: "Broken invariant is the data sink or route surface itself: file/blob/proxy/render/search/export/download/delete/upload exposure."
+    integration-trust: "Broken invariant is trust in an external caller, callback, webhook, state token, shared secret, queue message, or third-party integration boundary."
+    platform-posture: "Broken invariant is in dependency, CI/CD, IaC, container, async platform, namespace, logging, secrets/config, package publishing, or deployment posture."
+
+families:
+  - id: session-auth
+    generic_seed_hints:
+      - "auth/session middleware"
+      - "login/logout/session refresh endpoints"
+      - "cookie, JWT, OAuth, API key, and token handling"
+      - "CSRF middleware and mutating browser routes"
+      - "password reset, magic link, invitation, and account binding flows"
+    subdomains:
+      - "session validity"
+      - "cookie/session settings"
+      - "token issuance, refresh, and revocation"
+      - "session rebinding and auth oracles"
+      - "browser-readable auth material"
+      - "CSRF posture"
+    generic_priority_patterns:
+      - "session"
+      - "cookie"
+      - "csrf"
+      - "jwt"
+      - "token"
+      - "refresh"
+      - "logout"
+      - "password_reset"
+      - "magic_link"
+      - "api_key"
+    coverage_units:
+      - "auth/session helpers"
+      - "session-bearing browser routes"
+      - "auth endpoints and callbacks"
+      - "token issuance and refresh flows"
+      - "CSRF-protected mutating endpoints"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+  - id: object-auth
+    generic_seed_hints:
+      - "API handlers that accept object identifiers"
+      - "model loading and repository helpers"
+      - "tenant, account, organization, project, location, and owner scoping"
+      - "read, write, export, delete, or transfer endpoints with foreign-key reach"
+    subdomains:
+      - "caller-supplied object identifiers"
+      - "cross-user or cross-tenant reads"
+      - "cross-object mutation"
+      - "tenant, organization, location, or account ownership checks"
+      - "helper functions that deserialize or resolve identity"
+    generic_priority_patterns:
+      - "id"
+      - "uuid"
+      - "key"
+      - "slug"
+      - "tenant_id"
+      - "org_id"
+      - "account_id"
+      - "owner_id"
+      - "user_id"
+      - "get_object"
+      - "find_by"
+      - "resolve"
+    coverage_units:
+      - "mutating endpoints with object identifiers"
+      - "read endpoints with foreign-key reach"
+      - "shared object-resolution helpers"
+      - "tenant or organization scoping helpers"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+  - id: role-matrix
+    generic_seed_hints:
+      - "admin routes and privileged UI actions"
+      - "policy, permission, guard, decorator, and middleware code"
+      - "role assignment and invitation flows"
+      - "debug, support, billing, moderation, and operations surfaces"
+    subdomains:
+      - "permission class drift"
+      - "valid-session fallback on sensitive actions"
+      - "page, route, resolver, or command gates"
+      - "developer, admin, support, tenant, or user scope mismatches"
+      - "privilege assignment and escalation paths"
+    generic_priority_patterns:
+      - "permission"
+      - "policy"
+      - "guard"
+      - "role"
+      - "admin"
+      - "superuser"
+      - "is_admin"
+      - "is_owner"
+      - "can_"
+      - "authorize"
+    coverage_units:
+      - "API permission families"
+      - "admin and support surfaces"
+      - "legacy page views or server-rendered privileged routes"
+      - "role assignment and privilege transition flows"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+  - id: data-surfaces
+    generic_seed_hints:
+      - "file, blob, object storage, media, attachment, and export routes"
+      - "rendering, templating, markdown, HTML, PDF, CSV, and document generation sinks"
+      - "search, filter, query builder, import, delete, and bulk operation surfaces"
+      - "proxy, fetch, redirect, URL preview, and server-side request surfaces"
+    subdomains:
+      - "blob/file serving"
+      - "download, export, import, and delete routes"
+      - "external file or URL proxy"
+      - "render sinks"
+      - "search/query builders"
+      - "upload and attachment surfaces"
+    generic_priority_patterns:
+      - "blob"
+      - "file"
+      - "download"
+      - "upload"
+      - "export"
+      - "import"
+      - "delete"
+      - "render"
+      - "html"
+      - "safe"
+      - "query"
+      - "search"
+      - "proxy"
+      - "redirect"
+    coverage_units:
+      - "file-serving route families"
+      - "upload and attachment route families"
+      - "external-content render sinks"
+      - "search helpers and query builders"
+      - "download/export/delete side-effect routes"
+      - "proxy, redirect, or server-side fetch surfaces"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+  - id: integration-trust
+    generic_seed_hints:
+      - "webhooks, callbacks, and public integration endpoints"
+      - "OAuth, OIDC, SAML, payment, email, SMS, queue, and object-storage integrations"
+      - "shared-secret, signature, state, nonce, replay, and idempotency handling"
+      - "outbound sync, refresh, ingestion, and third-party API clients"
+    subdomains:
+      - "public callbacks"
+      - "oauth, oidc, and saml binding and state"
+      - "webhook signature and replay handling"
+      - "shared-secret public operations endpoints"
+      - "credentialed outbound refresh or sync"
+      - "queue and message trust boundaries"
+    generic_priority_patterns:
+      - "callback"
+      - "webhook"
+      - "signature"
+      - "secret"
+      - "state"
+      - "nonce"
+      - "oauth"
+      - "oidc"
+      - "saml"
+      - "payment"
+      - "stripe"
+      - "queue"
+      - "message"
+      - "requests."
+      - "fetch"
+    coverage_units:
+      - "webhook and callback route families"
+      - "oauth, oidc, or saml flows"
+      - "public operations or integration endpoints"
+      - "third-party API clients and sync jobs"
+      - "queue consumers and message handlers"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+  - id: platform-posture
+    generic_seed_hints:
+      - "dependency manifests and lockfiles"
+      - "package-manager scripts and package publishing metadata"
+      - "CI/CD workflows, deployment config, Dockerfiles, Kubernetes, Terraform, and cloud config"
+      - "background jobs, scheduled tasks, queues, and worker entrypoints"
+      - "logging, secrets, environment config, and security headers"
+    subdomains:
+      - "dependency manifests and lockfiles"
+      - "known vulnerable dependency patterns"
+      - "package publishing and install scripts"
+      - "CI/CD secrets and permissions"
+      - "Dockerfile and container posture"
+      - "IaC and cloud configuration"
+      - "committed secrets"
+      - "logging exposure"
+      - "deployment security headers and config"
+      - "task, cron, worker, and deferred trust boundaries"
+    generic_priority_patterns:
+      - "GITHUB_TOKEN"
+      - "permissions:"
+      - "pull_request_target"
+      - "postinstall"
+      - "preinstall"
+      - "curl | sh"
+      - "docker.sock"
+      - "privileged: true"
+      - "AWS_"
+      - "SECRET"
+      - "TOKEN"
+      - "PRIVATE_KEY"
+      - "Authorization"
+      - "ALLOWED_HOSTS"
+      - "SecurityMiddleware"
+      - "CORS"
+      - "X-Forwarded"
+      - "pickle.loads"
+    coverage_units:
+      - "dependency manifests and lockfiles"
+      - "package scripts and publishing metadata"
+      - "CI/CD workflows"
+      - "container and deployment manifests"
+      - "IaC and cloud configuration"
+      - "task, cron, and worker entrypoints"
+      - "request/task logging paths"
+      - "config, secrets, CORS, and security headers"
+    preferred_modes:
+      - canonical-sweep
+      - canonical-gap-fill
+      - clonehunt
+      - runtime-safe
+      - parked
+      - post-fix-resweep
+
+specialists:
+  - id: exploit-synthesis
+    inputs:
+      - "finding inventory"
+      - "chain inventory"
+      - "shared context summary"
+      - "coverage inventory"
+    mission: "Build cross-family exploit chains, harden severity, and propose regression-test priorities without reopening clone mapping."

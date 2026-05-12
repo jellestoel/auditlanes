@@ -1,0 +1,61 @@
+version: 1
+name: auditlanes-run-init
+
+mission: "Create the run identity and initial output directory before calibration."
+
+inputs:
+  repo_root: "."
+  variable_contract: "${PROTOCOL_ROOT}/variables.yaml"
+  requested_run_id: "${RUN_ID}"
+  baseline_commit: "${BASELINE_COMMIT}"
+  target_environment: "${TARGET_ENV}"
+
+tasks:
+  - "Resolve protocol variables according to ${PROTOCOL_ROOT}/variables.yaml."
+  - "If RUN_ID was provided by the operator or CLI, validate it is safe for a path segment."
+  - "If RUN_ID was not provided, create a stable run ID for this invocation."
+  - "If ${RUN_DIR} already exists, stop unless the operator explicitly requested resume."
+  - "Create ${OUTPUT_ROOT}/.gitignore if absent with rules that ignore generated output but keep the placeholder file."
+  - "Create ${RUN_DIR}/state."
+  - "Write initial run metadata before project calibration starts."
+  - "Initialize runtime_approval.enabled=false unless the operator explicitly approved a target runtime environment."
+
+required_outputs:
+  - "${OUTPUT_ROOT}/.gitignore"
+  - "${RUN_DIR}/state/run-metadata.yaml"
+
+run_metadata_fields:
+  - schema_version
+  - run_id
+  - created_at
+  - repo_root
+  - baseline_commit
+  - target_environment
+  - invocation_mode
+  - protocol_source
+  - protocol_root
+  - output_root
+  - run_dir
+  - runtime_approval
+
+default_runtime_approval:
+  enabled: false
+  target_environment: null
+  allowed_request_classes: []
+  network_allowed: false
+  credential_posture: null
+
+run_id_policy:
+  allowed_pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+  forbidden_values:
+    - "."
+    - ".."
+  generated_format: "run-YYYYMMDDTHHMMSSZ-<short_commit_or_nogit>-<random6>"
+  max_length: 80
+  resolved_run_dir_invariant: "Resolved RUN_DIR must be inside OUTPUT_ROOT/runs."
+  on_existing_run_dir: "error unless operator explicitly requested resume"
+
+baseline_commit_policy:
+  - "Use git rev-parse HEAD when TARGET_ROOT is a git worktree."
+  - "Use null when no git baseline exists and TARGET_ROOT was explicitly provided."
+  - "Record dirty worktree status without running hooks."

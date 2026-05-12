@@ -1,0 +1,44 @@
+schema_version: 1
+run_id: run-good
+batch_id: batch-01
+generated_at: "2026-05-11T00:00:00Z"
+producer: orchestrator
+manifest_status: completed
+expected_families:
+  - session-auth
+  - object-auth
+  - role-matrix
+  - data-surfaces
+  - integration-trust
+  - platform-posture
+families:
+  - family: session-auth
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/session-auth/report.md"
+    json: "${RUN_DIR}/reports/batch-01/session-auth/report.json"
+  - family: object-auth
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/object-auth/report.md"
+    json: "${RUN_DIR}/reports/batch-01/object-auth/report.json"
+  - family: role-matrix
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/role-matrix/report.md"
+    json: "${RUN_DIR}/reports/batch-01/role-matrix/report.json"
+  - family: data-surfaces
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/data-surfaces/report.md"
+    json: "${RUN_DIR}/reports/batch-01/data-surfaces/report.json"
+  - family: integration-trust
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/integration-trust/report.md"
+    json: "${RUN_DIR}/reports/batch-01/integration-trust/report.json"
+  - family: platform-posture
+    status: ran
+    mode: canonical-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/platform-posture/report.md"
+    json: "${RUN_DIR}/reports/batch-01/platform-posture/report.json"

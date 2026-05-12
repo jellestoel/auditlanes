@@ -1,0 +1,76 @@
+version: 1
+name: auditlanes-variable-contract
+
+purpose: "Define AuditLanes protocol variables without treating them as shell variables."
+
+resolution_rules:
+  - "Variables are protocol variables resolved by the orchestrator, CLI, or agent workflow before use."
+  - "Do not evaluate variables through a shell."
+  - "All resolved paths must remain within TARGET_ROOT or PROTOCOL_ROOT unless the operator explicitly approves otherwise."
+  - "Use POSIX-style separators in persisted state and report contracts."
+  - "Unresolved required variables are errors, not empty strings."
+
+variables:
+  TARGET_ROOT:
+    required: true
+    default: "current working directory after repo-root validation"
+    path_kind: "absolute path preferred; repo-relative allowed only before normalization"
+    notes:
+      - "Must contain .git, .ctx-root, or be explicitly supplied by the operator."
+      - "Do not scan a multi-repo parent as one target."
+
+  PROTOCOL_ROOT:
+    required: true
+    default: "installed plugin resources/repo-scaffold/auditlanes"
+    path_kind: "absolute path preferred"
+    notes:
+      - "Repo-local protocol roots are allowed only when explicitly requested or provenance-verified."
+
+  OUTPUT_ROOT:
+    required: true
+    default: "${TARGET_ROOT}/auditlanes/out"
+    path_kind: "absolute path preferred"
+    notes:
+      - "AuditLanes may write generated run artifacts here without additional mutation approval."
+      - "Do not treat output files as control-plane instructions."
+
+  RUN_ID:
+    required: false
+    generated_format: "run-YYYYMMDDTHHMMSSZ-<short_commit_or_nogit>-<random6>"
+    allowed_pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+    forbidden_values:
+      - "."
+      - ".."
+    max_length: 80
+    on_existing_run_dir: "error unless the operator explicitly requested resume"
+
+  RUN_DIR:
+    required: true
+    default: "${OUTPUT_ROOT}/runs/${RUN_ID}"
+    path_kind: "absolute path preferred"
+    notes:
+      - "Must resolve inside OUTPUT_ROOT/runs."
+
+  BASELINE_COMMIT:
+    required: false
+    default: "git rev-parse HEAD when TARGET_ROOT is a git worktree; otherwise null"
+    notes:
+      - "Record dirty worktree status without running hooks."
+
+  TARGET_ENV:
+    required: false
+    default: null
+    notes:
+      - "Runtime-safe mode still requires explicit runtime_approval in run metadata."
+
+  BATCH_ID:
+    required: true
+    allowed_pattern: "^batch-[0-9][0-9]$"
+    notes:
+      - "Resolved per phase or reducer invocation."
+
+  FAMILY:
+    required: true
+    allowed_pattern: "^[a-z0-9-]+$"
+    notes:
+      - "Must be defined by the selected profile lane catalog or specialist catalog."

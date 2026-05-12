@@ -1,0 +1,330 @@
+version: 1
+name: auditlanes-state-model
+
+statuses:
+  finding_status:
+    - lead
+    - candidate
+    - confirmed-static
+    - runtime-confirmed
+    - blocked
+    - rejected
+    - duplicate
+    - fixed
+    - reswept-open
+    - reswept-closed
+
+common_types:
+  evidence_ref:
+    fields:
+      - name: path
+        type: string
+      - name: line_start
+        type: integer
+      - name: line_end
+        type: integer_or_null
+      - name: symbol
+        type: string_or_null
+      - name: evidence_type
+        type: string
+      - name: snippet_hash
+        type: string_or_null
+      - name: rationale
+        type: string
+  structure_ref:
+    fields:
+      - name: path
+        type: string
+      - name: evidence_type
+        type: string
+      - name: rationale
+        type: string
+      - name: line_start
+        type: integer_or_null
+      - name: line_end
+        type: integer_or_null
+      - name: confidence
+        type: string_or_null
+
+records:
+  finding_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: finding_id
+        type: string
+      - name: root_cause_id
+        type: string
+      - name: id_policy_version
+        type: integer
+      - name: dedupe_key
+        type: object
+      - name: provisional_ids
+        type: string_list
+      - name: source_reports
+        type: object_list
+      - name: record_created_at
+        type: string
+      - name: record_updated_at
+        type: string
+      - name: owner_family
+        type: enum
+        values_from: selected_profile.lanes
+      - name: status
+        type: enum
+        source: finding_status
+      - name: severity
+        type: enum
+        values:
+          - critical
+          - high
+          - medium
+          - low
+          - info
+      - name: confidence
+        type: enum
+        values:
+          - certain
+          - probable
+          - speculative
+      - name: first_seen_batch
+        type: string
+      - name: last_touched_batch
+        type: string
+      - name: summary
+        type: string
+      - name: entrypoint
+        type: string_or_null
+      - name: security_invariant
+        type: string_or_null
+      - name: attacker_precondition
+        type: string_or_null
+      - name: introduced_after_batch_01
+        type: boolean
+      - name: duplicate_of
+        type: string_or_null
+      - name: clone_of
+        type: string_or_null
+      - name: related_findings
+        type: string_list
+      - name: files
+        type: string_list
+      - name: evidence_refs
+        type: evidence_ref_list
+      - name: report_refs
+        type: string_list
+      - name: lead_source_refs
+        type: string_list
+      - name: widespread_pattern
+        type: boolean
+      - name: estimated_clone_count
+        type: integer_or_null
+      - name: missing_guard
+        type: string
+      - name: impact_boundary
+        type: string
+      - name: severity_rationale
+        type: string_or_null
+      - name: candidate_blocker
+        type: string_or_null
+      - name: runtime_status
+        type: enum_or_null
+        values:
+          - confirmed-at-runtime
+          - not-reproduced
+          - blocked-by-ingress-or-environment
+          - unsafe-to-validate-without-separate-approval
+
+  rejected_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: claim_id
+        type: string
+      - name: source_family
+        type: string
+      - name: batch_id
+        type: string
+      - name: reason
+        type: string
+      - name: subsumed_by
+        type: string_or_null
+
+  coverage_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: coverage_unit_id
+        type: string
+      - name: owner_family
+        type: string
+      - name: description
+        type: string
+      - name: source_paths
+        type: string_list
+      - name: triaged
+        type: boolean
+      - name: canonical_done
+        type: boolean
+      - name: clonehunt_done
+        type: boolean
+      - name: runtime_done
+        type: boolean
+      - name: chain_done
+        type: boolean
+      - name: resweep_done
+        type: boolean
+      - name: current_gap
+        type: string_or_null
+      - name: last_touched_batch
+        type: string_or_null
+      - name: notes
+        type: string_or_null
+
+  chain_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: chain_id
+        type: string
+      - name: component_findings
+        type: string_list
+      - name: families_involved
+        type: string_list
+      - name: impact
+        type: string
+      - name: confidence
+        type: enum
+        values:
+          - certain
+          - probable
+          - speculative
+      - name: status
+        type: enum
+        values:
+          - candidate
+          - confirmed
+          - rejected
+
+  profile_feedback_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: profile_gap_id
+        type: string
+      - name: family
+        type: string
+      - name: affected_families
+        type: string_list
+      - name: observed_issue
+        type: string
+      - name: suggested_change
+        type: string
+      - name: evidence_refs
+        type: evidence_ref_list
+      - name: urgency
+        type: enum
+        values:
+          - high
+          - medium
+          - low
+      - name: reducer_status
+        type: enum
+        values:
+          - accepted
+          - rejected
+          - deferred
+      - name: reducer_reason
+        type: string_or_null
+
+  attack_surface_inventory:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: surface_id
+        type: string
+      - name: category
+        type: string
+      - name: owner_family
+        type: string
+      - name: description
+        type: string
+      - name: paths
+        type: string_list
+      - name: evidence_refs
+        type: evidence_ref_list
+
+  family_directives:
+    format: yaml
+    fields:
+      - name: schema_version
+        type: integer
+      - name: family
+        type: string
+      - name: next_mode
+        type: string
+      - name: reason
+        type: string
+      - name: priority_targets
+        type: string_list
+
+  run_events:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: event_id
+        type: string
+      - name: event_type
+        type: string
+      - name: occurred_at
+        type: string
+      - name: batch_id
+        type: string_or_null
+      - name: family
+        type: string_or_null
+      - name: severity
+        type: string
+      - name: message
+        type: string
+      - name: input_hashes
+        type: object_list
+
+status_specific_requirements:
+  lead:
+    required:
+      - schema_version
+      - status
+      - summary
+      - lead_source_refs
+  candidate:
+    required:
+      - schema_version
+      - status
+      - summary
+      - confidence
+      - candidate_blocker
+      - dedupe_key
+  confirmed-static:
+    required:
+      - schema_version
+      - finding_id
+      - root_cause_id
+      - status
+      - severity
+      - confidence
+      - missing_guard
+      - impact_boundary
+      - evidence_refs
+      - severity_rationale
+  rejected:
+    storage: "rejected_inventory"
+  duplicate:
+    required:
+      - duplicate_of

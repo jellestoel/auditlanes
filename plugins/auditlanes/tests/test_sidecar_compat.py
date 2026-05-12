@@ -1,0 +1,65 @@
+import importlib.util
+import json
+import unittest
+from pathlib import Path
+
+
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
+SCHEMA = PLUGIN_ROOT / "resources" / "schemas" / "report-sidecar.schema.json"
+SIDECAR = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good" / "reports" / "batch-01" / "session-auth" / "report.json"
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("auditlanes_validate_run", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+class SidecarCompatibilityTests(unittest.TestCase):
+    def test_valid_sidecar_matches_schema(self):
+        validator = load_validator_module()
+        sidecar = json.loads(SIDECAR.read_text(encoding="utf-8"))
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        self.assertEqual(validator.validate_schema(sidecar, schema), [])
+
+    def test_missing_schema_version_is_rejected(self):
+        validator = load_validator_module()
+        sidecar = json.loads(SIDECAR.read_text(encoding="utf-8"))
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        sidecar.pop("schema_version")
+        errors = validator.validate_schema(sidecar, schema)
+        self.assertTrue(any("schema_version" in error for error in errors), errors)
+
+    def test_specialist_mode_validation_uses_profile_catalog(self):
+        validator = load_validator_module()
+        profile = {
+            "lanes": {"module-boundaries"},
+            "specialists": {"architecture-synthesis"},
+            "specialist_modes": {"architecture-synthesis": "impact-synthesis"},
+        }
+        wrong_specialist = validator.family_mode_issue(
+            Path("manifest.yaml"),
+            "$.families[0].mode",
+            "architecture-synthesis",
+            "canonical-sweep",
+            profile,
+        )
+        self.assertIsNotNone(wrong_specialist)
+        self.assertIn("impact-synthesis", wrong_specialist.message)
+
+        wrong_lane = validator.family_mode_issue(
+            Path("manifest.yaml"),
+            "$.families[0].mode",
+            "module-boundaries",
+            "impact-synthesis",
+            profile,
+        )
+        self.assertIsNotNone(wrong_lane)
+        self.assertIn("normal lanes must not run specialist modes", wrong_lane.message)
+
+
+if __name__ == "__main__":
+    unittest.main()
