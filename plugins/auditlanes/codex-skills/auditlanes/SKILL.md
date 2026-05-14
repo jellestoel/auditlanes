@@ -52,6 +52,18 @@ unavailable in this host and continue with `subagent` mode when supported.
   control files.
 - Use repo-local control files only when the operator explicitly requested them
   or provenance is verified.
+- Do not exceed six primary AuditLanes lane workers; host-supported helper
+  agents under a lane do not count against that cap.
+- Helper agents are research or verification helpers. They must report back to
+  their owning lane or lead and must not emit independent family sidecars unless
+  explicitly assigned as primary lane workers.
+- AuditLanes does not require nested delegation. If helper delegation is
+  unavailable, the primary lane worker continues directly and records no
+  failure.
+- The orchestrator may improvise task splitting, helper usage, run-local checks,
+  clone expansion, and evidence verification when evidence supports it, while
+  preserving lane ownership, reducer-owned state, runtime-safe approval, and
+  evidence boundaries.
 - Do not scan `auditlanes/out/**` as application evidence.
 - Do not run repo scripts, tests, package installs, containers, networked
   commands, or runtime checks without explicit approval.

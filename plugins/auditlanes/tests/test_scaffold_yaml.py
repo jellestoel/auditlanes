@@ -61,10 +61,21 @@ class ScaffoldYamlTests(unittest.TestCase):
         manifest = validator.load_json_or_yaml(PLUGIN_ROOT / "package-manifest.yaml")
         self.assertEqual(manifest["execution_modes"]["default"], "agent-team")
         self.assertEqual(manifest["execution_modes"]["fallback_order"][0], "subagent")
+        self.assertEqual(manifest["execution_modes"]["primary_lane_worker_cap"], 6)
+        helper_policy = manifest["execution_modes"]["helper_agent_delegation"]
+        self.assertTrue(helper_policy["allowed_when_host_supports"])
+        self.assertTrue(helper_policy["does_not_count_against_primary_lane_worker_cap"])
+        self.assertTrue(any("subagent-spawned subagents" in item for item in helper_policy["constraints"]))
+        self.assertTrue(manifest["execution_modes"]["orchestrator_discretion"]["can_improvise"])
 
         orchestrator = validator.load_json_or_yaml(SCAFFOLD_ROOT / "orchestrator.yaml")
         default_order = orchestrator["host_execution_preferences"]["claude_code"]["default_order"]
         self.assertEqual(default_order[:2], ["agent-team", "subagent"])
+        self.assertEqual(orchestrator["policy"]["primary_lane_worker_cap"], 6)
+        self.assertTrue(orchestrator["policy"]["helper_agent_delegation"]["allowed_when_host_supports"])
+        constraints = orchestrator["policy"]["helper_agent_delegation"]["constraints"]
+        self.assertTrue(any("subagent-spawned subagents" in item for item in constraints))
+        self.assertTrue(orchestrator["policy"]["orchestrator_discretion"]["can_improvise"])
 
         profile = validator.load_json_or_yaml(PLUGIN_ROOT / "resources/profiles/security/profile.yaml")
         self.assertEqual(profile["default_execution_mode"], "agent-team")

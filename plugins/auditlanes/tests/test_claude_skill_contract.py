@@ -41,6 +41,11 @@ class ClaudeSkillContractTests(unittest.TestCase):
         self.assertIn("before any run work", text)
         self.assertIn("native team roster", text)
         self.assertIn("A lead-session", text)
+        self.assertIn("six-worker cap applies to primary AuditLanes lane owners", text)
+        self.assertIn("Helper agents are not independent", text)
+        self.assertIn("teammate-spawned teams", text)
+        self.assertIn("more than six total", text)
+        self.assertIn("orchestrator may improvise", text)
 
     def test_codex_manifest_uses_codex_specific_skill_entrypoint(self):
         manifest = json.loads((PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
