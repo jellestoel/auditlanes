@@ -10,9 +10,14 @@ allowed_modes:
   - runtime-safe
   - post-fix-resweep
   - exploit-synthesis
+batch_shape:
+  batch-01:
+    expected_families: profile_lanes
+    status: ran
+    mode: canonical-sweep
 anti_tunnel:
   universal_reportability: true
   reviewers_may_emit_out_of_lane_leads: true
   reducer_assigns_final_owner: true
-  broad_sanity_pass_required: true
-  final_adversarial_review_required: true
+  broad_sanity_pass_recommended: true
+  final_adversarial_review_recommended: true

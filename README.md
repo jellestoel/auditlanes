@@ -243,8 +243,10 @@ proof updates, `run_local_checks`, and regression recommendations. Run-local
 checks let agents preserve repo-specific security questions outside the bundled
 packs. It preserves existing state when reducing a selected batch. It emits
 basic `family-directives.yaml` guidance from incidental leads, run-local checks,
-and cross-lane triggers. It does not yet update coverage ledgers, runtime
-status, clone maps, final reports, or calibrated scope.
+and cross-lane triggers. It rewrites provisional finding/candidate references
+to reducer stable IDs where possible and keeps the strongest proof level per
+subject. It does not yet update coverage ledgers, clone maps, final reports, or
+calibrated scope.
 
 ## Contract Coverage
 
@@ -256,8 +258,9 @@ status, clone maps, final reports, or calibrated scope.
 | Overlay IDs from selected profile | yes | no |
 | Strategy-allowed sidecar modes | yes | no |
 | Cross-lane trigger notification lanes | yes | yes |
-| Batch-01 security lanes are the six profile lanes | yes | no |
-| Batch-01 lanes all ran canonical-sweep | yes | no |
+| Batch-01 shape follows selected strategy metadata | yes | no |
+| Strategies and overlays require declared state artifacts | yes | no |
+| `strategy:auto` is rejected in post-calibration sidecars | yes | no |
 | Batch-04 exploit synthesis uses the specialist | yes | no |
 | Manifest status/mode consistency, including parked families | yes | no |
 | Family/mode compatibility | yes | no |
@@ -270,8 +273,9 @@ status, clone maps, final reports, or calibrated scope.
 | Affected profile-feedback families are selected-profile lanes | yes | yes |
 | Incidental leads require evidence and normal lane owners | yes | yes |
 | Security smells import into structured state | yes | yes |
-| Proof updates import into proof ledger | yes | yes |
-| Regression recommendations import into regression plan | yes | yes |
+| Proof updates import into proof ledger with strongest-level merge | yes | yes |
+| Regression recommendations import into regression plan with stable finding IDs | yes | yes |
+| Runtime updates can update existing reducer findings | yes | yes |
 | Basic family directives from incidental leads and trigger matches | no | yes |
 | Coverage ledger updates | no | no |
 | Clone maps processed into stable state | no | no |

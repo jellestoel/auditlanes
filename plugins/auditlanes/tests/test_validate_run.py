@@ -276,6 +276,22 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("runtime-safe mode requires runtime_approval.enabled=true", result.stderr)
 
+    def test_runtime_safe_requires_metadata_approval_when_metadata_is_missing(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["mode"] = "runtime-safe"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
+        manifest.write_text(manifest.read_text(encoding="utf-8").replace("mode: canonical-sweep", "mode: runtime-safe", 1), encoding="utf-8")
+        metadata = run_copy / "state" / "run-metadata.yaml"
+        if metadata.exists():
+            metadata.unlink()
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime-safe mode requires runtime_approval.enabled=true", result.stderr)
+
     def test_normal_lane_cannot_run_exploit_synthesis(self):
         run_copy = self.copied_run()
         sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
@@ -400,6 +416,28 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("strategy 'unknown-strategy' is not defined by profile 'security'", result.stderr)
 
+    def test_auto_strategy_is_rejected_in_sidecars(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["strategy"] = "auto"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("strategy 'auto' is only valid before calibration", result.stderr)
+
+    def test_planned_strategy_is_rejected_by_default(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["strategy"] = "asvs-baseline"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("strategy 'asvs-baseline' is not runnable", result.stderr)
+
     def test_unknown_overlay_is_rejected(self):
         run_copy = self.copied_run()
         sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
@@ -410,6 +448,17 @@ class ValidateRunCliTests(unittest.TestCase):
         result = self.run_validator(run_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("overlay 'unknown-overlay' is not defined by profile 'security'", result.stderr)
+
+    def test_overlays_must_not_be_empty(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["overlays"] = []
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("overlays must contain at least one overlay id", result.stderr)
 
     def test_strategy_restricts_sidecar_mode(self):
         run_copy = self.copied_run()
@@ -524,6 +573,101 @@ class ValidateRunCliTests(unittest.TestCase):
         result = self.run_validator(run_copy)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must be greater than or equal to line_start", result.stderr)
+
+    def test_evidence_line_end_requires_line_start(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["confirmed_findings"][0]["evidence_refs"][0]["line_start"] = None
+        sidecar["confirmed_findings"][0]["evidence_refs"][0]["line_end"] = 50
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires line_start when present", result.stderr)
+
+    def test_strategy_required_state_artifacts_are_enforced(self):
+        run_copy = self.copied_run()
+        (run_copy / "state" / "proof-ledger.jsonl").unlink()
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("required state artifact is missing", result.stderr)
+        self.assertIn("proof-ledger.jsonl", result.stderr)
+
+    def test_required_state_artifacts_are_schema_validated(self):
+        run_copy = self.copied_run()
+        (run_copy / "state" / "security-invariants.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "invariant_id": "INV-bad",
+        }) + "\n", encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("security-invariants.jsonl", result.stderr)
+        self.assertIn("missing required property", result.stderr)
+
+    def test_attack_surface_inventory_uses_inventory_schema(self):
+        run_copy = self.copied_run()
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        profiles_dir = Path(tmp.name) / "profiles"
+        shutil.copytree(PLUGIN_ROOT / "resources" / "profiles", profiles_dir)
+        strategy_path = profiles_dir / "security" / "strategies" / "invariant-audit.yaml"
+        strategy_path.write_text(
+            strategy_path.read_text(encoding="utf-8").replace(
+                "  - state/attack-surface-graph.jsonl\n",
+                "  - state/attack-surface-graph.jsonl\n  - state/attack-surface-inventory.jsonl\n",
+                1,
+            ),
+            encoding="utf-8",
+        )
+        (run_copy / "state" / "attack-surface-inventory.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "surface_id": "surface-web-checkout",
+            "category": "web-route",
+            "owner_family": "object-auth",
+            "description": "Checkout route accepts user input.",
+            "paths": ["src/api/checkout.py"],
+            "evidence_refs": [],
+        }) + "\n", encoding="utf-8")
+
+        result = self.run_validator(run_copy, "--profiles-dir", str(profiles_dir))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_diff_review_batch_01_can_use_relevant_lane_subset(self):
+        run_copy = self.copied_run()
+        manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
+        manifest.write_text(
+            "\n".join([
+                "schema_version: 1",
+                "run_id: run-good",
+                "batch_id: batch-01",
+                'generated_at: "2026-05-11T00:00:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - session-auth",
+                "families:",
+                "  - family: session-auth",
+                "    status: ran",
+                "    mode: canonical-sweep",
+                '    markdown: "${RUN_DIR}/reports/batch-01/session-auth/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-01/session-auth/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+        for family_dir in (run_copy / "reports" / "batch-01").iterdir():
+            if family_dir.is_dir() and family_dir.name != "session-auth":
+                shutil.rmtree(family_dir)
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["strategy"] = "diff-review"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_profile_version_must_match_package_version_when_present(self):
         run_copy = self.copied_run()

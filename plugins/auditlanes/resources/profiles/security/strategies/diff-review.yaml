@@ -8,6 +8,10 @@ allowed_modes:
   - canonical-gap-fill
   - clonehunt
   - runtime-safe
+batch_shape:
+  batch-01:
+    expected_families: changed_relevant_lanes
+    status: ran
 anti_tunnel:
   universal_reportability: true
   reviewers_may_emit_out_of_lane_leads: true

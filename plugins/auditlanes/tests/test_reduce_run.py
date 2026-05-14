@@ -263,6 +263,7 @@ class ReduceRunTests(unittest.TestCase):
         self.assertEqual(proof[0]["proof_level"], "P0-lead")
         regression = read_jsonl(run_copy / "state" / "regression-plan.jsonl")
         self.assertRegex(regression[0]["regression_id"], r"^REG-[0-9a-f]{12}$")
+        self.assertRegex(regression[0]["finding_id"], r"^F-session-auth-[0-9a-f]{12}$")
         local_checks = read_jsonl(run_copy / "state" / "run-local-checks.jsonl")
         self.assertEqual(local_checks[0]["check_id"], "local.invoice-export-state")
         directives_text = (run_copy / "state" / "family-directives.yaml").read_text(encoding="utf-8")
@@ -274,6 +275,107 @@ class ReduceRunTests(unittest.TestCase):
         self.assertTrue(any(event["event_type"] == "out-of-lane-lead-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "run-local-check-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "cross-lane-trigger-matched" for event in events))
+
+    def test_proof_updates_map_provisional_ids_and_keep_strongest_level(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-good"
+        shutil.copytree(VALID_RUN, run_copy)
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["proof_updates"] = [
+            {
+                "subject_id": "PF-session-auth-001",
+                "proof_level": "P4-runtime-confirmed",
+                "evidence_summary": "Runtime evidence confirmed the missing guard.",
+            },
+            {
+                "subject_id": "PF-session-auth-001",
+                "proof_level": "P1-candidate",
+                "evidence_summary": "Weaker later proof should not replace stronger proof.",
+            },
+        ]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        proof = read_jsonl(run_copy / "state" / "proof-ledger.jsonl")
+        self.assertEqual(len(proof), 1)
+        self.assertRegex(proof[0]["subject_id"], r"^F-session-auth-[0-9a-f]{12}$")
+        self.assertEqual(proof[0]["proof_level"], "P4-runtime-confirmed")
+
+    def test_runtime_updates_map_provisional_ids_and_update_existing_findings(self):
+        run_copy, _ = self.run_reducer(VALID_RUN)
+        batch_dir = run_copy / "reports" / "batch-02"
+        family_dir = batch_dir / "session-auth"
+        family_dir.mkdir(parents=True)
+        (family_dir / "report.md").write_text("# Runtime Validation\n", encoding="utf-8")
+        source_sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(source_sidecar_path.read_text(encoding="utf-8"))
+        sidecar.update({
+            "sidecar_id": "sidecar-session-auth-runtime-001",
+            "generated_at": "2026-05-11T00:20:00Z",
+            "batch_id": "batch-02",
+            "mode": "runtime-safe",
+        })
+        sidecar["confirmed_findings"] = []
+        sidecar["runtime_updates"] = [{
+            "finding_id": "PF-session-auth-001",
+            "runtime_status": "confirmed-at-runtime",
+            "request_posture": "approved local reproduction",
+            "result": "Missing session guard was reachable at runtime.",
+            "evidence_refs": [{
+                "path": "src/api/session.py",
+                "line_start": 42,
+                "line_end": 58,
+                "symbol": "login_required",
+                "evidence_type": "runtime-observation",
+                "snippet_hash": None,
+                "rationale": "Synthetic runtime evidence."
+            }],
+        }]
+        (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        (batch_dir / "manifest.yaml").write_text(
+            "\n".join([
+                "schema_version: 1",
+                "run_id: run-good",
+                "batch_id: batch-02",
+                'generated_at: "2026-05-11T00:20:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - session-auth",
+                "families:",
+                "  - family: session-auth",
+                "    status: ran",
+                "    mode: runtime-safe",
+                '    markdown: "${RUN_DIR}/reports/batch-02/session-auth/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-02/session-auth/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+        (run_copy / "state" / "run-metadata.yaml").write_text(
+            "runtime_approval:\n  enabled: true\n",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy), "--batch-id", "batch-02"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = read_jsonl(run_copy / "state" / "finding-inventory.jsonl")
+        finding = next(record for record in records if str(record.get("finding_id", "")).startswith("F-session-auth-"))
+        self.assertEqual(finding["status"], "runtime-confirmed")
+        self.assertEqual(finding["runtime_status"], "confirmed-at-runtime")
 
     def test_cross_lane_triggers_create_directives_from_attack_surface_graph(self):
         tmp = tempfile.TemporaryDirectory()
@@ -342,7 +444,7 @@ class ReduceRunTests(unittest.TestCase):
             check=False,
         )
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("refusing to write through symlinked state directory", result.stderr)
+        self.assertIn("symlinked state directory is not allowed", result.stderr)
 
     @unittest.skipUnless(hasattr(os, "symlink"), "symlink support required")
     def test_reducer_does_not_write_through_predictable_temp_symlink(self):

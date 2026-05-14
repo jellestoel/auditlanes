@@ -24,6 +24,20 @@ DEFAULT_PROFILES_DIR = PLUGIN_ROOT / "resources" / "profiles"
 DEFAULT_PROFILE = "security"
 MANIFEST_FILENAMES = ("manifest.yaml", "manifest.yml", "manifest.json")
 RUNTIME_APPROVAL_PATH = "state/run-metadata.yaml"
+STATE_ARTIFACT_SCHEMAS = {
+    "attack-surface-graph.jsonl": "attack-surface.schema.json",
+    "attack-surface-inventory.jsonl": "attack-surface-inventory.schema.json",
+    "authorization-matrix.jsonl": "authorization-matrix.schema.json",
+    "incidental-leads.jsonl": "incidental-lead.schema.json",
+    "proof-ledger.jsonl": "proof-ledger.schema.json",
+    "regression-plan.jsonl": "regression-plan.schema.json",
+    "relevance-plan.yaml": "relevance-plan.schema.json",
+    "relevance-plan.yml": "relevance-plan.schema.json",
+    "run-local-checks.jsonl": "run-local-check.schema.json",
+    "security-invariants.jsonl": "security-invariant.schema.json",
+    "security-smells.jsonl": "security-smell.schema.json",
+    "unowned-surfaces.jsonl": "unowned-surface.schema.json",
+}
 
 
 class ValidationIssue:
@@ -403,7 +417,19 @@ def collect_input_hashes(run_dir: Path, batch_id: str | None = None) -> list[dic
     ]
 
 
-def load_catalog_items(profile_root: Path, source: Any, item_kind: str) -> tuple[dict[str, dict[str, Any]], list[str]]:
+def load_catalog_items(
+    profile_root: Path,
+    profile_id_or_source: str | Any,
+    source_or_kind: Any,
+    item_kind: str | None = None,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    if item_kind is None:
+        profile_id = ""
+        source = profile_id_or_source
+        item_kind = source_or_kind
+    else:
+        profile_id = profile_id_or_source
+        source = source_or_kind
     if source is None:
         return {}, []
     if not isinstance(source, str) or not source:
@@ -433,6 +459,9 @@ def load_catalog_items(profile_root: Path, source: Any, item_kind: str) -> tuple
             item_id = item["id"]
             if item_id in items:
                 raise ValueError(f"duplicate {item_kind} id {item_id!r} in {path}")
+            declared_profile = item.get("profile")
+            if profile_id and declared_profile is not None and declared_profile != profile_id:
+                raise ValueError(f"{item_kind} {item_id!r} declares profile {declared_profile!r}, expected {profile_id!r} in {path}")
             normalized = dict(item)
             allowed_modes = normalized.get("allowed_modes")
             if allowed_modes is None:
@@ -497,6 +526,9 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     profile = load_json_or_yaml(profile_path)
     if not isinstance(profile, dict):
         raise ValueError(f"profile file must be an object: {profile_path}")
+    declared_profile_id = profile.get("id")
+    if declared_profile_id is not None and declared_profile_id != profile_id:
+        raise ValueError(f"profile file id {declared_profile_id!r} does not match selected profile {profile_id!r}: {profile_path}")
 
     lane_source = profile.get("lane_source", "lanes.yaml")
     if not isinstance(lane_source, str) or not lane_source:
@@ -512,6 +544,8 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     for index, lane in enumerate(lanes_data.get("lanes", [])):
         if not isinstance(lane, dict) or not isinstance(lane.get("id"), str):
             raise ValueError(f"lane entry {index} must contain an id in {lanes_path}")
+        if lane["id"] in lanes:
+            raise ValueError(f"duplicate lane id {lane['id']!r} in {lanes_path}")
         lanes.add(lane["id"])
         lane_order.append(lane["id"])
 
@@ -520,6 +554,10 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     for index, specialist in enumerate(lanes_data.get("specialists", [])):
         if not isinstance(specialist, dict) or not isinstance(specialist.get("id"), str):
             raise ValueError(f"specialist entry {index} must contain an id in {lanes_path}")
+        if specialist["id"] in specialists:
+            raise ValueError(f"duplicate specialist id {specialist['id']!r} in {lanes_path}")
+        if specialist["id"] in lanes:
+            raise ValueError(f"specialist id {specialist['id']!r} conflicts with a lane id in {lanes_path}")
         specialists.add(specialist["id"])
         if isinstance(specialist.get("mode"), str):
             specialist_modes[specialist["id"]] = specialist["mode"]
@@ -527,8 +565,8 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     if not lanes:
         raise ValueError(f"profile must define at least one lane: {lanes_path}")
 
-    strategies, strategy_order = load_catalog_items(profile_root, profile.get("strategy_source"), "strategies")
-    overlays, overlay_order = load_catalog_items(profile_root, profile.get("overlay_source"), "overlays")
+    strategies, strategy_order = load_catalog_items(profile_root, profile_id, profile.get("strategy_source"), "strategies")
+    overlays, overlay_order = load_catalog_items(profile_root, profile_id, profile.get("overlay_source"), "overlays")
     cross_lane_triggers = load_cross_lane_triggers(profile_root, profile.get("cross_lane_trigger_source"), lanes)
 
     implemented = profile.get("implemented")
@@ -588,6 +626,7 @@ def validate_sidecar_profile(
     selected_profile: dict[str, Any],
     run_metadata: dict[str, Any] | None,
     expected_version: str | None,
+    allow_experimental: bool = False,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     lanes = selected_profile["lanes"]
@@ -605,6 +644,11 @@ def validate_sidecar_profile(
         if strategy_config is None:
             issues.append(ValidationIssue(sidecar_path, "$.strategy", f"strategy {strategy!r} is not defined by profile {profile_id!r}"))
         else:
+            if strategy == "auto":
+                issues.append(ValidationIssue(sidecar_path, "$.strategy", "strategy 'auto' is only valid before calibration; sidecars must use the resolved concrete strategy"))
+            status = strategy_config.get("status")
+            if (strategy_config.get("runnable") is False or status == "planned") and not allow_experimental:
+                issues.append(ValidationIssue(sidecar_path, "$.strategy", f"strategy {strategy!r} is not runnable; pass --allow-experimental only for catalog compatibility checks"))
             allowed_modes = strategy_config.get("allowed_modes", set())
             mode = sidecar.get("mode")
             if isinstance(mode, str) and allowed_modes and mode not in allowed_modes:
@@ -614,9 +658,16 @@ def validate_sidecar_profile(
 
     sidecar_overlays = sidecar.get("overlays", [])
     if isinstance(sidecar_overlays, list):
+        if not sidecar_overlays:
+            issues.append(ValidationIssue(sidecar_path, "$.overlays", "overlays must contain at least one overlay id"))
         for index, overlay in enumerate(sidecar_overlays):
             if isinstance(overlay, str) and overlay not in overlays:
                 issues.append(ValidationIssue(sidecar_path, f"$.overlays[{index}]", f"overlay {overlay!r} is not defined by profile {profile_id!r}"))
+            if isinstance(overlay, str) and overlay in overlays:
+                overlay_config = overlays[overlay]
+                status = overlay_config.get("status")
+                if (overlay_config.get("runnable") is False or status == "planned") and not allow_experimental:
+                    issues.append(ValidationIssue(sidecar_path, f"$.overlays[{index}]", f"overlay {overlay!r} is not runnable; pass --allow-experimental only for catalog compatibility checks"))
     elif sidecar_overlays is not None:
         issues.append(ValidationIssue(sidecar_path, "$.overlays", "overlays must be an array of overlay ids"))
 
@@ -644,8 +695,8 @@ def validate_sidecar_profile(
     )
     if (has_runtime_updates or has_runtime_confirmed) and sidecar.get("mode") != "runtime-safe":
         issues.append(ValidationIssue(sidecar_path, "$.mode", "runtime_updates and runtime-confirmed findings require mode=runtime-safe"))
-    if sidecar.get("mode") == "runtime-safe" and run_metadata is not None:
-        approval = run_metadata.get("runtime_approval")
+    if sidecar.get("mode") == "runtime-safe":
+        approval = run_metadata.get("runtime_approval") if run_metadata is not None else None
         approved = isinstance(approval, dict) and approval.get("enabled") is True
         if not approved:
             issues.append(ValidationIssue(sidecar_path, "$.mode", f"runtime-safe mode requires runtime_approval.enabled=true in {RUNTIME_APPROVAL_PATH}"))
@@ -746,6 +797,8 @@ def validate_evidence_refs(
             issues.append(ValidationIssue(sidecar_path, f"{ref_location}.line_start", "must be null or a 1-based line number"))
         if line_end is not None and (not isinstance(line_end, int) or isinstance(line_end, bool) or line_end < 1):
             issues.append(ValidationIssue(sidecar_path, f"{ref_location}.line_end", "must be null or a 1-based line number"))
+        if line_end is not None and line_start is None:
+            issues.append(ValidationIssue(sidecar_path, f"{ref_location}.line_end", "requires line_start when present"))
         if isinstance(line_start, int) and isinstance(line_end, int) and line_end < line_start:
             issues.append(ValidationIssue(sidecar_path, f"{ref_location}.line_end", "must be greater than or equal to line_start"))
     return issues
@@ -849,6 +902,85 @@ def manifest_batch_id_from_path(run_dir: Path, manifest_path: Path) -> str | Non
     return parts[1]
 
 
+def manifest_sidecar_strategy_ids(run_dir: Path, manifest_path: Path, family_items: list[Any]) -> set[str]:
+    strategy_ids: set[str] = set()
+    for item in family_items:
+        if not isinstance(item, dict) or item.get("status") != "ran":
+            continue
+        value = item.get("json")
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            report_path = resolve_run_path(run_dir, value, manifest_path.parent)
+            sidecar = load_json(report_path)
+        except Exception:  # noqa: BLE001
+            continue
+        if isinstance(sidecar, dict) and isinstance(sidecar.get("strategy"), str):
+            strategy_ids.add(sidecar["strategy"])
+    return strategy_ids
+
+
+def batch_shape_expected_families(
+    batch_shape: dict[str, Any],
+    selected_profile: dict[str, Any],
+) -> list[str] | None:
+    expected_source = batch_shape.get("expected_families")
+    if expected_source == "profile_lanes":
+        return list(selected_profile["lane_order"])
+    if expected_source == "profile_specialists":
+        return sorted(selected_profile["specialists"])
+    if isinstance(expected_source, list) and all(isinstance(item, str) for item in expected_source):
+        return list(expected_source)
+    return None
+
+
+def validate_strategy_batch_shape(
+    manifest_path: Path,
+    path_batch_id: str | None,
+    expected_items: list[Any],
+    family_items: list[Any],
+    selected_profile: dict[str, Any],
+    strategy_id: str,
+    strategy_config: dict[str, Any],
+) -> list[ValidationIssue]:
+    if path_batch_id is None:
+        return []
+    batch_shapes = strategy_config.get("batch_shape")
+    if not isinstance(batch_shapes, dict):
+        return []
+    batch_shape = batch_shapes.get(path_batch_id)
+    if not isinstance(batch_shape, dict):
+        return []
+
+    issues: list[ValidationIssue] = []
+    expected_exact = batch_shape_expected_families(batch_shape, selected_profile)
+    if expected_exact is not None and (set(expected_items) != set(expected_exact) or len(expected_items) != len(expected_exact)):
+        if path_batch_id == "batch-01" and selected_profile["id"] == "security" and expected_exact == selected_profile["lane_order"]:
+            message = "batch-01 security canonical sweep must include exactly the six security lanes"
+        else:
+            message = f"{path_batch_id} strategy {strategy_id!r} must include exactly the declared batch_shape families"
+        issues.append(ValidationIssue(manifest_path, "$.expected_families", message))
+
+    required_status = batch_shape.get("status")
+    required_mode = batch_shape.get("mode")
+    for index, item in enumerate(family_items):
+        if not isinstance(item, dict):
+            continue
+        if isinstance(required_status, str) and item.get("status") != required_status:
+            if path_batch_id == "batch-01" and selected_profile["id"] == "security" and required_status == "ran":
+                message = "batch-01 security lanes must all run"
+            else:
+                message = f"{path_batch_id} strategy {strategy_id!r} families must have status={required_status}"
+            issues.append(ValidationIssue(manifest_path, f"$.families[{index}].status", message))
+        if isinstance(required_mode, str) and item.get("mode") != required_mode:
+            if path_batch_id == "batch-01" and selected_profile["id"] == "security" and required_mode == "canonical-sweep":
+                message = "batch-01 security lanes must run canonical-sweep"
+            else:
+                message = f"{path_batch_id} strategy {strategy_id!r} families must run mode={required_mode}"
+            issues.append(ValidationIssue(manifest_path, f"$.families[{index}].mode", message))
+    return issues
+
+
 def validate_manifest_outputs(
     run_dir: Path,
     manifest_path: Path,
@@ -890,10 +1022,22 @@ def validate_manifest_outputs(
     for family in sorted(missing):
         issues.append(ValidationIssue(manifest_path, "$.families", f"expected family {family!r} is not represented"))
 
-    if path_batch_id == "batch-01" and selected_profile["id"] == "security":
-        lane_order = selected_profile["lane_order"]
-        if set(expected_items) != set(lane_order) or len(expected_items) != len(lane_order):
-            issues.append(ValidationIssue(manifest_path, "$.expected_families", "batch-01 security canonical sweep must include exactly the six security lanes"))
+    manifest_strategy_ids = manifest_sidecar_strategy_ids(run_dir, manifest_path, family_items)
+    if len(manifest_strategy_ids) > 1:
+        issues.append(ValidationIssue(manifest_path, "$.families", f"batch manifest references multiple sidecar strategies: {sorted(manifest_strategy_ids)!r}"))
+    elif manifest_strategy_ids:
+        strategy_id = next(iter(manifest_strategy_ids))
+        strategy_config = selected_profile.get("strategies", {}).get(strategy_id)
+        if isinstance(strategy_config, dict):
+            issues.extend(validate_strategy_batch_shape(
+                manifest_path,
+                path_batch_id,
+                expected_items,
+                family_items,
+                selected_profile,
+                strategy_id,
+                strategy_config,
+            ))
     if path_batch_id == "batch-04" and selected_profile["id"] == "security":
         specialists = selected_profile["specialists"]
         if set(expected_items) != set(specialists) or len(expected_items) != len(specialists):
@@ -928,11 +1072,6 @@ def validate_manifest_outputs(
                     issues.append(ValidationIssue(manifest_path, f"$.families[{index}].{field}", "parked family must not declare a fresh output path"))
         if status == "ran" and mode == "parked":
             issues.append(ValidationIssue(manifest_path, f"$.families[{index}].mode", "ran family must not use mode=parked"))
-        if path_batch_id == "batch-01" and selected_profile["id"] == "security":
-            if status != "ran":
-                issues.append(ValidationIssue(manifest_path, f"$.families[{index}].status", "batch-01 security lanes must all run"))
-            if mode != "canonical-sweep":
-                issues.append(ValidationIssue(manifest_path, f"$.families[{index}].mode", "batch-01 security lanes must run canonical-sweep"))
         if path_batch_id == "batch-04" and selected_profile["id"] == "security" and status == "ran" and mode != "exploit-synthesis":
             issues.append(ValidationIssue(manifest_path, f"$.families[{index}].mode", "batch-04 security specialist must run exploit-synthesis"))
         if status != "ran":
@@ -1026,6 +1165,147 @@ def validate_file(path: Path, schema: dict[str, Any], loader) -> list[Validation
     ]
 
 
+def validate_jsonl_file(path: Path, schema: dict[str, Any]) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    row = json.loads(text)
+                except json.JSONDecodeError as exc:
+                    issues.append(ValidationIssue(path, f"$[{line_number}]", f"could not parse JSONL row: {exc}"))
+                    continue
+                for message in validate_schema(row, schema):
+                    location = message.split(":", 1)[0]
+                    detail = message.split(":", 1)[1].strip() if ":" in message else message
+                    issues.append(ValidationIssue(path, f"$[{line_number}]{location[1:] if location.startswith('$') else location}", detail))
+    except Exception as exc:  # noqa: BLE001
+        issues.append(ValidationIssue(path, "$", f"could not read JSONL file: {exc}"))
+    return issues
+
+
+def validate_state_artifact(
+    run_dir: Path,
+    schemas_dir: Path,
+    relative_artifact: str,
+    origins: list[str],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    artifact_path = run_dir / relative_artifact
+    if not artifact_path.exists():
+        issues.append(ValidationIssue(artifact_path, "$", f"required state artifact is missing (required by {', '.join(origins)})"))
+        return issues
+
+    plain_file_issues = require_plain_file_under(run_dir, artifact_path, "state artifact")
+    if plain_file_issues:
+        return plain_file_issues
+
+    schema_name = STATE_ARTIFACT_SCHEMAS.get(Path(relative_artifact).name)
+    if not schema_name:
+        return issues
+    schema_path = schemas_dir / schema_name
+    if not schema_path.exists():
+        issues.append(ValidationIssue(schema_path, "$", f"schema for state artifact {relative_artifact!r} is missing"))
+        return issues
+    schema = load_json(schema_path)
+    if artifact_path.suffix == ".jsonl":
+        issues.extend(validate_jsonl_file(artifact_path, schema))
+    else:
+        issues.extend(validate_file(artifact_path, schema, load_json_or_yaml))
+    return issues
+
+
+def validate_required_state_artifacts(
+    run_dir: Path,
+    schemas_dir: Path,
+    selected_profile: dict[str, Any],
+    sidecars: list[tuple[Path, dict[str, Any]]],
+) -> list[ValidationIssue]:
+    requirements: dict[str, list[str]] = {}
+    strategies = selected_profile.get("strategies", {})
+    overlays = selected_profile.get("overlays", {})
+
+    for _, sidecar in sidecars:
+        strategy = sidecar.get("strategy")
+        if isinstance(strategy, str) and isinstance(strategies.get(strategy), dict):
+            for artifact in strategies[strategy].get("required_state_artifacts", []) or []:
+                if isinstance(artifact, str) and artifact:
+                    requirements.setdefault(artifact, []).append(f"strategy:{strategy}")
+        sidecar_overlays = sidecar.get("overlays", [])
+        if isinstance(sidecar_overlays, list):
+            for overlay in sidecar_overlays:
+                if isinstance(overlay, str) and isinstance(overlays.get(overlay), dict):
+                    for artifact in overlays[overlay].get("required_artifacts", []) or []:
+                        if isinstance(artifact, str) and artifact:
+                            requirements.setdefault(artifact, []).append(f"overlay:{overlay}")
+
+    issues: list[ValidationIssue] = []
+    if requirements and (run_dir / "state").is_symlink():
+        return [ValidationIssue(run_dir / "state", "$", "symlinked state directory is not allowed")]
+    for artifact, origins in sorted(requirements.items()):
+        issues.extend(validate_state_artifact(run_dir, schemas_dir, artifact, sorted(set(origins))))
+    return issues
+
+
+def validate_relevance_plan_consistency(
+    run_dir: Path,
+    schemas_dir: Path,
+    selected_profile: dict[str, Any],
+    sidecars: list[tuple[Path, dict[str, Any]]],
+    allow_experimental: bool,
+) -> list[ValidationIssue]:
+    path = run_dir / "state" / "relevance-plan.yaml"
+    if not path.exists():
+        return []
+
+    issues = require_plain_file_under(run_dir, path, "relevance plan")
+    if issues:
+        return issues
+    try:
+        plan = load_json_or_yaml(path)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(path, "$", f"could not parse relevance plan: {exc}")]
+    if not isinstance(plan, dict):
+        return [ValidationIssue(path, "$", "relevance plan must be an object")]
+
+    schema_path = schemas_dir / "relevance-plan.schema.json"
+    if schema_path.exists():
+        schema = load_json(schema_path)
+        for message in validate_schema(plan, schema):
+            issues.append(ValidationIssue(path, message.split(":", 1)[0], message.split(":", 1)[1].strip() if ":" in message else message))
+
+    profile_id = selected_profile["id"]
+    if plan.get("profile") != profile_id:
+        issues.append(ValidationIssue(path, "$.profile", f"expected selected profile {profile_id!r}, got {plan.get('profile')!r}"))
+
+    strategies = selected_profile.get("strategies", {})
+    overlays = selected_profile.get("overlays", {})
+    resolved_strategy = plan.get("resolved_strategy")
+    if isinstance(resolved_strategy, str):
+        strategy_config = strategies.get(resolved_strategy)
+        if strategy_config is None:
+            issues.append(ValidationIssue(path, "$.resolved_strategy", f"strategy {resolved_strategy!r} is not defined by profile {profile_id!r}"))
+        elif resolved_strategy == "auto":
+            issues.append(ValidationIssue(path, "$.resolved_strategy", "strategy 'auto' must resolve to a concrete strategy"))
+        elif (strategy_config.get("runnable") is False or strategy_config.get("status") == "planned") and not allow_experimental:
+            issues.append(ValidationIssue(path, "$.resolved_strategy", f"strategy {resolved_strategy!r} is not runnable"))
+    requested_strategy = plan.get("requested_strategy")
+    if requested_strategy == "auto" and isinstance(resolved_strategy, str) and resolved_strategy != "auto":
+        for sidecar_path, sidecar in sidecars:
+            if sidecar.get("strategy") != resolved_strategy:
+                issues.append(ValidationIssue(sidecar_path, "$.strategy", f"must match auto-resolved strategy {resolved_strategy!r} from state/relevance-plan.yaml"))
+
+    resolved_overlays = plan.get("resolved_overlays", [])
+    if isinstance(resolved_overlays, list):
+        for index, overlay in enumerate(resolved_overlays):
+            if isinstance(overlay, str) and overlay not in overlays:
+                issues.append(ValidationIssue(path, f"$.resolved_overlays[{index}]", f"overlay {overlay!r} is not defined by profile {profile_id!r}"))
+    return issues
+
+
 def validate_run(
     run_dir: Path,
     schemas_dir: Path,
@@ -1052,6 +1332,7 @@ def validate_run(
     manifests = manifest_paths(run_dir, batch_id)
     sidecars = sidecar_paths(run_dir, batch_id)
     referenced_sidecars: dict[Path, int] = {}
+    parsed_sidecars: list[tuple[Path, dict[str, Any]]] = []
 
     if not manifests:
         target = f" for {batch_id}" if batch_id else ""
@@ -1089,8 +1370,9 @@ def validate_run(
         for message in validate_schema(sidecar, sidecar_schema):
             issues.append(ValidationIssue(sidecar_path, message.split(":", 1)[0], message.split(":", 1)[1].strip() if ":" in message else message))
         if isinstance(sidecar, dict):
+            parsed_sidecars.append((sidecar_path, sidecar))
             issues.extend(validate_sidecar_path(run_dir, sidecar_path, sidecar))
-            issues.extend(validate_sidecar_profile(sidecar_path, sidecar, selected_profile, run_metadata, expected_version))
+            issues.extend(validate_sidecar_profile(sidecar_path, sidecar, selected_profile, run_metadata, expected_version, allow_experimental))
 
     for sidecar_path in sidecars:
         if not is_plain_file_under(run_dir, sidecar_path):
@@ -1105,6 +1387,9 @@ def validate_run(
     for sidecar_path, count in sorted(referenced_sidecars.items(), key=lambda item: item[0].as_posix()):
         if count > 1:
             issues.append(ValidationIssue(sidecar_path, "$", "sidecar is referenced by multiple manifest items"))
+
+    issues.extend(validate_required_state_artifacts(run_dir, schemas_dir, selected_profile, parsed_sidecars))
+    issues.extend(validate_relevance_plan_consistency(run_dir, schemas_dir, selected_profile, parsed_sidecars, allow_experimental))
 
     return issues
 

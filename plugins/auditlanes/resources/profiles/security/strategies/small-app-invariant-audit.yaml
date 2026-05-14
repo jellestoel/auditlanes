@@ -9,11 +9,18 @@ execution_shape:
   lane_workers: false
   lanes_as_owner_labels_only: true
   recommended_max_loc: 2000
+  sidecar_output: "single-session runs still emit compact lane-labelled batch-01 sidecars so reducer-owned state has stable owners."
 allowed_modes:
   - canonical-sweep
   - canonical-gap-fill
   - runtime-safe
   - post-fix-resweep
+batch_shape:
+  batch-01:
+    expected_families: profile_lanes
+    status: ran
+    mode: canonical-sweep
+    sidecar_owner_model: lanes-as-labels
 required_sidecar_fields:
   - strategy
   - overlays
@@ -31,8 +38,8 @@ anti_tunnel:
   universal_reportability: true
   reviewers_may_emit_out_of_lane_leads: true
   reducer_assigns_final_owner: true
-  broad_sanity_pass_required: true
-  final_adversarial_review_required: true
+  broad_sanity_pass_recommended: true
+  final_adversarial_review_recommended: true
   strategy_may_prioritize_but_not_exclude_issue_classes: true
   overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
   final_report_must_include_unresolved_incidental_leads: true

@@ -154,6 +154,43 @@ class ScanAdvisorTests(unittest.TestCase):
         self.assertEqual(plan["resolved_strategy"], "diff-review")
         self.assertEqual(plan["coverage_mode"], "full-read")
 
+    def test_repo_local_auditlanes_control_files_do_not_drive_detection(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / "plain-app"
+        root.mkdir()
+        (root / "app.py").write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+        control_dir = root / "auditlanes"
+        control_dir.mkdir()
+        (control_dir / "orchestrator.yaml").write_text(
+            "\n".join([
+                "notes:",
+                "  - from flask import Flask, request, session",
+                "  - stripe.checkout.Session.create(line_items=[], mode='payment')",
+                "  - /checkout",
+                "  - /webhook",
+            ]),
+            encoding="utf-8",
+        )
+        profiles_dir = control_dir / "profiles"
+        profiles_dir.mkdir()
+        (profiles_dir / "project.yaml").write_text(
+            "\n".join([
+                "notes:",
+                "  - from flask import Flask, request, session",
+                "  - stripe.checkout.Session.create(line_items=[], mode='payment')",
+                "  - /checkout",
+                "  - /webhook",
+            ]),
+            encoding="utf-8",
+        )
+
+        plan = self.run_advisor_json(root)
+        self.assertNotIn("checkout", plan["repo_observations"]["detected_surfaces"])
+        self.assertNotIn("payment-flow", plan["resolved_overlays"])
+        check_ids = {check["id"] for check in plan["selected_checks"]}
+        self.assertFalse(any(check_id.startswith("payment.") for check_id in check_ids))
+
 
 if __name__ == "__main__":
     unittest.main()

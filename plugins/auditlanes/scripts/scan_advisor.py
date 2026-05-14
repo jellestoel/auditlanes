@@ -172,6 +172,8 @@ def is_excluded(root: Path, path: Path) -> bool:
         return True
     if len(parts) >= 2 and parts[0] == "auditlanes" and parts[1] == "out":
         return True
+    if is_repo_local_auditlanes_control_file(root, path):
+        return True
     return any(part in EXCLUDED_DIR_NAMES for part in parts)
 
 
@@ -198,8 +200,15 @@ def is_auditlanes_control_file(root: Path, path: Path) -> bool:
     return False
 
 
+def is_repo_local_auditlanes_control_file(root: Path, path: Path) -> bool:
+    parts = path.relative_to(root).parts
+    return len(parts) >= 1 and parts[0] == "auditlanes"
+
+
 def is_signal_file(root: Path, path: Path) -> bool:
     if is_auditlanes_control_file(root, path):
+        return False
+    if is_repo_local_auditlanes_control_file(root, path):
         return False
     parts = path.relative_to(root).parts
     if any(part in NON_APP_SIGNAL_DIR_NAMES for part in parts):

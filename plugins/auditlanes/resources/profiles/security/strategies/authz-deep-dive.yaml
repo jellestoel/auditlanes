@@ -15,5 +15,5 @@ anti_tunnel:
   universal_reportability: true
   reviewers_may_emit_out_of_lane_leads: true
   reducer_assigns_final_owner: true
-  broad_sanity_pass_required: true
+  broad_sanity_pass_recommended: true
   strategy_may_prioritize_but_not_exclude_issue_classes: true

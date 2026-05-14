@@ -26,6 +26,15 @@ SEVERITY_RANK = {
     "low": 2,
     "info": 1
 }
+PROOF_LEVEL_RANK = {
+    "P0-lead": 0,
+    "P1-candidate": 1,
+    "P2-static-confirmed": 2,
+    "P3-reachability-confirmed": 3,
+    "P4-runtime-confirmed": 4,
+    "P5-regression-backed": 5,
+}
+PROVISIONAL_ID_PREFIXES = ("PF-", "CAND-")
 STATUS_TRANSITIONS = {
     "lead": {"candidate", "confirmed-static", "rejected"},
     "candidate": {"confirmed-static", "blocked", "rejected", "duplicate"},
@@ -370,6 +379,10 @@ def regression_recommendation_id(recommendation: dict[str, Any]) -> str:
     return f"REG-{short}"
 
 
+def regression_record_id(record: dict[str, Any]) -> str:
+    return regression_recommendation_id(record)
+
+
 def regression_recommendation_record(sidecar: dict[str, Any], recommendation: dict[str, Any], report_path: Path) -> dict[str, Any]:
     batch_id = sidecar["batch_id"]
     family = sidecar["family"]
@@ -385,6 +398,22 @@ def regression_recommendation_record(sidecar: dict[str, Any], recommendation: di
         "guard_asserted": recommendation["guard_asserted"],
         "automation_status": recommendation["automation_status"],
         "owner_hint": recommendation.get("owner_hint"),
+    }
+
+
+def runtime_update_record(sidecar: dict[str, Any], update: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "finding_id": update["finding_id"],
+        "source_family": family,
+        "source_reports": [source_report(batch_id, family, report_path, update["finding_id"])],
+        "last_touched_batch": batch_id,
+        "runtime_status": update["runtime_status"],
+        "request_posture": update["request_posture"],
+        "result": update["result"],
+        "evidence_refs": update.get("evidence_refs", []),
     }
 
 
@@ -812,6 +841,203 @@ def make_event(event_type: str, batch_id: str | None, family: str | None, severi
     }
 
 
+def build_id_crosswalk(existing_inventory: list[dict[str, Any]], incoming_records: list[dict[str, Any]]) -> dict[str, str]:
+    crosswalk: dict[str, str] = {}
+    for record in existing_inventory + incoming_records:
+        stable_id = record.get("finding_id")
+        if not isinstance(stable_id, str) or not stable_id:
+            continue
+        crosswalk.setdefault(stable_id, stable_id)
+        for provisional_id in record.get("provisional_ids", []) or []:
+            if isinstance(provisional_id, str) and provisional_id:
+                crosswalk[provisional_id] = stable_id
+        for source in record.get("source_reports", []) or []:
+            if isinstance(source, dict) and isinstance(source.get("local_id"), str) and source["local_id"]:
+                crosswalk[source["local_id"]] = stable_id
+    return crosswalk
+
+
+def should_report_unresolved_reference(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(PROVISIONAL_ID_PREFIXES)
+
+
+def rewrite_reference_id(
+    value: Any,
+    crosswalk: dict[str, str],
+    events: list[dict[str, Any]],
+    batch_id: str | None,
+    family: str | None,
+    context: str,
+    input_hashes: list[dict[str, str]],
+) -> Any:
+    if not isinstance(value, str):
+        return value
+    rewritten = crosswalk.get(value)
+    if rewritten:
+        return rewritten
+    if should_report_unresolved_reference(value):
+        events.append(make_event(
+            "stable-id-reference-unresolved",
+            batch_id,
+            family,
+            "warn",
+            f"Could not map {context} reference {value!r} to a reducer stable ID.",
+            input_hashes,
+        ))
+    return value
+
+
+def rewrite_proof_references(
+    records: list[dict[str, Any]],
+    crosswalk: dict[str, str],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    rewritten_records: list[dict[str, Any]] = []
+    for record in records:
+        rewritten = dict(record)
+        rewritten["subject_id"] = rewrite_reference_id(
+            record.get("subject_id"),
+            crosswalk,
+            events,
+            record.get("last_touched_batch"),
+            record.get("source_family"),
+            "proof subject_id",
+            input_hashes,
+        )
+        rewritten_records.append(rewritten)
+    return rewritten_records
+
+
+def rewrite_regression_references(
+    records: list[dict[str, Any]],
+    crosswalk: dict[str, str],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    rewritten_records: list[dict[str, Any]] = []
+    for record in records:
+        rewritten = dict(record)
+        rewritten["finding_id"] = rewrite_reference_id(
+            record.get("finding_id"),
+            crosswalk,
+            events,
+            record.get("last_touched_batch"),
+            record.get("source_family"),
+            "regression finding_id",
+            input_hashes,
+        )
+        try:
+            rewritten["regression_id"] = regression_record_id(rewritten)
+        except KeyError:
+            pass
+        rewritten_records.append(rewritten)
+    return rewritten_records
+
+
+def rewrite_runtime_update_references(
+    records: list[dict[str, Any]],
+    crosswalk: dict[str, str],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    rewritten_records: list[dict[str, Any]] = []
+    for record in records:
+        rewritten = dict(record)
+        rewritten["finding_id"] = rewrite_reference_id(
+            record.get("finding_id"),
+            crosswalk,
+            events,
+            record.get("last_touched_batch"),
+            record.get("source_family"),
+            "runtime finding_id",
+            input_hashes,
+        )
+        rewritten_records.append(rewritten)
+    return rewritten_records
+
+
+def chain_record_id(record: dict[str, Any]) -> str:
+    return f"CH-{stable_hash([record.get('source_chain_candidate_id', record.get('chain_id')), record.get('component_findings', [])])}"
+
+
+def rewrite_chain_references(
+    records: list[dict[str, Any]],
+    crosswalk: dict[str, str],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    rewritten_records: list[dict[str, Any]] = []
+    for record in records:
+        rewritten = dict(record)
+        components = []
+        for component in record.get("component_findings", []) or []:
+            components.append(rewrite_reference_id(
+                component,
+                crosswalk,
+                events,
+                None,
+                None,
+                "chain component_findings",
+                input_hashes,
+            ))
+        rewritten["component_findings"] = unique_sorted(components)
+        rewritten["chain_id"] = chain_record_id(rewritten)
+        rewritten_records.append(rewritten)
+    return rewritten_records
+
+
+def apply_runtime_updates(
+    records: list[dict[str, Any]],
+    runtime_updates: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+    unkeyed: list[dict[str, Any]] = []
+    for record in records:
+        if isinstance(record.get("finding_id"), str) and record["finding_id"]:
+            by_id[record["finding_id"]] = dict(record)
+        else:
+            unkeyed.append(record)
+    for update in runtime_updates:
+        finding_id_value = update.get("finding_id")
+        if not isinstance(finding_id_value, str):
+            continue
+        record = by_id.get(finding_id_value)
+        if record is None:
+            events.append(make_event(
+                "runtime-update-unmatched",
+                update.get("last_touched_batch"),
+                update.get("source_family"),
+                "warn",
+                f"Runtime update referenced unknown finding {finding_id_value}.",
+                input_hashes,
+            ))
+            continue
+        record["runtime_status"] = update.get("runtime_status")
+        record["evidence_refs"] = unique_sorted(record.get("evidence_refs", []) + update.get("evidence_refs", []))
+        if "last_touched_batch" in record and isinstance(update.get("last_touched_batch"), str):
+            record["last_touched_batch"] = max(record["last_touched_batch"], update["last_touched_batch"])
+        if update.get("runtime_status") == "confirmed-at-runtime" and record.get("status") != "runtime-confirmed":
+            if transition_allowed(record.get("status", ""), "runtime-confirmed"):
+                record["status"] = "runtime-confirmed"
+            else:
+                events.append(make_event(
+                    "runtime-status-transition-rejected",
+                    update.get("last_touched_batch"),
+                    update.get("source_family"),
+                    "warn",
+                    f"Rejected runtime confirmation transition for {finding_id_value}: {record.get('status')} -> runtime-confirmed",
+                    input_hashes,
+                ))
+        by_id[finding_id_value] = record
+    return [by_id[key] for key in sorted(by_id)] + sorted(
+        unkeyed,
+        key=lambda row: json.dumps(normalize_value(row), sort_keys=True, separators=(",", ":")),
+    )
+
+
 def reduce_run(
     run_dir: Path,
     batch_id: str | None = None,
@@ -857,6 +1083,7 @@ def reduce_run(
     security_smells: list[dict[str, Any]] = []
     proof_updates: list[dict[str, Any]] = []
     regression_recommendations: list[dict[str, Any]] = []
+    runtime_updates: list[dict[str, Any]] = []
     run_local_checks: list[dict[str, Any]] = []
     trigger_signals = state_surface_signals(state_dir)
 
@@ -903,6 +1130,8 @@ def reduce_run(
                 proof_updates.append(proof_update_record(sidecar, proof_update, report_path.relative_to(run_dir)))
             for recommendation in sidecar.get("regression_recommendations", []):
                 regression_recommendations.append(regression_recommendation_record(sidecar, recommendation, report_path.relative_to(run_dir)))
+            for runtime_update in sidecar.get("runtime_updates", []):
+                runtime_updates.append(runtime_update_record(sidecar, runtime_update, report_path.relative_to(run_dir)))
             for local_check in sidecar.get("run_local_checks", []):
                 run_local_checks.append(run_local_check_record(sidecar, local_check, report_path.relative_to(run_dir)))
                 events.append(make_event(
@@ -939,6 +1168,7 @@ def reduce_run(
                 chain_records.append({
                     "schema_version": STATE_SCHEMA_VERSION,
                     "chain_id": f"CH-{stable_hash([chain['chain_candidate_id'], chain.get('component_findings', [])])}",
+                    "source_chain_candidate_id": chain["chain_candidate_id"],
                     "component_findings": chain.get("component_findings", []),
                     "families_involved": sorted({sidecar["family"]}),
                     "impact": chain["why_chain_matters"],
@@ -946,12 +1176,22 @@ def reduce_run(
                     "status": "candidate",
                 })
 
+    id_crosswalk = build_id_crosswalk(existing_inventory, records)
+    existing_proof_updates = rewrite_proof_references(existing_proof_updates, id_crosswalk, events, input_hashes)
+    proof_updates = rewrite_proof_references(proof_updates, id_crosswalk, events, input_hashes)
+    existing_regression_recommendations = rewrite_regression_references(existing_regression_recommendations, id_crosswalk, events, input_hashes)
+    regression_recommendations = rewrite_regression_references(regression_recommendations, id_crosswalk, events, input_hashes)
+    runtime_updates = rewrite_runtime_update_references(runtime_updates, id_crosswalk, events, input_hashes)
+    existing_chains = rewrite_chain_references(existing_chains, id_crosswalk, events, input_hashes)
+    chain_records = rewrite_chain_references(chain_records, id_crosswalk, events, input_hashes)
+
     incoming_merged = merge_records(records)
     incoming_merged = enforce_status_transitions(existing_records, incoming_merged, events)
     merged = merge_inventory(existing_inventory, incoming_merged)
+    merged = apply_runtime_updates(merged, runtime_updates, events, input_hashes)
     merged_incidental_leads = merge_aux_records_by_key(existing_incidental_leads + incidental_leads, "lead_id")
     merged_security_smells = merge_aux_records_by_key(existing_security_smells + security_smells, "smell_id")
-    merged_proof_updates = merge_aux_records_by_key(existing_proof_updates + proof_updates, "subject_id")
+    merged_proof_updates = merge_proof_records(existing_proof_updates + proof_updates)
     merged_regression_recommendations = merge_aux_records_by_key(existing_regression_recommendations + regression_recommendations, "regression_id")
     merged_run_local_checks = merge_aux_records_by_key(existing_run_local_checks + run_local_checks, "check_id")
     family_directives = build_family_directives(
@@ -995,6 +1235,7 @@ def reduce_run(
         "security_smells": len(security_smells),
         "proof_updates": len(proof_updates),
         "regression_recommendations": len(regression_recommendations),
+        "runtime_updates": len(runtime_updates),
         "run_local_checks": len(run_local_checks),
         "family_directives": len(family_directives),
     }
@@ -1028,6 +1269,39 @@ def merge_aux_records_by_key(records: list[dict[str, Any]], key: str) -> list[di
             merged["last_touched_batch"] = max(existing["last_touched_batch"], record["last_touched_batch"])
         by_key[value] = merged
     return [by_key[value] for value in sorted(by_key)]
+
+
+def choose_stronger_proof(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
+    existing_rank = PROOF_LEVEL_RANK.get(existing.get("proof_level"), -1)
+    incoming_rank = PROOF_LEVEL_RANK.get(incoming.get("proof_level"), -1)
+    if incoming_rank > existing_rank:
+        base, other = incoming, existing
+    elif incoming_rank < existing_rank:
+        base, other = existing, incoming
+    elif incoming.get("last_touched_batch", "") > existing.get("last_touched_batch", ""):
+        base, other = incoming, existing
+    else:
+        base, other = existing, incoming
+
+    merged = {**other, **base}
+    for list_field in ("source_reports", "evidence_refs"):
+        merged[list_field] = unique_sorted(existing.get(list_field, []) + incoming.get(list_field, []))
+    if "last_touched_batch" in existing and "last_touched_batch" in incoming:
+        merged["last_touched_batch"] = max(existing["last_touched_batch"], incoming["last_touched_batch"])
+    return merged
+
+
+def merge_proof_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_subject: dict[str, dict[str, Any]] = {}
+    for record in records:
+        subject_id = record.get("subject_id")
+        if not isinstance(subject_id, str) or not subject_id:
+            continue
+        if subject_id in by_subject:
+            by_subject[subject_id] = choose_stronger_proof(by_subject[subject_id], record)
+        else:
+            by_subject[subject_id] = record
+    return [by_subject[value] for value in sorted(by_subject)]
 
 
 def shared_context_summary(records: list[dict[str, Any]]) -> str:
