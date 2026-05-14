@@ -1,4 +1,4 @@
-version: 0.4.8
+version: 0.4.9
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -49,19 +49,23 @@ default_install:
   project_skill: "optional fallback"
 
 execution_modes:
-  default: "single-session"
-  preferred_for_large_claude_code_runs: "agent-team"
+  default: "agent-team"
+  fallback_order:
+    - "subagent"
+    - "single-session"
+  preferred_for_claude_code_runs: "agent-team"
   claude_code_agent_team_enable_hint: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude"
   supported:
     - "single-session"
     - "subagent"
     - "agent-team"
   notes:
-    - "single-session runs family lanes sequentially and is the reliable default."
-    - "subagent mode may isolate family reviews when the host agent supports it."
+    - "agent-team mode is the default Claude Code execution target for all AuditLanes scans."
+    - "subagent mode is the automatic fallback when native Claude Code agent teams are unavailable and the host supports subagents."
+    - "single-session runs family lanes sequentially and is reserved for explicit requests or hosts without agent-team or subagent support."
     - "agent-team mode means native Claude Code agent teams with a lead, teammates, shared task list, and direct teammate messaging."
-    - "agent-team mode has a hard activation gate before run-init; lead-session todo lists or subagent tasks are not accepted as a native team."
-    - "When requested agent-team mode is unavailable, the lead must stop and ask before falling back."
+    - "agent-team mode has an activation gate before run-init; lead-session todo lists or subagent tasks are not accepted as a native team."
+    - "When native agent-team mode is unavailable, record the fallback reason and use subagent lane execution when supported."
     - "Subagent and agent-team modes must not broaden the parent session sandbox, approval, runtime, or network posture."
 
 validator_status:
@@ -81,7 +85,7 @@ validator_status:
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.8 ships a direct profile-aware validator script."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.9 ships a direct profile-aware validator script."
 
 advisor_status:
   current_release: "minimal-script"
@@ -105,7 +109,7 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.8 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.9 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
 
 profile_status:
   implemented:
@@ -323,7 +327,7 @@ cli:
     - "auditlanes upgrade ."
 
 known_limitations:
-  - "v0.4.8 bundles only the security profile as a stable runnable profile."
+  - "v0.4.9 bundles only the security profile as a stable runnable profile."
   - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable against the security report schema."
   - "strategy:auto and small-app-invariant-audit are protocol contracts; a packaged CLI/orchestrator that performs automatic relevance scoring is still planned."
   - "scan_advisor.py performs minimal static relevance scoring; an interactive numbered-choice wizard is still planned."

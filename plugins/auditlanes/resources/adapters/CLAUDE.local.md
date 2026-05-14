@@ -9,8 +9,11 @@ repo-local scaffolding or provenance is verified.
 
 Prefer the `/auditlanes` skill when available.
 
-For large scans, agent-team mode is preferred when Claude Code was started with
-`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and the operator requests it.
+For AuditLanes scans, use native agent-team mode whenever Claude Code was
+started with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. If native teams are
+unavailable, record the reason and fall back to subagent lane execution when
+supported; use single-session only when subagents are unavailable or explicitly
+requested.
 
 Use permission-friendly static inspection commands: start Claude in the target
 root, use repo-relative paths, do not prefix commands with `cd <target-root> &&`,

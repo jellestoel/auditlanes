@@ -2,14 +2,17 @@ version: 1
 id: small-app-invariant-audit
 profile: security
 status: stable
-description: "Single-session full-read invariant audit for small applications where complete code review is cheaper and safer than lane partitioning."
+description: "Full-read invariant audit for small applications where complete code review is safer than narrow lane partitioning."
 execution_shape:
-  default_mode: single-session
+  default_mode: agent-team
+  fallback_modes:
+    - subagent
+    - single-session
   coverage_mode: full-read
-  lane_workers: false
+  lane_workers: true
   lanes_as_owner_labels_only: true
   recommended_max_loc: 2000
-  sidecar_output: "single-session runs still emit compact lane-labelled batch-01 sidecars so reducer-owned state has stable owners."
+  sidecar_output: "Accelerated and single-session runs emit compact lane-labelled batch-01 sidecars so reducer-owned state has stable owners."
 allowed_modes:
   - canonical-sweep
   - canonical-gap-fill

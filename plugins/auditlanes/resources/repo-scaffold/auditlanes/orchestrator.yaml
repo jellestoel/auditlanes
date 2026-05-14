@@ -6,7 +6,11 @@ host_execution_preferences:
   claude_code:
     preferred_acceleration: agent-team
     enable_hint: "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude"
-    rule: "Use native Claude Code agent teams for large scans when the operator enabled them and requested agent-team mode. Do not silently simulate agent-team mode in the lead session."
+    rule: "Use native Claude Code agent teams for every scan when the operator enabled them. Do not simulate agent-team mode in the lead session; if native teams are unavailable, record the reason and fall back to subagent lane execution when supported."
+    default_order:
+      - "agent-team"
+      - "subagent"
+      - "single-session"
     activation_gate:
       required_before:
         - "target repo file reads"
@@ -18,7 +22,7 @@ host_execution_preferences:
         - "lead-session todo list"
         - "sequential lane labels"
         - "subagent tasks"
-      abort_message: "agent-team mode unavailable: native Claude Code agent team was not created. Start Claude Code with CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 or approve --mode single-session/subagent."
+      fallback_message: "agent-team mode unavailable: native Claude Code agent team was not created. Falling back to subagent lane execution when the host supports it; otherwise single-session."
     required_team_shape:
       lead: "main Claude Code session"
       communication: "shared task list plus direct teammate messaging"
@@ -29,10 +33,10 @@ host_execution_preferences:
         - data-surfaces
         - integration-trust
         - platform-posture
-      fallback: "stop and ask before using single-session or subagent mode"
+      fallback: "use subagent lane execution when supported; use single-session only when subagents are unavailable or explicitly requested"
   fallback:
-    - "single-session sequential lane execution"
     - "subagent lane execution when supported"
+    - "single-session sequential lane execution"
 
 variables:
   target_root: "${TARGET_ROOT}"

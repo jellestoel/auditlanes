@@ -46,6 +46,20 @@ class ScaffoldYamlTests(unittest.TestCase):
                 self.assertIn(relative, packaged_files)
                 self.assertIn(relative, executable_schemas)
 
+    def test_execution_policy_is_agent_team_first_with_subagent_fallback(self):
+        validator = load_validator_module()
+        manifest = validator.load_json_or_yaml(PLUGIN_ROOT / "package-manifest.yaml")
+        self.assertEqual(manifest["execution_modes"]["default"], "agent-team")
+        self.assertEqual(manifest["execution_modes"]["fallback_order"][0], "subagent")
+
+        orchestrator = validator.load_json_or_yaml(SCAFFOLD_ROOT / "orchestrator.yaml")
+        default_order = orchestrator["host_execution_preferences"]["claude_code"]["default_order"]
+        self.assertEqual(default_order[:2], ["agent-team", "subagent"])
+
+        profile = validator.load_json_or_yaml(PLUGIN_ROOT / "resources/profiles/security/profile.yaml")
+        self.assertEqual(profile["default_execution_mode"], "agent-team")
+        self.assertEqual(profile["execution_fallback_order"][0], "subagent")
+
     def test_guidance_yaml_core_enums_match_json_schema(self):
         validator = load_validator_module()
         guidance = validator.load_json_or_yaml(SCAFFOLD_ROOT / "report-sidecar-schema.yaml")

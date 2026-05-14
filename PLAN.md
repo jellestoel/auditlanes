@@ -1459,7 +1459,10 @@ should usually resolve to:
 ```yaml
 strategy: small-app-invariant-audit
 coverage_mode: full-read
-execution: single-session
+execution: agent-team
+fallback_execution:
+  - subagent
+  - single-session
 lanes_as_owner_labels_only: true
 ```
 
@@ -1467,7 +1470,8 @@ Rationale:
 
 ```text
 Complete read-through is feasible.
-Lane partitioning adds overhead.
+Lane partitioning should not narrow coverage; accelerated workers still use
+full-read coverage and lane ownership labels.
 Splitting too early increases tunnel-vision risk.
 ```
 
@@ -1533,7 +1537,7 @@ selected_checks:
 deprioritized_checks:
   - id: large-repo.agent-team
     status: not-applicable
-    reason: "Small codebase; full-read single-session is preferred."
+    reason: "Small codebase; keep full-read coverage, while execution still follows the agent-team-first policy."
     evidence: []
 
 universal_checks_enabled: true

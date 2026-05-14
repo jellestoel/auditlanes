@@ -41,15 +41,17 @@ Claude Code command hygiene:
 
 Default flow:
 
-0. If `agent-team` mode was requested, pass the native team activation gate
-   before reading target repo files, inspecting existing runs, or writing output.
+0. Use the agent-team-first execution policy: try native Claude Code
+   `agent-team` mode before reading target repo files, inspecting existing runs,
+   or writing output; if native teams are unavailable, record the reason and use
+   `subagent` mode when supported.
 1. Run init.
 2. Run project calibration.
 3. Run preflight using the generated project security profile.
 4. Run the first family batch.
 5. Run the reducer after every batch.
 
-For v0.4.8, `security` is the stable runnable profile. The default requested
+For v0.4.9, `security` is the stable runnable profile. The default requested
 strategy is `auto` and the default overlay is `auto`. Calibration must write
 `state/relevance-plan.yaml` with the resolved strategy, overlays, coverage
 mode, and suggested checks before audit work starts. The relevance plan frames
@@ -58,12 +60,13 @@ for unmodeled risks when they cite trigger evidence and explain the scope
 impact. Non-security profile metadata is not enough to run a production audit
 without matching report contracts and reducer semantics.
 
-For large Claude Code audits, use native agent teams when the operator started
-Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and requested
-agent-team mode. Native agent-team mode means the lead creates teammates, uses a
-shared task list, and allows direct teammate messaging. It is different from
-subagents. If native teams are not available, stop and ask before falling back to
-sequential or subagent execution.
+For Claude Code audits, use native agent teams whenever the operator started
+Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`. Native agent-team
+mode means the lead creates teammates, uses a shared task list, and allows
+direct teammate messaging. It is different from subagents. If native teams are
+not available, record the fallback reason and use subagent lane execution when
+supported. Use sequential execution only when subagents are also unavailable or
+explicitly requested.
 
 A lead-session todo list, sequential lane labels, or subagent tasks do not count
 as native agent-team mode.

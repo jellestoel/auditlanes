@@ -421,7 +421,7 @@ def selected_checks(root: Path, evidence_text: dict[str, list[str]], languages: 
 def deprioritized_checks(surfaces: list[str], loc: int) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = []
     if loc <= SMALL_REPO_LOC:
-        checks.append(check("large-repo.agent-team", "not-applicable", "Small codebase; full-read single-session is preferred.", dynamic=False))
+        checks.append(check("large-repo.agent-team", "not-applicable", "Small codebase; keep full-read coverage, while execution still follows the agent-team-first policy.", dynamic=False))
     if "upload" not in surfaces and "download" not in surfaces:
         checks.append(check("data.file-path-traversal", "not-applicable", "No upload, download, file-serving, or file-write surface was detected.", dynamic=False))
     if "admin" not in surfaces:

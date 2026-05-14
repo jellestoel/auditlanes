@@ -7,14 +7,14 @@ The installable plugin lives under `plugins/auditlanes/`. It defines how an
 agent orchestrator should plan work, control state, cap concurrency, suppress
 duplicate findings, share cross-family context, and produce a final report.
 
-The protocol now has a core/profile split. v0.4.8 keeps the `security` profile
+The protocol now has a core/profile split. v0.4.9 keeps the `security` profile
 as the only stable runnable profile and includes compact experimental
 architecture-profile metadata to prove lane catalogs can be loaded without
 bloating normal security runs.
 
 ## Current Status
 
-AuditLanes v0.4.8 is a protocol-first beta plugin package: a structured
+AuditLanes v0.4.9 is a protocol-first beta plugin package: a structured
 security-audit orchestration protocol with executable sidecar validation and a
 minimal deterministic reducer.
 
@@ -56,7 +56,7 @@ overlay validity, mode/family compatibility, runtime-safe constraints, and
 evidence path policy require `validate_run.py` or a generated profile-specific
 schema.
 
-v0.4.8 validates and reduces report sidecars into basic deterministic state,
+v0.4.9 validates and reduces report sidecars into basic deterministic state,
 including incidental leads, security smells, proof updates, and regression
 recommendations. It also emits basic family directives from incidental leads and
 cross-lane trigger matches. It does not yet orchestrate the full audit
@@ -77,19 +77,20 @@ concrete strategy, overlays, coverage mode, suggested checks, and
 agent-discretion flags in `state/relevance-plan.yaml`. Generated run artifacts
 still go under `auditlanes/out/` in the target repo.
 
-Default execution mode is `single-session`, where the family lanes run
-sequentially. Claude Code agent-team mode is the encouraged acceleration path
-for large audits when the operator starts Claude Code with agent teams enabled
-and explicitly asks for that mode:
+Default execution is agent-team-first. Claude Code should try native agent-team
+mode for every AuditLanes run when agent teams are enabled, then automatically
+fall back to subagent lane execution when native teams are unavailable. Use
+single-session execution only when neither acceleration path is supported or
+when the operator explicitly requests it:
 
 ```bash
 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude
 ```
 
-`subagent` and `agent-team` modes are acceleration paths. They may cost more
-tokens and add coordination overhead. The protocol remains the same: persistent
-logical lanes, reducer-owned state, and a hard concurrency cap of six lane
-workers.
+`agent-team` and `subagent` modes may cost more tokens and add coordination
+overhead, but they are the normal AuditLanes execution path. The protocol
+remains the same: persistent logical lanes, reducer-owned state, and a hard
+concurrency cap of six lane workers.
 
 ## Install
 
@@ -143,17 +144,18 @@ Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
 
 For a deliberately pinned install, use `/plugin marketplace add
-jellestoel/auditlanes@v0.4.8` in Claude Code or `codex plugin marketplace add
-jellestoel/auditlanes --ref v0.4.8` in Codex.
+jellestoel/auditlanes@v0.4.9` in Claude Code or `codex plugin marketplace add
+jellestoel/auditlanes --ref v0.4.9` in Codex.
 
-AuditLanes v0.4.8 is a protocol-first beta. It validates sidecars and reduces
+AuditLanes v0.4.9 is a protocol-first beta. It validates sidecars and reduces
 basic state, but does not yet run the full audit automatically or implement full
 reducer semantics.
 
 ## Design Goals
 
 - define persistent logical audit lanes
-- prefer Claude Code agent teams for large scans when explicitly enabled
+- prefer Claude Code agent teams for every scan, then subagents when native
+  teams are unavailable
 - never run more than `6` lane workers concurrently
 - preserve lane ownership across the audit
 - allow later revisits of the same family without breaking the concurrency cap
@@ -261,7 +263,7 @@ Experimental profiles are rejected by default.
 `--allow-experimental` is only for profile-loading/catalog compatibility checks;
 it does not make metadata-only profiles runnable sidecar audit modes.
 
-The v0.4.8 reducer imports confirmed findings, candidate findings, rejected
+The v0.4.9 reducer imports confirmed findings, candidate findings, rejected
 claims, profile feedback, chain candidates, incidental leads, security smells,
 proof updates, `run_local_checks`, and regression recommendations. Run-local
 checks let agents preserve repo-specific security questions outside the bundled
@@ -348,11 +350,12 @@ The orchestrator runs `preflight.yaml` serially after calibration to:
 ### 4. Batch Work
 
 The orchestrator executes up to `6` family lanes concurrently when the host can
-support it. In Claude Code, `--mode agent-team` means a native Claude Code agent
+support it. In Claude Code, agent-team mode means a native Claude Code agent
 team with a lead, teammates, shared task list, and direct teammate messaging.
 The lead should spawn one teammate per batch-01 family lane and should not
-silently simulate team mode in the lead session. If native agent teams are
-unavailable, stop and ask before falling back to single-session or subagent mode.
+simulate team mode in the lead session. If native agent teams are unavailable,
+record the reason and fall back to subagent lane execution; use single-session
+only when subagents are also unavailable or explicitly requested.
 
 - Batch 1 is fixed: all families start with `canonical-sweep`.
 - Later batches are adaptive: each family gets its next mode from reducer output.
@@ -478,7 +481,7 @@ AuditLanes Core
 
 ## Profiles
 
-AuditLanes v0.4.8 separates core workflow mechanics from profile lane catalogs:
+AuditLanes v0.4.9 separates core workflow mechanics from profile lane catalogs:
 
 - core: orchestration, output layout, validation scripts, reducer mechanics
 - stable profile: `security`

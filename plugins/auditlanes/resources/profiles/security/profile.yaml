@@ -10,4 +10,7 @@ default_strategy: auto
 default_overlays:
   - auto
 description: "Authentication, authorization, data exposure, trust boundary, and platform security audit profile."
-default_execution_mode: single-session
+default_execution_mode: agent-team
+execution_fallback_order:
+  - subagent
+  - single-session

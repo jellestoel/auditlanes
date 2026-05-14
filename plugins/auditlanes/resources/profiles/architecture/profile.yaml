@@ -4,4 +4,7 @@ status: experimental
 implemented: false
 lane_source: lanes.yaml
 description: "Architecture and maintainability audit profile metadata. Not yet a stable runnable profile."
-default_execution_mode: single-session
+default_execution_mode: agent-team
+execution_fallback_order:
+  - subagent
+  - single-session

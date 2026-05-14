@@ -36,13 +36,14 @@ Generated outputs go under `auditlanes/out/` in the target repository.
 
 ## Modes
 
-Default to `single-session` unless the operator explicitly asks for another
-mode. Codex may use sub-agents only when the host supports them and the operator
-requested or approved that mode.
+Default to the AuditLanes agent-team-first policy. Native Claude Code agent
+teams are unavailable inside Codex, so Codex should use `subagent` mode when the
+host supports subagents. Use `single-session` only when subagents are
+unavailable or the operator explicitly requests `--mode single-session`.
 
 `agent-team` is a Claude Code native-team mode, not a Codex mode. If the
-operator requests `--mode agent-team` inside Codex, stop and ask whether to use
-`--mode single-session` or `--mode subagent` instead.
+operator requests `--mode agent-team` inside Codex, record that native teams are
+unavailable in this host and continue with `subagent` mode when supported.
 
 ## Protocol Rules
 
