@@ -40,6 +40,9 @@ STATUS_TRANSITIONS = {
     "candidate": {"confirmed-static", "blocked", "rejected", "duplicate"},
     "confirmed-static": {"runtime-confirmed", "fixed", "duplicate", "reswept-open", "reswept-closed"},
     "runtime-confirmed": {"fixed", "duplicate", "reswept-open", "reswept-closed"},
+    "reswept-open": {"reswept-closed", "fixed", "duplicate"},
+    "fixed": {"reswept-open", "reswept-closed", "duplicate"},
+    "blocked": {"candidate", "confirmed-static", "rejected"},
 }
 
 
@@ -1017,6 +1020,7 @@ def apply_runtime_updates(
             continue
         record["runtime_status"] = update.get("runtime_status")
         record["evidence_refs"] = unique_sorted(record.get("evidence_refs", []) + update.get("evidence_refs", []))
+        record["source_reports"] = unique_sorted(record.get("source_reports", []) + update.get("source_reports", []))
         if "last_touched_batch" in record and isinstance(update.get("last_touched_batch"), str):
             record["last_touched_batch"] = max(record["last_touched_batch"], update["last_touched_batch"])
         if update.get("runtime_status") == "confirmed-at-runtime" and record.get("status") != "runtime-confirmed":

@@ -642,6 +642,7 @@ object_schemas:
       - subject_id
       - proof_level
       - evidence_summary
+      - evidence_refs
     properties:
       subject_id:
         type: string
@@ -657,6 +658,7 @@ object_schemas:
       evidence_refs:
         type: object_list
         item_schema: evidence_ref
+        min_items: 1
 
   regression_recommendation:
     additional_properties: false

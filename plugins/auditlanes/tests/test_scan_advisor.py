@@ -152,7 +152,9 @@ class ScanAdvisorTests(unittest.TestCase):
         plan = self.run_advisor_json(root, "--requested-strategy", "diff-review")
         self.assertEqual(plan["requested_strategy"], "diff-review")
         self.assertEqual(plan["resolved_strategy"], "diff-review")
-        self.assertEqual(plan["coverage_mode"], "full-read")
+        self.assertEqual(plan["coverage_mode"], "focused-lanes")
+        self.assertIn("diff inputs unavailable", plan["coverage_gaps"])
+        self.assertTrue(any("changed files were not available" in item for item in plan["uncertainty"]))
 
     def test_repo_local_auditlanes_control_files_do_not_drive_detection(self):
         tmp = tempfile.TemporaryDirectory()

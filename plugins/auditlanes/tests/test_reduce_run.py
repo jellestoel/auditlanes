@@ -131,6 +131,47 @@ class ReduceRunTests(unittest.TestCase):
         finding = next(record for record in records if str(record.get("finding_id", "")).startswith("F-session-auth-"))
         self.assertEqual(finding["status"], "reswept-open")
 
+        batch_dir = run_copy / "reports" / "batch-06"
+        family_dir = batch_dir / "session-auth"
+        family_dir.mkdir(parents=True)
+        (family_dir / "report.md").write_text("# Session Auth Closed Report\n", encoding="utf-8")
+        sidecar["sidecar_id"] = "sidecar-session-auth-post-fix-002"
+        sidecar["generated_at"] = "2026-05-11T00:15:00Z"
+        sidecar["batch_id"] = "batch-06"
+        sidecar["confirmed_findings"][0]["status"] = "reswept-closed"
+        (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        (batch_dir / "manifest.yaml").write_text(
+            "\n".join([
+                "schema_version: 1",
+                "run_id: run-good",
+                "batch_id: batch-06",
+                'generated_at: "2026-05-11T00:15:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - session-auth",
+                "families:",
+                "  - family: session-auth",
+                "    status: ran",
+                "    mode: post-fix-resweep",
+                '    markdown: "${RUN_DIR}/reports/batch-06/session-auth/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-06/session-auth/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy), "--batch-id", "batch-06"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = read_jsonl(run_copy / "state" / "finding-inventory.jsonl")
+        finding = next(record for record in records if str(record.get("finding_id", "")).startswith("F-session-auth-"))
+        self.assertEqual(finding["status"], "reswept-closed")
+
     def test_profile_feedback_preserves_affected_families(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
@@ -212,6 +253,15 @@ class ReduceRunTests(unittest.TestCase):
                 "reason": "No runtime approval was granted.",
             },
             "regression_status": "proposed",
+            "evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
         }]
         sidecar["regression_recommendations"] = [{
             "finding_id": "PF-session-auth-001",
@@ -288,11 +338,29 @@ class ReduceRunTests(unittest.TestCase):
                 "subject_id": "PF-session-auth-001",
                 "proof_level": "P4-runtime-confirmed",
                 "evidence_summary": "Runtime evidence confirmed the missing guard.",
+                "evidence_refs": [{
+                    "path": "src/api/session.py",
+                    "line_start": 42,
+                    "line_end": 58,
+                    "symbol": "SessionView.post",
+                    "evidence_type": "runtime-observation",
+                    "snippet_hash": None,
+                    "rationale": "Synthetic runtime evidence.",
+                }],
             },
             {
                 "subject_id": "PF-session-auth-001",
                 "proof_level": "P1-candidate",
                 "evidence_summary": "Weaker later proof should not replace stronger proof.",
+                "evidence_refs": [{
+                    "path": "src/api/session.py",
+                    "line_start": 42,
+                    "line_end": 58,
+                    "symbol": "SessionView.post",
+                    "evidence_type": "missing-authn-check",
+                    "snippet_hash": None,
+                    "rationale": "Synthetic static evidence.",
+                }],
             },
         ]
         sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
@@ -376,6 +444,7 @@ class ReduceRunTests(unittest.TestCase):
         finding = next(record for record in records if str(record.get("finding_id", "")).startswith("F-session-auth-"))
         self.assertEqual(finding["status"], "runtime-confirmed")
         self.assertEqual(finding["runtime_status"], "confirmed-at-runtime")
+        self.assertTrue(any(source["batch_id"] == "batch-02" for source in finding["source_reports"]))
 
     def test_cross_lane_triggers_create_directives_from_attack_surface_graph(self):
         tmp = tempfile.TemporaryDirectory()

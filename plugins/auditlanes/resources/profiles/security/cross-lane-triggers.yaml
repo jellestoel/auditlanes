@@ -39,13 +39,12 @@ triggers:
       - role-matrix
 
   - id: webhook-callback-route
-    description: "Webhook, callback, signature, state, or nonce surfaces should notify integration trust and session auth."
+    description: "Webhook, callback, signature, or nonce surfaces should notify integration trust and session auth."
     when:
       patterns:
         - webhook
         - callback
         - signature
-        - state
         - nonce
     notify:
       - integration-trust

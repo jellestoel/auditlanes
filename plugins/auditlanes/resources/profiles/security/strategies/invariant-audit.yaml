@@ -24,6 +24,7 @@ required_sidecar_fields:
   - proof_updates
   - regression_recommendations
 required_state_artifacts:
+  - state/relevance-plan.yaml
   - state/security-invariants.jsonl
   - state/attack-surface-graph.jsonl
   - state/proof-ledger.jsonl

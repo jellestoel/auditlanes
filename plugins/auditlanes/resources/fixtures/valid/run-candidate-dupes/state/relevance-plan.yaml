@@ -1,0 +1,22 @@
+schema_version: 1
+profile: security
+requested_strategy: auto
+resolved_strategy: invariant-audit
+resolved_overlays:
+  - auto
+coverage_mode: risk-ranked
+resolution_reason: "Fixture relevance plan for invariant-audit validation."
+runtime_validation: false
+output_style: structured
+repo_observations:
+  languages: []
+  approximate_loc: null
+  detected_frameworks: []
+  detected_surfaces: []
+  inferred_archetypes: []
+selected_checks: []
+deprioritized_checks: []
+universal_checks_enabled: true
+agent_discretion_enabled: true
+uncertainty: []
+coverage_gaps: []

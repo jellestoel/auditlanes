@@ -35,6 +35,17 @@ class ScaffoldYamlTests(unittest.TestCase):
             with self.subTest(path=relative):
                 self.assertTrue((PLUGIN_ROOT / relative).exists(), relative)
 
+    def test_state_artifact_schemas_are_packaged(self):
+        validator = load_validator_module()
+        manifest = validator.load_json_or_yaml(PLUGIN_ROOT / "package-manifest.yaml")
+        packaged_files = set(manifest["plugin_files"])
+        executable_schemas = set(manifest["validator_status"]["executable_schemas"])
+        for schema in sorted(set(validator.STATE_ARTIFACT_SCHEMAS.values())):
+            relative = f"resources/schemas/{schema}"
+            with self.subTest(schema=schema):
+                self.assertIn(relative, packaged_files)
+                self.assertIn(relative, executable_schemas)
+
     def test_guidance_yaml_core_enums_match_json_schema(self):
         validator = load_validator_module()
         guidance = validator.load_json_or_yaml(SCAFFOLD_ROOT / "report-sidecar-schema.yaml")

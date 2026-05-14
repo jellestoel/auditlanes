@@ -77,6 +77,32 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("manifest paths must be run-relative", result.stderr)
 
+    def test_manifest_unhashable_family_values_report_errors_without_traceback(self):
+        run_copy = self.copied_run()
+        manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
+        manifest.write_text(json.dumps({
+            "schema_version": 1,
+            "run_id": "run-good",
+            "batch_id": "batch-01",
+            "generated_at": "2026-05-11T00:00:00Z",
+            "producer": "orchestrator",
+            "manifest_status": "completed",
+            "expected_families": ["session-auth", {"bad": "family"}],
+            "families": [{
+                "family": ["session-auth"],
+                "status": "ran",
+                "mode": "canonical-sweep",
+                "markdown": "${RUN_DIR}/reports/batch-01/session-auth/report.md",
+                "json": "${RUN_DIR}/reports/batch-01/session-auth/report.json",
+            }],
+        }), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected_families", result.stderr)
+        self.assertIn("families", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_missing_manifest_message_hints_at_manifest_yaml(self):
         run_copy = self.copied_run()
         manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
@@ -98,6 +124,24 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("referenced sidecar family 'session-auth' does not match manifest item family 'object-auth'", result.stderr)
 
+    def test_markdown_report_path_must_use_report_layout(self):
+        run_copy = self.copied_run()
+        alternate = run_copy / "reports" / "batch-01" / "session-auth" / "alternate.md"
+        alternate.write_text("# Alternate\n", encoding="utf-8")
+        manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8").replace(
+                "${RUN_DIR}/reports/batch-01/session-auth/report.md",
+                "${RUN_DIR}/reports/batch-01/session-auth/alternate.md",
+                1,
+            ),
+            encoding="utf-8",
+        )
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("markdown report must live at reports/<batch-id>/<family>/report.md", result.stderr)
+
     def test_owner_family_must_match_dedupe_owner_family(self):
         run_copy = self.copied_run()
         sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
@@ -109,6 +153,42 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("dedupe_key.owner_family", result.stderr)
         self.assertIn("must mirror confirmed_finding.owner_family exactly", result.stderr)
+
+    def test_candidate_optional_fields_must_match_dedupe_key(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["candidate_findings"] = [{
+            "candidate_id": "C-local-mirror-gap",
+            "candidate_dedupe_key": {
+                "proposed_owner_family": "session-auth",
+                "summary": "Candidate with hidden key fields.",
+                "files": ["src/api/session.py"],
+                "suspected_missing_guard": "require_session",
+                "impact_boundary": "session mutation",
+            },
+            "proposed_owner_family": "session-auth",
+            "severity": "low",
+            "confidence": "speculative",
+            "summary": "Candidate with hidden key fields.",
+            "blocker_to_confirmation": "needs static proof",
+            "files": ["src/api/session.py"],
+            "evidence_refs": [{
+                "path": "src/api/session.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence.",
+            }],
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("candidate_dedupe_key.suspected_missing_guard", result.stderr)
+        self.assertIn("must mirror candidate_finding.suspected_missing_guard exactly", result.stderr)
 
     def test_parked_family_requires_carried_forward_from(self):
         run_copy = self.copied_run()
@@ -607,6 +687,63 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertIn("security-invariants.jsonl", result.stderr)
         self.assertIn("missing required property", result.stderr)
 
+    def test_present_optional_state_artifacts_are_schema_validated(self):
+        run_copy = self.copied_run()
+        (run_copy / "state" / "authorization-matrix.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "matrix_id": "AUTHZ-bad",
+            "principal": "tenant-user",
+            "object": "invoice",
+            "action": "export",
+            "expected": "deny cross-tenant export",
+            "observed_guard": "unknown",
+            "status": "needs-review",
+            "surface_id": "SURF-export",
+            "evidence_refs": [],
+        }) + "\n", encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("authorization-matrix.jsonl", result.stderr)
+        self.assertIn("evidence_refs", result.stderr)
+
+    def test_state_artifact_owner_families_must_be_profile_lanes(self):
+        run_copy = self.copied_run()
+        (run_copy / "state" / "attack-surface-inventory.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "surface_id": "SURF-specialist-owner",
+            "category": "web-route",
+            "owner_family": "exploit-synthesis",
+            "description": "Synthetic surface with specialist owner.",
+            "paths": ["src/api/session.py"],
+            "evidence_refs": [{
+                "path": "src/api/session.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence.",
+            }],
+        }) + "\n", encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("attack-surface-inventory.jsonl", result.stderr)
+        self.assertIn("not a lane in profile", result.stderr)
+
+    def test_relevance_plan_auto_overlays_must_match_sidecars(self):
+        run_copy = self.copied_run()
+        plan_path = run_copy / "state" / "relevance-plan.yaml"
+        plan_path.write_text(
+            plan_path.read_text(encoding="utf-8").replace("  - auto\n", "  - python\n  - webapp\n", 1),
+            encoding="utf-8",
+        )
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("must match auto-resolved overlays", result.stderr)
+
     def test_attack_surface_inventory_uses_inventory_schema(self):
         run_copy = self.copied_run()
         tmp = tempfile.TemporaryDirectory()
@@ -629,7 +766,15 @@ class ValidateRunCliTests(unittest.TestCase):
             "owner_family": "object-auth",
             "description": "Checkout route accepts user input.",
             "paths": ["src/api/checkout.py"],
-            "evidence_refs": [],
+            "evidence_refs": [{
+                "path": "src/api/checkout.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence.",
+            }],
         }) + "\n", encoding="utf-8")
 
         result = self.run_validator(run_copy, "--profiles-dir", str(profiles_dir))
@@ -665,6 +810,13 @@ class ValidateRunCliTests(unittest.TestCase):
         sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
         sidecar["strategy"] = "diff-review"
         sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        plan_path = run_copy / "state" / "relevance-plan.yaml"
+        plan_path.write_text(
+            plan_path.read_text(encoding="utf-8")
+            .replace("requested_strategy: auto", "requested_strategy: diff-review", 1)
+            .replace("resolved_strategy: invariant-audit", "resolved_strategy: diff-review", 1),
+            encoding="utf-8",
+        )
 
         result = self.run_validator(run_copy)
         self.assertEqual(result.returncode, 0, result.stderr)

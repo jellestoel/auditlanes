@@ -38,6 +38,25 @@ STATE_ARTIFACT_SCHEMAS = {
     "security-smells.jsonl": "security-smell.schema.json",
     "unowned-surfaces.jsonl": "unowned-surface.schema.json",
 }
+STATE_LANE_FIELDS = {
+    "attack-surface-graph.jsonl": ("owner_family",),
+    "attack-surface-inventory.jsonl": ("owner_family",),
+    "incidental-leads.jsonl": ("proposed_owner_family",),
+    "security-invariants.jsonl": ("owner_family",),
+    "security-smells.jsonl": ("recommended_owner",),
+}
+STATE_LANE_LIST_FIELDS = {
+    "attack-surface-graph.jsonl": ("secondary_families",),
+    "security-invariants.jsonl": ("secondary_families",),
+}
+STATE_EVIDENCE_ARTIFACTS = {
+    "attack-surface-graph.jsonl",
+    "attack-surface-inventory.jsonl",
+    "authorization-matrix.jsonl",
+    "incidental-leads.jsonl",
+    "proof-ledger.jsonl",
+    "security-invariants.jsonl",
+}
 
 
 class ValidationIssue:
@@ -92,6 +111,10 @@ def parse_simple_yaml(text: str) -> Any:
         value = value.strip()
         if value in {"null", "~"}:
             return None
+        if value == "[]":
+            return []
+        if value == "{}":
+            return {}
         if value == "true":
             return True
         if value == "false":
@@ -758,7 +781,7 @@ def validate_sidecar_profile(
             issues.append(ValidationIssue(sidecar_path, f"$.candidate_findings[{index}].candidate_dedupe_key.proposed_owner_family", f"owner family {dedupe_owner!r} is not a lane in profile {profile_id!r}"))
         dedupe_key = candidate.get("candidate_dedupe_key") if isinstance(candidate.get("candidate_dedupe_key"), dict) else {}
         for field in ("proposed_owner_family", "summary", "files", "suspected_missing_guard", "impact_boundary"):
-            if field in candidate and field in dedupe_key and candidate[field] != dedupe_key[field]:
+            if candidate.get(field) != dedupe_key.get(field):
                 issues.append(ValidationIssue(sidecar_path, f"$.candidate_findings[{index}].candidate_dedupe_key.{field}", f"must mirror candidate_finding.{field} exactly"))
 
     for index, feedback in enumerate(sidecar.get("profile_feedback", [])):
@@ -1003,16 +1026,23 @@ def validate_manifest_outputs(
     expected_items = manifest.get("expected_families", [])
     if not isinstance(expected_items, list):
         expected_items = []
-    if isinstance(expected_items, list):
-        expected_duplicates = sorted({family for family in expected_items if expected_items.count(family) > 1})
-        for family in expected_duplicates:
-            issues.append(ValidationIssue(manifest_path, "$.expected_families", f"duplicate expected family {family!r}"))
-    expected = set(expected_items)
+    expected_strings = [family for family in expected_items if isinstance(family, str)]
+    expected_duplicates = sorted({
+        family for family in expected_strings
+        if expected_strings.count(family) > 1
+    })
+    for family in expected_duplicates:
+        issues.append(ValidationIssue(manifest_path, "$.expected_families", f"duplicate expected family {family!r}"))
+    expected = set(expected_strings)
 
     family_items = manifest.get("families", [])
     if not isinstance(family_items, list):
         family_items = []
-    seen_list = [item.get("family") for item in family_items if isinstance(item, dict)]
+    seen_list = [
+        item.get("family")
+        for item in family_items
+        if isinstance(item, dict) and isinstance(item.get("family"), str)
+    ]
     seen = set(seen_list)
     for family in sorted({family for family in seen_list if seen_list.count(family) > 1}):
         issues.append(ValidationIssue(manifest_path, "$.families", f"duplicate family entry {family!r}"))
@@ -1032,7 +1062,7 @@ def validate_manifest_outputs(
             issues.extend(validate_strategy_batch_shape(
                 manifest_path,
                 path_batch_id,
-                expected_items,
+                expected_strings,
                 family_items,
                 selected_profile,
                 strategy_id,
@@ -1040,7 +1070,7 @@ def validate_manifest_outputs(
             ))
     if path_batch_id == "batch-04" and selected_profile["id"] == "security":
         specialists = selected_profile["specialists"]
-        if set(expected_items) != set(specialists) or len(expected_items) != len(specialists):
+        if set(expected_strings) != set(specialists) or len(expected_strings) != len(specialists):
             issues.append(ValidationIssue(manifest_path, "$.expected_families", "batch-04 security exploit synthesis must include only the exploit-synthesis specialist"))
 
     manifest_status = manifest.get("manifest_status")
@@ -1090,6 +1120,13 @@ def validate_manifest_outputs(
             if not resolved.exists():
                 issues.append(ValidationIssue(manifest_path, f"$.families[{index}].{field}", f"output file does not exist: {resolved}"))
                 continue
+            if field == "markdown":
+                plain_file_issues = require_plain_file_under(run_dir, raw_output, "markdown report")
+                if plain_file_issues:
+                    issues.extend(plain_file_issues)
+                    continue
+                issues.extend(validate_markdown_report_path(run_dir, raw_output, path_batch_id, family))
+                continue
             if field == "json":
                 plain_file_issues = require_plain_file_under(run_dir, raw_output, "sidecar")
                 if plain_file_issues:
@@ -1103,6 +1140,29 @@ def validate_manifest_outputs(
                     continue
                 if isinstance(sidecar, dict):
                     issues.extend(validate_manifest_sidecar_reference(run_dir, manifest_path, manifest, index, item, resolved, sidecar))
+    return issues
+
+
+def validate_markdown_report_path(
+    run_dir: Path,
+    path: Path,
+    expected_batch_id: str | None,
+    expected_family: Any,
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    try:
+        relative = path.resolve().relative_to(run_dir.resolve())
+    except ValueError:
+        return [ValidationIssue(path, "$", "markdown report path is outside RUN_DIR")]
+
+    parts = relative.parts
+    if len(parts) != 4 or parts[0] != "reports" or parts[3] != "report.md":
+        issues.append(ValidationIssue(path, "$", "markdown report must live at reports/<batch-id>/<family>/report.md"))
+        return issues
+    if expected_batch_id is not None and parts[1] != expected_batch_id:
+        issues.append(ValidationIssue(path, "$", f"markdown report batch path must match manifest batch {expected_batch_id!r}"))
+    if isinstance(expected_family, str) and parts[2] != expected_family:
+        issues.append(ValidationIssue(path, "$", f"markdown report family path must match manifest family {expected_family!r}"))
     return issues
 
 
@@ -1187,11 +1247,89 @@ def validate_jsonl_file(path: Path, schema: dict[str, Any]) -> list[ValidationIs
     return issues
 
 
+def parsed_jsonl_rows(path: Path) -> list[tuple[int, Any]]:
+    rows: list[tuple[int, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    rows.append((line_number, json.loads(text)))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return rows
+    return rows
+
+
+def validate_evidence_ref_semantics(path: Path, location: str, refs: Any) -> list[ValidationIssue]:
+    issues = validate_evidence_refs(path, location, refs)
+    if not isinstance(refs, list):
+        return issues
+
+    required_fields = ("path", "line_start", "evidence_type", "rationale")
+    for index, ref in enumerate(refs):
+        if not isinstance(ref, dict):
+            continue
+        ref_location = f"{location}[{index}]"
+        for field in required_fields:
+            if field not in ref:
+                issues.append(ValidationIssue(path, f"{ref_location}.{field}", "missing required evidence field"))
+        if "path" in ref and (not isinstance(ref.get("path"), str) or not ref.get("path")):
+            issues.append(ValidationIssue(path, f"{ref_location}.path", "must be a non-empty repository-relative path"))
+        if "rationale" in ref and (not isinstance(ref.get("rationale"), str) or not ref.get("rationale")):
+            issues.append(ValidationIssue(path, f"{ref_location}.rationale", "must be a non-empty string"))
+    return issues
+
+
+def validate_state_artifact_semantics(
+    artifact_path: Path,
+    artifact_name: str,
+    selected_profile: dict[str, Any],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    lanes = selected_profile["lanes"]
+    profile_id = selected_profile["id"]
+
+    for line_number, row in parsed_jsonl_rows(artifact_path):
+        if not isinstance(row, dict):
+            continue
+        for field in STATE_LANE_FIELDS.get(artifact_name, ()):
+            value = row.get(field)
+            if isinstance(value, str) and value not in lanes:
+                issues.append(ValidationIssue(
+                    artifact_path,
+                    f"$[{line_number}].{field}",
+                    f"owner family {value!r} is not a lane in profile {profile_id!r}",
+                ))
+        for field in STATE_LANE_LIST_FIELDS.get(artifact_name, ()):
+            values = row.get(field, [])
+            if not isinstance(values, list):
+                continue
+            for index, value in enumerate(values):
+                if isinstance(value, str) and value not in lanes:
+                    issues.append(ValidationIssue(
+                        artifact_path,
+                        f"$[{line_number}].{field}[{index}]",
+                        f"owner family {value!r} is not a lane in profile {profile_id!r}",
+                    ))
+        if artifact_name in STATE_EVIDENCE_ARTIFACTS and "evidence_refs" in row:
+            issues.extend(validate_evidence_ref_semantics(
+                artifact_path,
+                f"$[{line_number}].evidence_refs",
+                row.get("evidence_refs"),
+            ))
+    return issues
+
+
 def validate_state_artifact(
     run_dir: Path,
     schemas_dir: Path,
     relative_artifact: str,
     origins: list[str],
+    selected_profile: dict[str, Any] | None = None,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     artifact_path = run_dir / relative_artifact
@@ -1213,8 +1351,35 @@ def validate_state_artifact(
     schema = load_json(schema_path)
     if artifact_path.suffix == ".jsonl":
         issues.extend(validate_jsonl_file(artifact_path, schema))
+        if selected_profile is not None:
+            issues.extend(validate_state_artifact_semantics(artifact_path, artifact_path.name, selected_profile))
     else:
         issues.extend(validate_file(artifact_path, schema, load_json_or_yaml))
+    return issues
+
+
+def validate_present_state_artifacts(
+    run_dir: Path,
+    schemas_dir: Path,
+    selected_profile: dict[str, Any],
+) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    state_dir = run_dir / "state"
+    if not state_dir.exists():
+        return issues
+    if state_dir.is_symlink():
+        return [ValidationIssue(state_dir, "$", "symlinked state directory is not allowed")]
+
+    for artifact_name in sorted(STATE_ARTIFACT_SCHEMAS):
+        artifact_path = state_dir / artifact_name
+        if artifact_path.exists():
+            issues.extend(validate_state_artifact(
+                run_dir,
+                schemas_dir,
+                f"state/{artifact_name}",
+                ["present-state-artifact"],
+                selected_profile,
+            ))
     return issues
 
 
@@ -1246,7 +1411,9 @@ def validate_required_state_artifacts(
     if requirements and (run_dir / "state").is_symlink():
         return [ValidationIssue(run_dir / "state", "$", "symlinked state directory is not allowed")]
     for artifact, origins in sorted(requirements.items()):
-        issues.extend(validate_state_artifact(run_dir, schemas_dir, artifact, sorted(set(origins))))
+        if (run_dir / artifact).exists():
+            continue
+        issues.extend(validate_state_artifact(run_dir, schemas_dir, artifact, sorted(set(origins)), selected_profile))
     return issues
 
 
@@ -1270,12 +1437,6 @@ def validate_relevance_plan_consistency(
         return [ValidationIssue(path, "$", f"could not parse relevance plan: {exc}")]
     if not isinstance(plan, dict):
         return [ValidationIssue(path, "$", "relevance plan must be an object")]
-
-    schema_path = schemas_dir / "relevance-plan.schema.json"
-    if schema_path.exists():
-        schema = load_json(schema_path)
-        for message in validate_schema(plan, schema):
-            issues.append(ValidationIssue(path, message.split(":", 1)[0], message.split(":", 1)[1].strip() if ":" in message else message))
 
     profile_id = selected_profile["id"]
     if plan.get("profile") != profile_id:
@@ -1303,6 +1464,17 @@ def validate_relevance_plan_consistency(
         for index, overlay in enumerate(resolved_overlays):
             if isinstance(overlay, str) and overlay not in overlays:
                 issues.append(ValidationIssue(path, f"$.resolved_overlays[{index}]", f"overlay {overlay!r} is not defined by profile {profile_id!r}"))
+        if requested_strategy == "auto":
+            expected_overlays = {overlay for overlay in resolved_overlays if isinstance(overlay, str)}
+            for sidecar_path, sidecar in sidecars:
+                sidecar_overlays = sidecar.get("overlays", [])
+                actual_overlays = set(sidecar_overlays) if isinstance(sidecar_overlays, list) and all(isinstance(overlay, str) for overlay in sidecar_overlays) else set()
+                if actual_overlays != expected_overlays:
+                    issues.append(ValidationIssue(
+                        sidecar_path,
+                        "$.overlays",
+                        f"must match auto-resolved overlays from state/relevance-plan.yaml: {sorted(expected_overlays)!r}",
+                    ))
     return issues
 
 
@@ -1388,6 +1560,7 @@ def validate_run(
         if count > 1:
             issues.append(ValidationIssue(sidecar_path, "$", "sidecar is referenced by multiple manifest items"))
 
+    issues.extend(validate_present_state_artifacts(run_dir, schemas_dir, selected_profile))
     issues.extend(validate_required_state_artifacts(run_dir, schemas_dir, selected_profile, parsed_sidecars))
     issues.extend(validate_relevance_plan_consistency(run_dir, schemas_dir, selected_profile, parsed_sidecars, allow_experimental))
 

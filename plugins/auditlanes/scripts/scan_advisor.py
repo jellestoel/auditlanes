@@ -436,7 +436,7 @@ def dedupe_checks(checks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [by_id[key] for key in sorted(by_id)]
 
 
-def build_plan(root: Path, requested_strategy: str = "auto") -> dict[str, Any]:
+def build_plan(root: Path, requested_strategy: str = "auto", changed_files: list[str] | None = None) -> dict[str, Any]:
     files = list_files(root)
     text, evidence_text = collect_text(root, files)
     loc = approximate_loc(root, files)
@@ -456,6 +456,10 @@ def build_plan(root: Path, requested_strategy: str = "auto") -> dict[str, Any]:
         uncertainty.append("Commerce/order-like names are treated as relevance cues, not proof of a checkout or payment application.")
     if payment_detected and "webhook" not in surfaces:
         uncertainty.append("Payment provider usage was detected, but no webhook surface was found during pre-scan.")
+    if requested_strategy == "diff-review" and not changed_files:
+        coverage_mode = "focused-lanes"
+        reason = "Diff-review was requested, but no base/head or changed-file input was supplied; lane focus is advisory only."
+        uncertainty.append("Diff-review changed files were not available to the advisor; reviewers must supply or inspect the diff before relying on relevance.")
 
     return {
         "schema_version": 1,
@@ -479,7 +483,7 @@ def build_plan(root: Path, requested_strategy: str = "auto") -> dict[str, Any]:
         "universal_checks_enabled": True,
         "agent_discretion_enabled": True,
         "uncertainty": uncertainty,
-        "coverage_gaps": [],
+        "coverage_gaps": ["diff inputs unavailable"] if requested_strategy == "diff-review" and not changed_files else [],
         "advisor": {
             "target_root": root.as_posix(),
             "git_detected": (root / ".git").exists(),
@@ -530,6 +534,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Static-only AuditLanes scan advisor.")
     parser.add_argument("target", nargs="?", default=".", type=Path)
     parser.add_argument("--requested-strategy", default="auto")
+    parser.add_argument("--changed-file", action="append", default=[], help="Changed file path for diff-review relevance planning. May be passed multiple times.")
     parser.add_argument("--format", choices=["json", "text"], default="text")
     parser.add_argument("--json", action="store_true", help="Shortcut for --format json.")
     args = parser.parse_args(argv)
@@ -539,7 +544,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"target root does not exist or is not a directory: {root}", file=sys.stderr)
         return 2
 
-    plan = build_plan(root, requested_strategy=args.requested_strategy)
+    plan = build_plan(root, requested_strategy=args.requested_strategy, changed_files=args.changed_file)
     if args.json or args.format == "json":
         print(json.dumps(plan, indent=2, sort_keys=True))
     else:
