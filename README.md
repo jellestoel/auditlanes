@@ -7,14 +7,14 @@ The installable plugin lives under `plugins/auditlanes/`. It defines how an
 agent orchestrator should plan work, control state, cap concurrency, suppress
 duplicate findings, share cross-family context, and produce a final report.
 
-The protocol now has a core/profile split. v0.4.9 keeps the `security` profile
+The protocol now has a core/profile split. v0.4.10 keeps the `security` profile
 as the only stable runnable profile and includes compact experimental
 architecture-profile metadata to prove lane catalogs can be loaded without
 bloating normal security runs.
 
 ## Current Status
 
-AuditLanes v0.4.9 is a protocol-first beta plugin package: a structured
+AuditLanes v0.4.10 is a protocol-first beta plugin package: a structured
 security-audit orchestration protocol with executable sidecar validation and a
 minimal deterministic reducer.
 
@@ -56,7 +56,7 @@ overlay validity, mode/family compatibility, runtime-safe constraints, and
 evidence path policy require `validate_run.py` or a generated profile-specific
 schema.
 
-v0.4.9 validates and reduces report sidecars into basic deterministic state,
+v0.4.10 validates and reduces report sidecars into basic deterministic state,
 including incidental leads, security smells, proof updates, and regression
 recommendations. It also emits basic family directives from incidental leads and
 cross-lane trigger matches. It does not yet orchestrate the full audit
@@ -144,10 +144,10 @@ Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
 
 For a deliberately pinned install, use `/plugin marketplace add
-jellestoel/auditlanes@v0.4.9` in Claude Code or `codex plugin marketplace add
-jellestoel/auditlanes --ref v0.4.9` in Codex.
+jellestoel/auditlanes@v0.4.10` in Claude Code or `codex plugin marketplace add
+jellestoel/auditlanes --ref v0.4.10` in Codex.
 
-AuditLanes v0.4.9 is a protocol-first beta. It validates sidecars and reduces
+AuditLanes v0.4.10 is a protocol-first beta. It validates sidecars and reduces
 basic state, but does not yet run the full audit automatically or implement full
 reducer semantics.
 
@@ -263,7 +263,7 @@ Experimental profiles are rejected by default.
 `--allow-experimental` is only for profile-loading/catalog compatibility checks;
 it does not make metadata-only profiles runnable sidecar audit modes.
 
-The v0.4.9 reducer imports confirmed findings, candidate findings, rejected
+The v0.4.10 reducer imports confirmed findings, candidate findings, rejected
 claims, profile feedback, chain candidates, incidental leads, security smells,
 proof updates, `run_local_checks`, and regression recommendations. Run-local
 checks let agents preserve repo-specific security questions outside the bundled
@@ -481,7 +481,7 @@ AuditLanes Core
 
 ## Profiles
 
-AuditLanes v0.4.9 separates core workflow mechanics from profile lane catalogs:
+AuditLanes v0.4.10 separates core workflow mechanics from profile lane catalogs:
 
 - core: orchestration, output layout, validation scripts, reducer mechanics
 - stable profile: `security`
@@ -491,6 +491,12 @@ The validator derives allowed lane IDs from
 `plugins/auditlanes/resources/profiles/<profile>/lanes.yaml`. This keeps normal
 context small because agents only need the selected profile's compact lane list,
 not every future audit domain.
+
+The security profile also includes project-shape overlays for repo scanners,
+JavaScript/TypeScript, browser clients, GraphQL, background jobs, identity
+federation, admin backoffices, realtime messaging, monorepos, microservices,
+AI-agent apps, mobile backends, APIs, SaaS tenancy, data-heavy apps, platforms,
+libraries, web apps, checkout, payments, integrations, and Python.
 
 The architecture profile is metadata-only. Its lane catalog can be loaded for
 compatibility checks, but its specialist mode is not part of the executable

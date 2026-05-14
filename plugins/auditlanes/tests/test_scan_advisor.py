@@ -81,6 +81,7 @@ class ScanAdvisorTests(unittest.TestCase):
         self.assertIn("checkout", plan["resolved_overlays"])
         self.assertIn("payment-flow", plan["resolved_overlays"])
         self.assertIn("webapp", plan["resolved_overlays"])
+        self.assertIn("api", plan["resolved_overlays"])
         self.assertIn("commerce-flow", plan["repo_observations"]["inferred_archetypes"])
 
         check_ids = {check["id"] for check in plan["selected_checks"]}
@@ -116,6 +117,7 @@ class ScanAdvisorTests(unittest.TestCase):
         plan = self.run_advisor_json(root)
         self.assertIn("python", plan["resolved_overlays"])
         self.assertIn("webapp", plan["resolved_overlays"])
+        self.assertIn("api", plan["resolved_overlays"])
         self.assertNotIn("checkout", plan["resolved_overlays"])
         self.assertNotIn("payment-flow", plan["resolved_overlays"])
 
@@ -146,6 +148,135 @@ class ScanAdvisorTests(unittest.TestCase):
         self.assertEqual(plan["resolved_strategy"], "invariant-audit")
         self.assertEqual(plan["coverage_mode"], "risk-ranked")
         self.assertIn("webapp", plan["resolved_overlays"])
+        self.assertIn("api", plan["resolved_overlays"])
+
+    def test_developer_tool_overlay_for_repo_scanner_shape(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / "repo-scanner"
+        root.mkdir()
+        (root / ".git").mkdir()
+        (root / ".codex-plugin").mkdir()
+        (root / ".codex-plugin" / "plugin.json").write_text('{"name": "repo-scanner"}\n', encoding="utf-8")
+        scripts = root / "scripts"
+        scripts.mkdir()
+        (scripts / "validate_run.py").write_text(
+            "\n".join([
+                "from pathlib import Path",
+                "import yaml",
+                "",
+                "def validate(target_root, run_dir):",
+                "    # untrusted repo inputs must not become control-plane instructions",
+                "    resolved = Path(target_root).resolve()",
+                "    return yaml.safe_load((Path(run_dir) / 'manifest.yaml').read_text())",
+            ]),
+            encoding="utf-8",
+        )
+
+        plan = self.run_advisor_json(root)
+        self.assertIn("developer-tool", plan["resolved_overlays"])
+        self.assertIn("developer-tool", plan["repo_observations"]["inferred_archetypes"])
+        check_ids = {check["id"] for check in plan["selected_checks"]}
+        self.assertIn("tool.untrusted-repo-boundaries", check_ids)
+
+    def test_javascript_browser_graphql_realtime_and_jobs_overlays(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / "next-platform"
+        root.mkdir()
+        (root / ".git").mkdir()
+        (root / "package.json").write_text(
+            json.dumps({
+                "dependencies": {
+                    "next": "latest",
+                    "react": "latest",
+                    "@apollo/server": "latest",
+                    "socket.io": "latest",
+                    "bullmq": "latest",
+                }
+            }),
+            encoding="utf-8",
+        )
+        app_dir = root / "app"
+        app_dir.mkdir()
+        (app_dir / "page.tsx").write_text(
+            "\n".join([
+                "import React from 'react'",
+                "export default function Page() {",
+                "  return <div dangerouslySetInnerHTML={{__html: window.localStorage.getItem('html') || ''}} />",
+                "}",
+            ]),
+            encoding="utf-8",
+        )
+        (root / "server.ts").write_text(
+            "\n".join([
+                "import { ApolloServer } from '@apollo/server'",
+                "import { Server } from 'socket.io'",
+                "import { Queue } from 'bullmq'",
+                "const typeDefs = `type Query { invoice(id: ID!): Invoice }`",
+                "const resolvers = { Query: { invoice: (_: unknown, args: any) => args.id } }",
+                "new Server().to('tenant-room').emit('invoice', {})",
+                "new Queue('fulfillment').add('ship', { orderId: 'ord_1' })",
+            ]),
+            encoding="utf-8",
+        )
+
+        plan = self.run_advisor_json(root)
+        for overlay in (
+            "javascript-typescript",
+            "browser-client",
+            "webapp",
+            "api",
+            "graphql",
+            "realtime-messaging",
+            "background-jobs",
+        ):
+            self.assertIn(overlay, plan["resolved_overlays"])
+
+        check_ids = {check["id"] for check in plan["selected_checks"]}
+        self.assertIn("graphql.resolver-authorization", check_ids)
+        self.assertIn("realtime.channel-authorization", check_ids)
+        self.assertIn("jobs.payload-trust-transfer", check_ids)
+
+    def test_dormant_and_project_shape_overlays_are_selected(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / "platform-monorepo"
+        root.mkdir()
+        (root / ".git").mkdir()
+        (root / "pnpm-workspace.yaml").write_text("packages:\n  - apps/*\n  - packages/*\n  - services/*\n", encoding="utf-8")
+        (root / "docker-compose.yml").write_text("services:\n  api:\n    build: ./services/api\n  worker:\n    build: ./services/worker\n", encoding="utf-8")
+        for directory in ("apps/admin", "packages/auth", "services/api", "services/worker"):
+            (root / directory).mkdir(parents=True)
+        (root / "services/api/app.py").write_text(
+            "\n".join([
+                "from fastapi import FastAPI",
+                "import openai",
+                "app = FastAPI()",
+                "@app.get('/admin/export')",
+                "def admin_export(tenant_id: str, organization_id: str):",
+                "    prompt = 'summarize customer data'",
+                "    device_token = 'fcm-token'",
+                "    redirect_uri = 'https://example.test/callback'",
+                "    oauth_state_nonce = 'state nonce'",
+                "    internal_api = 'service-to-service mtls api gateway shared secret'",
+                "    return {'tenant': tenant_id, 'prompt': prompt, 'device_token': device_token, 'redirect_uri': redirect_uri, 'internal_api': internal_api}",
+            ]),
+            encoding="utf-8",
+        )
+
+        plan = self.run_advisor_json(root)
+        for overlay in (
+            "multi-tenant-saas",
+            "admin-backoffice",
+            "identity-federation",
+            "ai-agent-app",
+            "mobile-backend",
+            "monorepo",
+            "microservices",
+            "platform-heavy",
+        ):
+            self.assertIn(overlay, plan["resolved_overlays"])
 
     def test_explicit_requested_strategy_is_preserved(self):
         root = self.small_checkout_repo()

@@ -118,6 +118,12 @@ FRAMEWORK_PATTERNS = {
     "starlette": [r"\bfrom\s+starlette\b"],
     "express": [r"\bexpress\s*\(", r"\bapp\.(get|post|put|delete|patch)\s*\("],
     "nextjs": [r"\bnext\b", r"pages/api", r"app/api"],
+    "react": [r"\bfrom\s+['\"]react['\"]", r"\bimport\s+React\b", r"\bReactDOM\b"],
+    "vue": [r"\bfrom\s+['\"]vue['\"]", r"\bcreateApp\s*\("],
+    "svelte": [r"\.svelte\b", r"\bsvelte\b"],
+    "angular": [r"@angular/", r"\bNgModule\b"],
+    "remix": [r"@remix-run/", r"\bremix\b"],
+    "nuxt": [r"\bnuxt\b", r"defineNuxtConfig"],
 }
 
 SURFACE_PATTERNS = {
@@ -132,6 +138,15 @@ SURFACE_PATTERNS = {
     "upload": [r"['\"][^'\"]*/[^'\"]*upload", r"\brequest\.files\b", r"\bmultipart/form-data\b"],
     "download": [r"['\"][^'\"]*/[^'\"]*(download|export)", r"\bsend_file\s*\(", r"\battachment_filename\s*="],
     "database": [r"\bimport\s+sqlite3\b", r"\bfrom\s+sqlalchemy\b", r"\bexecute\s*\(\s*f?['\"].*\b(SELECT|INSERT|UPDATE|DELETE)\b"],
+    "graphql": [r"\bGraphQL\b", r"\bApollo(Server|Client)?\b", r"\btypeDefs\b", r"\bresolvers\b", r"\bgraphene\b", r"\bstrawberry\.graphql\b", r"['\"][^'\"]*/[^'\"]*graphql"],
+    "realtime": [r"\bWebSocket\b", r"\bsocket\.io\b", r"\bSocketIO\b", r"\bsubscriptions?\b", r"\bEventSource\b", r"\bSSE\b", r"\bpubsub\b"],
+    "background-job": [r"\b(Celery|RQ|Dramatiq|Sidekiq|BullMQ|Bull|Agenda)\b", r"\bqueue\.(add|publish|send|enqueue)\b", r"\bcron\b", r"\bschedule(d)?_task\b", r"\bworker\b"],
+    "identity-federation": [r"\b(OAuth|OIDC|SAML|SCIM)\b", r"\bredirect_uri\b", r"\bstate\b.{0,80}\bnonce\b", r"\bmagic[_-]?link\b", r"\bpassword[_-]?reset\b", r"\binvitation\b"],
+    "tenant": [r"\b(tenant|tenant_id|org_id|organization_id|workspace_id|account_id|membership|team_id)\b"],
+    "ai-agent": [r"\b(openai|anthropic|langchain|llm|rag|vector[_-]?store|embedding|tool_call|function_call|prompt)\b"],
+    "mobile": [r"\b(device_token|push_token|apns|fcm|firebase messaging|expo push|mobile_app|ios|android)\b"],
+    "service-to-service": [r"\b(service[-_ ]to[-_ ]service|internal api|api gateway|mtls|x-service|shared secret)\b", r"\bgrpc\b", r"\bprotobuf\b"],
+    "search-reporting": [r"\b(search|analytics|report|dashboard|export|csv|pdf|data warehouse)\b"],
 }
 
 PAYMENT_PATTERNS = [
@@ -154,11 +169,36 @@ CONFIG_FILENAMES = {
     "Pipfile",
     "poetry.lock",
     "package.json",
+    "package-lock.json",
     "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
     "yarn.lock",
+    "turbo.json",
+    "nx.json",
+    "lerna.json",
+    "tsconfig.json",
+    "vite.config.js",
+    "vite.config.ts",
+    "next.config.js",
+    "next.config.ts",
     "Dockerfile",
     "docker-compose.yml",
+    "docker-compose.yaml",
+    "go.mod",
+    "Cargo.toml",
 }
+
+API_FRAMEWORKS = {"flask", "django", "fastapi", "starlette", "express", "nextjs"}
+CLIENT_FRAMEWORKS = {"react", "vue", "svelte", "angular", "nextjs", "remix", "nuxt"}
+JS_TS_LANGUAGES = {"javascript", "typescript"}
+PLATFORM_CONFIGS = {
+    "Dockerfile",
+    "docker-compose.yml",
+    "docker-compose.yaml",
+    "go.mod",
+    "Cargo.toml",
+}
+MONOREPO_CONFIGS = {"pnpm-workspace.yaml", "turbo.json", "nx.json", "lerna.json"}
 
 
 def repo_relative(root: Path, path: Path) -> str:
@@ -325,7 +365,89 @@ def has_strong_checkout_signal(surfaces: list[str], payment_detected: bool) -> b
     )
 
 
-def archetypes(surfaces: list[str], frameworks: list[str], languages: list[str], payment_detected: bool) -> list[str]:
+def relative_paths(root: Path, files: list[Path]) -> set[str]:
+    return {repo_relative(root, path) for path in files}
+
+
+def top_level_dirs(root: Path, files: list[Path]) -> set[str]:
+    dirs: set[str] = set()
+    for path in files:
+        parts = path.relative_to(root).parts
+        if len(parts) >= 2:
+            dirs.add(parts[0])
+    return dirs
+
+
+def has_file_under(root: Path, files: list[Path], dirname: str) -> bool:
+    prefix = f"{dirname}/"
+    return any(repo_relative(root, path).startswith(prefix) for path in files)
+
+
+def has_developer_tool_signal(root: Path, files: list[Path], text: str) -> bool:
+    rels = relative_paths(root, files)
+    if {".codex-plugin/plugin.json", ".claude-plugin/plugin.json"} & rels:
+        return True
+    if "plugins/auditlanes/package-manifest.yaml" in rels:
+        return True
+    if any(rel.endswith(("validate_run.py", "reduce_run.py", "scan_advisor.py")) for rel in rels):
+        if re.search(r"\b(untrusted|target_root|plugin_root|run_dir|symlink|Path\.resolve|yaml\.safe_load)\b", text, re.IGNORECASE):
+            return True
+    return bool(re.search(r"\b(repo[- ]scanner|plugin manifest|untrusted repo|target root|plugin root|control-plane)\b", text, re.IGNORECASE))
+
+
+def has_library_package_signal(text: str, config: list[str], frameworks: list[str], surfaces: list[str]) -> bool:
+    package_config = {"package.json", "pyproject.toml", "Cargo.toml", "go.mod"} & set(config)
+    if not package_config:
+        return False
+    library_metadata = re.search(
+        r"(\[project\]|\"(main|module|exports|types)\"\s*:|\bsetuptools\b|\bpoetry\b|\bcrate-type\b|\bmodule\s+[\w./-]+)",
+        text,
+        re.IGNORECASE,
+    )
+    app_signals = set(frameworks) & (API_FRAMEWORKS | CLIENT_FRAMEWORKS)
+    app_surfaces = set(surfaces) & {"auth-session", "admin", "upload", "download", "webhook", "callback", "checkout", "payment-session"}
+    return bool(library_metadata) and not (app_signals or app_surfaces)
+
+
+def has_browser_client_signal(root: Path, files: list[Path], frameworks: list[str], text: str) -> bool:
+    if set(frameworks) & CLIENT_FRAMEWORKS:
+        return True
+    if any(path.suffix in {".jsx", ".tsx", ".vue", ".svelte"} for path in files):
+        return True
+    return bool(re.search(r"\b(localStorage|sessionStorage|dangerouslySetInnerHTML|import\.meta\.env|NEXT_PUBLIC_|VITE_)\b", text))
+
+
+def has_monorepo_signal(root: Path, files: list[Path], config: list[str]) -> bool:
+    if set(config) & MONOREPO_CONFIGS:
+        return True
+    dirs = top_level_dirs(root, files)
+    workspace_dirs = {"apps", "packages", "services"}
+    return len(dirs & workspace_dirs) >= 2
+
+
+def has_microservices_signal(root: Path, files: list[Path], config: list[str], surfaces: list[str]) -> bool:
+    if "service-to-service" in surfaces:
+        return True
+    if {"docker-compose.yml", "docker-compose.yaml"} & set(config) and has_file_under(root, files, "services"):
+        return True
+    service_children = {
+        path.relative_to(root).parts[1]
+        for path in files
+        if len(path.relative_to(root).parts) >= 3 and path.relative_to(root).parts[0] == "services"
+    }
+    return len(service_children) >= 2
+
+
+def archetypes(
+    root: Path,
+    files: list[Path],
+    text: str,
+    surfaces: list[str],
+    frameworks: list[str],
+    languages: list[str],
+    payment_detected: bool,
+    config: list[str],
+) -> list[str]:
     result: set[str] = set()
     if set(surfaces) & COMMERCE_SURFACES:
         result.add("commerce-flow")
@@ -335,8 +457,42 @@ def archetypes(surfaces: list[str], frameworks: list[str], languages: list[str],
         result.add("payment-flow")
     if frameworks or any(surface in surfaces for surface in ("webhook", "callback", "auth-session", "upload", "download")):
         result.add("webapp")
+    if set(frameworks) & API_FRAMEWORKS:
+        result.add("api")
+    if set(languages) & JS_TS_LANGUAGES:
+        result.add("javascript-typescript")
+    if has_browser_client_signal(root, files, frameworks, text):
+        result.add("browser-client")
     if "python" in languages:
         result.add("python")
+    if "graphql" in surfaces:
+        result.add("graphql")
+        result.add("api")
+    if "realtime" in surfaces:
+        result.add("realtime-messaging")
+    if "background-job" in surfaces:
+        result.add("background-jobs")
+    if "identity-federation" in surfaces:
+        result.add("identity-federation")
+        result.add("integration-heavy")
+    if "tenant" in surfaces:
+        result.add("multi-tenant-saas")
+    if "admin" in surfaces:
+        result.add("admin-backoffice")
+    if "ai-agent" in surfaces:
+        result.add("ai-agent-app")
+    if "mobile" in surfaces:
+        result.add("mobile-backend")
+    if "database" in surfaces or "search-reporting" in surfaces or any(surface in surfaces for surface in ("upload", "download")):
+        result.add("data-heavy")
+    if has_library_package_signal(text, config, frameworks, surfaces):
+        result.add("library-package")
+    if has_developer_tool_signal(root, files, text):
+        result.add("developer-tool")
+    if has_monorepo_signal(root, files, config):
+        result.add("monorepo")
+    if has_microservices_signal(root, files, config, surfaces):
+        result.add("microservices")
     return sorted(result)
 
 
@@ -354,19 +510,38 @@ def choose_strategy(loc: int, detected_archetypes: list[str]) -> tuple[str, str,
     )
 
 
-def choose_overlays(languages: list[str], frameworks: list[str], detected_archetypes: list[str], surfaces: list[str], config: list[str]) -> list[str]:
+def choose_overlays(detected_archetypes: list[str], surfaces: list[str], config: list[str]) -> list[str]:
     overlays: list[str] = []
-    if "python" in languages:
-        overlays.append("python")
+    for overlay in (
+        "python",
+        "javascript-typescript",
+        "developer-tool",
+        "library-package",
+        "api",
+        "webapp",
+        "browser-client",
+        "checkout",
+        "payment-flow",
+        "multi-tenant-saas",
+        "identity-federation",
+        "admin-backoffice",
+        "graphql",
+        "realtime-messaging",
+        "background-jobs",
+        "integration-heavy",
+        "microservices",
+        "mobile-backend",
+        "data-heavy",
+        "ai-agent-app",
+        "monorepo",
+    ):
+        if overlay in detected_archetypes:
+            overlays.append(overlay)
     if "checkout" in detected_archetypes and has_strong_checkout_signal(surfaces, "payment-flow" in detected_archetypes):
         overlays.append("checkout")
-    if "payment-flow" in detected_archetypes:
-        overlays.append("payment-flow")
-    if "webapp" in detected_archetypes:
-        overlays.append("webapp")
     if any(surface in surfaces for surface in ("webhook", "callback")):
         overlays.append("integration-heavy")
-    if len(config) >= 4 or any(name.startswith(".github/") for name in config):
+    if len(config) >= 4 or any(name.startswith(".github/") for name in config) or (set(config) & PLATFORM_CONFIGS):
         overlays.append("platform-heavy")
     return sorted(dict.fromkeys(overlays or ["auto"]))
 
@@ -381,7 +556,14 @@ def check(id_: str, status: str, reason: str, evidence: list[str] | None = None,
     }
 
 
-def selected_checks(root: Path, evidence_text: dict[str, list[str]], languages: list[str], surfaces: list[str], payment_detected: bool) -> list[dict[str, Any]]:
+def selected_checks(
+    root: Path,
+    evidence_text: dict[str, list[str]],
+    languages: list[str],
+    surfaces: list[str],
+    detected_archetypes: list[str],
+    payment_detected: bool,
+) -> list[dict[str, Any]]:
     checks: list[dict[str, Any]] = [
         check("secrets.hardcoded", "required", "Universal security check.", dynamic=False),
         check("config.debug-posture", "required", "Universal security check for unsafe debug or local-development posture.", dynamic=False),
@@ -415,6 +597,28 @@ def selected_checks(root: Path, evidence_text: dict[str, list[str]], languages: 
         checks.append(check("data.sql-injection", "recommended", "Database/query indicators detected; review query construction and object scoping."))
     if "upload" in surfaces or "download" in surfaces:
         checks.append(check("data.file-surface", "recommended", "File upload/download/export-like surface detected; review path traversal, authorization, and data exposure."))
+    if "developer-tool" in detected_archetypes:
+        checks.append(check("tool.untrusted-repo-boundaries", "required", "Developer tooling or repo-scanner signals detected; verify repo content cannot become trusted control-plane instructions or escape path boundaries."))
+    if "javascript-typescript" in detected_archetypes:
+        checks.append(check("javascript.package-and-boundary-posture", "recommended", "JavaScript/TypeScript signals detected; review package scripts, dependency posture, and server/client trust boundaries."))
+    if "browser-client" in detected_archetypes:
+        checks.append(check("browser.client-trust-boundary", "recommended", "Browser client signals detected; verify auth, token storage, XSS sinks, public env vars, and API trust assumptions."))
+    if "graphql" in detected_archetypes:
+        checks.append(check("graphql.resolver-authorization", "required", "GraphQL signals detected; verify resolver-level object authorization, nested traversal, and query complexity."))
+    if "realtime-messaging" in detected_archetypes:
+        checks.append(check("realtime.channel-authorization", "recommended", "Realtime messaging signals detected; verify room/channel authorization, reconnect auth, broadcast targeting, and event spoofing controls."))
+    if "background-jobs" in detected_archetypes:
+        checks.append(check("jobs.payload-trust-transfer", "recommended", "Background job signals detected; verify queue payload trust, idempotency, retries, and delayed authorization checks."))
+    if "identity-federation" in detected_archetypes:
+        checks.append(check("identity.federation-binding", "required", "Identity federation signals detected; verify OAuth/OIDC/SAML state, nonce, redirect URI, account linking, and tenant binding."))
+    if "multi-tenant-saas" in detected_archetypes:
+        checks.append(check("authz.tenant-boundary", "required", "Tenant or organization signals detected; verify tenant scoping across reads, writes, exports, and background work."))
+    if "admin-backoffice" in detected_archetypes:
+        checks.append(check("admin.privileged-action-boundaries", "recommended", "Admin/backoffice signals detected; verify staff roles, support impersonation, privileged exports, and audit logs."))
+    if "microservices" in detected_archetypes:
+        checks.append(check("services.internal-trust-boundary", "recommended", "Microservice signals detected; verify service-to-service authentication, tenant propagation, and internal API assumptions."))
+    if "ai-agent-app" in detected_archetypes:
+        checks.append(check("ai.prompt-tool-boundary", "recommended", "AI agent signals detected; verify prompt/data boundaries, tool permissions, retrieval exposure, and delegated actions."))
     return dedupe_checks(checks)
 
 
@@ -445,9 +649,9 @@ def build_plan(root: Path, requested_strategy: str = "auto", changed_files: list
     surfaces = detect_named_patterns(text, SURFACE_PATTERNS)
     payment_detected = any(re.search(pattern, text, re.IGNORECASE) for pattern in PAYMENT_PATTERNS)
     config = detect_config(root, files)
-    detected_archetypes = archetypes(surfaces, frameworks, languages, payment_detected)
+    detected_archetypes = archetypes(root, files, text, surfaces, frameworks, languages, payment_detected, config)
     resolved_strategy, coverage_mode, reason = choose_strategy(loc, detected_archetypes)
-    overlays = choose_overlays(languages, frameworks, detected_archetypes, surfaces, config)
+    overlays = choose_overlays(detected_archetypes, surfaces, config)
 
     uncertainty: list[str] = []
     if not frameworks and surfaces:
@@ -478,7 +682,7 @@ def build_plan(root: Path, requested_strategy: str = "auto", changed_files: list
             "detected_surfaces": surfaces,
             "inferred_archetypes": detected_archetypes,
         },
-        "selected_checks": selected_checks(root, evidence_text, languages, surfaces, payment_detected),
+        "selected_checks": selected_checks(root, evidence_text, languages, surfaces, detected_archetypes, payment_detected),
         "deprioritized_checks": deprioritized_checks(surfaces, loc),
         "universal_checks_enabled": True,
         "agent_discretion_enabled": True,

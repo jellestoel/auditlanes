@@ -1,0 +1,20 @@
+version: 1
+id: browser-client
+profile: security
+status: stable
+description: "Browser client and frontend SPA emphasis for client-side auth assumptions, token storage, public env vars, XSS sinks, OAuth callbacks, CORS coupling, and build artifact exposure."
+priority_surfaces:
+  - browser-auth-state
+  - token-storage
+  - public-env-vars
+  - dangerous-html-rendering
+  - oauth-callbacks
+  - source-map-artifacts
+invariant_templates:
+  - "Client-side checks must never be the only authorization boundary for protected API actions or data."
+  - "Browser storage must not hold long-lived bearer secrets when safer cookie or server-side state is available."
+  - "Public environment variables and serialized props must not expose secrets, internal endpoints, or tenant data."
+  - "HTML rendering and markdown rendering must sanitize or constrain untrusted content before it reaches browser sinks."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

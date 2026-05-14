@@ -1,0 +1,20 @@
+version: 1
+id: graphql
+profile: security
+status: stable
+description: "GraphQL emphasis for resolver-level authorization, nested relation traversal, batching behavior, query complexity, field-level exposure, introspection, and mutation authorization."
+priority_surfaces:
+  - graphql-schema
+  - resolvers
+  - dataloader-batching
+  - nested-relations
+  - mutation-authz
+  - introspection-posture
+invariant_templates:
+  - "Every resolver that returns object data must enforce tenant and object authorization, not rely only on parent route checks."
+  - "Nested relation traversal must not bypass tenant scope, membership checks, or field-level sensitivity rules."
+  - "Batching and DataLoader paths must preserve the caller's authorization context per requested object."
+  - "Query complexity, depth, and introspection posture must match the deployment environment."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

@@ -1,0 +1,21 @@
+version: 1
+id: microservices
+profile: security
+status: stable
+description: "Microservices and service-to-service emphasis for internal API exposure, service authentication, tenant propagation, shared secrets, API gateway assumptions, queue/event trust, and confused deputy risks."
+priority_surfaces:
+  - service-to-service-auth
+  - internal-apis
+  - tenant-propagation
+  - shared-service-secrets
+  - api-gateway-assumptions
+  - queue-event-trust
+  - internal-admin-endpoints
+invariant_templates:
+  - "Internal service calls must authenticate the caller and propagate tenant and user authority explicitly."
+  - "Service boundaries must not assume private network location is sufficient authorization."
+  - "Queues, events, and internal APIs must not let one service act as a confused deputy for another."
+  - "API gateway, mTLS, and shared secret assumptions must be verified at each service entrypoint."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

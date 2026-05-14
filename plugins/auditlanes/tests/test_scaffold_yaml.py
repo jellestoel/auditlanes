@@ -35,6 +35,16 @@ class ScaffoldYamlTests(unittest.TestCase):
             with self.subTest(path=relative):
                 self.assertTrue((PLUGIN_ROOT / relative).exists(), relative)
 
+    def test_security_overlays_are_packaged(self):
+        validator = load_validator_module()
+        manifest = validator.load_json_or_yaml(PLUGIN_ROOT / "package-manifest.yaml")
+        packaged_files = set(manifest["plugin_files"])
+        overlays_root = PLUGIN_ROOT / "resources" / "profiles" / "security" / "overlays"
+        for overlay in sorted(overlays_root.glob("*.yaml")):
+            relative = overlay.relative_to(PLUGIN_ROOT).as_posix()
+            with self.subTest(path=relative):
+                self.assertIn(relative, packaged_files)
+
     def test_state_artifact_schemas_are_packaged(self):
         validator = load_validator_module()
         manifest = validator.load_json_or_yaml(PLUGIN_ROOT / "package-manifest.yaml")

@@ -1152,7 +1152,7 @@ add incidental-leads.jsonl
 add broad obvious-risk sweep guidance
 ```
 
-## v0.4.9
+## v0.4.10
 
 Attack-surface and invariant artifacts.
 

@@ -1,0 +1,21 @@
+version: 1
+id: admin-backoffice
+profile: security
+status: stable
+description: "Admin and backoffice emphasis for staff route protection, support impersonation, privileged exports, manual account edits, billing/refund actions, moderation, audit logs, and debug endpoints."
+priority_surfaces:
+  - admin-routes
+  - staff-roles
+  - support-impersonation
+  - privileged-exports
+  - account-edits
+  - moderation-actions
+  - audit-log-coverage
+invariant_templates:
+  - "Admin and staff routes must require explicit privileged roles, not just an authenticated session."
+  - "Support impersonation must be scoped, logged, time-limited, and unable to escalate privileges silently."
+  - "Privileged exports, refunds, moderation actions, and manual account edits must enforce role and tenant boundaries."
+  - "Debug or maintenance endpoints must not be reachable in production without strong administrative controls."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

@@ -1,0 +1,20 @@
+version: 1
+id: javascript-typescript
+profile: security
+status: stable
+description: "JavaScript and TypeScript emphasis for package scripts, SSR/client boundaries, dependency posture, browser/server data exposure, tokens, cookies, CORS, and public environment variables."
+priority_surfaces:
+  - package-scripts
+  - ssr-client-boundaries
+  - public-env-vars
+  - jwt-cookie-cors
+  - dependency-lockfiles
+  - prototype-pollution-inputs
+invariant_templates:
+  - "Package lifecycle scripts and build hooks must not be executed unless explicitly approved."
+  - "Server-only secrets and privileged data must not cross into browser bundles, public env vars, or serialized SSR props."
+  - "Token, cookie, and CORS defaults must match the actual browser/server trust boundary."
+  - "Untrusted objects merged into application state must not control prototypes or security-sensitive options."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

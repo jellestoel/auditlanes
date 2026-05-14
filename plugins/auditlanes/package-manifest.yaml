@@ -1,4 +1,4 @@
-version: 0.4.9
+version: 0.4.10
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -85,7 +85,7 @@ validator_status:
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.9 ships a direct profile-aware validator script."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.10 ships a direct profile-aware validator script."
 
 advisor_status:
   current_release: "minimal-script"
@@ -109,7 +109,7 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.9 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.10 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
 
 profile_status:
   implemented:
@@ -185,6 +185,16 @@ plugin_files:
   - "resources/profiles/security/overlays/library-package.yaml"
   - "resources/profiles/security/overlays/mobile-backend.yaml"
   - "resources/profiles/security/overlays/ai-agent-app.yaml"
+  - "resources/profiles/security/overlays/developer-tool.yaml"
+  - "resources/profiles/security/overlays/javascript-typescript.yaml"
+  - "resources/profiles/security/overlays/browser-client.yaml"
+  - "resources/profiles/security/overlays/graphql.yaml"
+  - "resources/profiles/security/overlays/background-jobs.yaml"
+  - "resources/profiles/security/overlays/identity-federation.yaml"
+  - "resources/profiles/security/overlays/admin-backoffice.yaml"
+  - "resources/profiles/security/overlays/realtime-messaging.yaml"
+  - "resources/profiles/security/overlays/monorepo.yaml"
+  - "resources/profiles/security/overlays/microservices.yaml"
   - "resources/profiles/architecture/profile.yaml"
   - "resources/profiles/architecture/lanes.yaml"
   - "resources/profiles/architecture/README.md"
@@ -327,7 +337,7 @@ cli:
     - "auditlanes upgrade ."
 
 known_limitations:
-  - "v0.4.9 bundles only the security profile as a stable runnable profile."
+  - "v0.4.10 bundles only the security profile as a stable runnable profile."
   - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable against the security report schema."
   - "strategy:auto and small-app-invariant-audit are protocol contracts; a packaged CLI/orchestrator that performs automatic relevance scoring is still planned."
   - "scan_advisor.py performs minimal static relevance scoring; an interactive numbered-choice wizard is still planned."
