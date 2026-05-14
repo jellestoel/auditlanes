@@ -1,0 +1,49 @@
+version: 1
+id: money-documents-workflows
+profile: production-integrity
+status: experimental
+description: "Emphasis for apps that generate money-facing records, documents, contracts, signatures, discounts, credits, or accounting exports. Maps product vocabulary onto generic production-integrity lanes."
+priority_surfaces:
+  - invoice-generation
+  - invoice-lines
+  - credit-notes
+  - accounting-export
+  - month-close
+  - document-templates
+  - signatures
+  - discounts
+  - price-periods
+  - contract-conversion
+invariant_templates:
+  - "Financial totals must be recomputed server-side from trusted state and reconcile with persisted line items."
+  - "Historical documents must use snapshots where legal/finance history requires immutability."
+  - "Credit notes, reruns, retries, and exports must not double-post or silently omit records."
+  - "Month-close locks must prevent conflicting writes, or conflicting writes must be detectable and recoverable."
+  - "Public approval/signature tokens must transition state exactly once and record sufficient audit context."
+maps_to_lanes:
+  state-model-integrity:
+    - price-periods
+    - tax-rounding-invariants
+    - numbering-constraints
+    - snapshot-boundaries
+  workflow-atomicity:
+    - invoice-generation
+    - credit-note-creation
+    - approval-signature-transitions
+    - month-close-mutation-locks
+  derived-output-reconciliation:
+    - pdfs
+    - accounting-exports
+    - invoice-deliveries
+    - finance-facing-reports
+  lifecycle-recovery:
+    - historical-documents
+    - restored-downloads
+    - retained-financial-evidence
+  assurance-evidence:
+    - rerun-tests
+    - double-submit-tests
+    - reconciliation-tests
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

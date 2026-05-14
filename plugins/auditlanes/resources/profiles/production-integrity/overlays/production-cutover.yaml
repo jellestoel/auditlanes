@@ -1,0 +1,30 @@
+version: 1
+id: production-cutover
+profile: production-integrity
+status: experimental
+description: "Launch and migration emphasis for correctness-affecting deploy, migration, smoke, rollback, scheduler, and restore controls."
+priority_surfaces:
+  - deploy-checklist
+  - environment-validation
+  - migrations
+  - seed-data
+  - backups
+  - restore-drills
+  - smoke-tests
+  - rollback-plan
+  - cron-scheduler
+  - private-upload-root
+invariant_templates:
+  - "A release gate must fail when required production environment variables, migrations, or high-risk smoke checks are missing."
+  - "Backup and restore must include both database state and private file state."
+  - "Rollback instructions must account for non-backward-compatible migrations and file mutations."
+  - "Scheduled maintenance jobs must have an owner, cadence, authentication, observability, and retry behavior."
+  - "Production deploy must fail before serving traffic when required env, migrations, private storage root, or schema constraints are missing."
+  - "Smoke checks must exercise at least one core workflow and one generated/private artifact, not only application boot."
+  - "Rollback must identify irreversible migrations, external side effects, generated files, and data written after deploy."
+non_goals:
+  - "General SRE maturity."
+  - "Capacity planning unless ordinary capacity failure can corrupt state, lose side effects, or break recovery."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

@@ -1,0 +1,19 @@
+version: 1
+id: post-fix-resweep
+profile: production-integrity
+status: experimental
+description: "Focused resweep after launch-blocking production-integrity fixes."
+allowed_modes:
+  - post-fix-resweep
+  - runtime-safe
+  - launch-gate-synthesis
+review_requirements:
+  - "Re-read the changed code paths and the original evidence, not only the patch summary."
+  - "Confirm that fixes close the root cause and do not only handle the demonstrated example."
+  - "Require regression tests or a documented runtime-safe validation path for fixed high/critical findings."
+  - "Refresh the launch decision and residual risk statement."
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

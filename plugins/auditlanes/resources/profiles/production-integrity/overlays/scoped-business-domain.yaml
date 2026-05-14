@@ -1,0 +1,29 @@
+version: 1
+id: scoped-business-domain
+profile: production-integrity
+status: experimental
+description: "Apps with tenant, organization, location, project, department, region, or other business scope that can affect both security and data correctness."
+priority_surfaces:
+  - scoped-authoritative-records
+  - scoped-derived-outputs
+  - scoped-templates
+  - scoped-price-periods
+  - cross-scope-reports
+  - hierarchy-consistency
+invariant_templates:
+  - "Scope-specific workflows must not mix records from different scopes unless the feature is explicitly cross-scope."
+  - "Scope snapshots copied into generated outputs must stay consistent with the source record intended at the time of creation."
+  - "A scope-related high/critical security finding is also a launch-gate candidate for production-integrity."
+maps_to_lanes:
+  state-model-integrity:
+    - scope-hierarchy
+    - snapshot-boundaries
+  workflow-atomicity:
+    - cross-scope-state-transitions
+  derived-output-reconciliation:
+    - scoped-generated-outputs
+  assurance-evidence:
+    - external-security-gates
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

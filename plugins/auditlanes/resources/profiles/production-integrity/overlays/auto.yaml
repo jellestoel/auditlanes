@@ -1,0 +1,12 @@
+version: 1
+id: auto
+profile: production-integrity
+status: experimental
+description: "Calibration-selected production-integrity overlays. The advisor should replace this with concrete overlays in state/relevance-plan.yaml before audit work starts."
+selection_rules:
+  - "Select `money-documents-workflows` when money, contracts, signed documents, invoices, reports, PDFs, or accounting exports are core workflows."
+  - "Select `file-backed-records` when database rows reference private files, generated documents, uploads, images, CAD files, or blobs."
+  - "Select `batch-jobs-and-schedulers` when cron jobs, queues, recurring jobs, cleanup, exports, imports, or maintenance tasks mutate state or side effects."
+  - "Select `imports-and-backfills` when CSV/CAD imports, migrations, seed data, bulk updates, anonymization, or data correction scripts exist."
+  - "Select `scoped-business-domain` when tenant, organization, location, project, department, or region scope affects correctness."
+  - "Select framework and rapid-build overlays only when calibration finds matching implementation signals."

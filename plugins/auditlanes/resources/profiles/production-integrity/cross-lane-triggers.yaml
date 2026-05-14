@@ -1,0 +1,130 @@
+version: 1
+profile: production-integrity
+triggers:
+  - id: generated-commitment-surface
+    description: "Generated documents, PDFs, reports, exports, emails, contracts, delivery rows, and other externalized commitments should notify output reconciliation, state integrity, and assurance evidence."
+    when:
+      patterns:
+        - invoice
+        - factuur
+        - pdf
+        - document
+        - contract
+        - export
+        - report
+        - delivery
+        - email
+        - template
+        - accounting
+        - fmuta
+    notify:
+      - derived-output-reconciliation
+      - state-model-integrity
+      - assurance-evidence
+
+  - id: temporal-boundary
+    description: "Effective dates, service periods, closed periods, price periods, time zones, and status time boundaries should notify state integrity and workflow atomicity."
+    when:
+      patterns:
+        - effective
+        - startDate
+        - endDate
+        - serviceMonth
+        - serviceYear
+        - month-close
+        - closed-period
+        - price-period
+        - timezone
+        - retention
+        - expiresAt
+    notify:
+      - state-model-integrity
+      - workflow-atomicity
+
+  - id: retry-idempotency
+    description: "Retry, idempotency, lock, transaction, createMany, batch, and rerun evidence should notify workflow atomicity and output reconciliation."
+    when:
+      patterns:
+        - retry
+        - idempotency
+        - idempotent
+        - upsert
+        - lock
+        - transaction
+        - createMany
+        - batch
+        - rerun
+        - heartbeat
+    notify:
+      - workflow-atomicity
+      - derived-output-reconciliation
+
+  - id: lifecycle-recovery
+    description: "Migration, backfill, import, anonymization, retention, backup, restore, private upload, and stored-file evidence should notify lifecycle recovery and runtime cutover controls."
+    when:
+      patterns:
+        - migration
+        - backfill
+        - import
+        - anonymize
+        - anonymization
+        - retention
+        - backup
+        - restore
+        - private-upload
+        - private_upload_root
+        - storedfile
+        - stored-file
+    notify:
+      - lifecycle-recovery
+      - runtime-cutover-controls
+
+  - id: scheduled-job
+    description: "Cron, scheduler, queue, maintenance, cleanup, recurring batch, and worker evidence should notify runtime cutover controls and workflow atomicity."
+    when:
+      patterns:
+        - cron
+        - scheduler
+        - scheduled
+        - queue
+        - worker
+        - maintenance
+        - cleanup
+        - recurring
+    notify:
+      - runtime-cutover-controls
+      - workflow-atomicity
+
+  - id: evidence-claim
+    description: "Tests, scenarios, smoke checks, CI, runbooks, deploy gates, and production checklists should notify assurance evidence."
+    when:
+      paths:
+        - "README.md"
+        - "docs/**"
+        - "tests/**"
+        - ".github/**"
+        - "playwright.config.*"
+        - "vitest.config.*"
+      patterns:
+        - test
+        - scenario
+        - smoke
+        - checklist
+        - runbook
+        - ci
+        - deploy-gate
+        - production
+    notify:
+      - assurance-evidence
+
+  - id: external-security-gate
+    description: "High or critical prior security findings, especially scope/authorization findings that can affect durable state correctness, should notify assurance evidence as launch-gate input without becoming duplicate production-integrity findings."
+    when:
+      evidence_type: prior-profile-finding
+      profile: security
+      severities:
+        - critical
+        - high
+    notify:
+      - assurance-evidence
+    synthesis_hint: launch-gate-synthesis

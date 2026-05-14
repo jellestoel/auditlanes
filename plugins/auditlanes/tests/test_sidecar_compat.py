@@ -71,6 +71,28 @@ class SidecarCompatibilityTests(unittest.TestCase):
         self.assertIn("payment-flow", profile["overlays"])
         self.assertTrue(profile["cross_lane_triggers"])
 
+    def test_production_integrity_profile_loads_as_experimental_metadata(self):
+        validator = load_validator_module()
+        profile = validator.load_profile("production-integrity", PLUGIN_ROOT / "resources" / "profiles")
+        self.assertFalse(profile["implemented"])
+        self.assertEqual(profile["default_strategy"], "auto")
+        self.assertEqual(
+            profile["lane_order"],
+            [
+                "state-model-integrity",
+                "workflow-atomicity",
+                "derived-output-reconciliation",
+                "lifecycle-recovery",
+                "runtime-cutover-controls",
+                "assurance-evidence",
+            ],
+        )
+        self.assertIn("production-gate", profile["strategies"])
+        self.assertIn("control-clonehunt", profile["strategies"]["production-gate"]["allowed_modes"])
+        self.assertIn("auto", profile["overlays"])
+        self.assertIn("money-documents-workflows", profile["overlays"])
+        self.assertTrue(profile["cross_lane_triggers"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,31 @@
+version: 1
+id: production-integrity
+status: experimental
+implemented: false
+lane_source: lanes.yaml
+strategy_source: strategies
+overlay_source: overlays
+cross_lane_trigger_source: cross-lane-triggers.yaml
+default_strategy: auto
+default_overlays:
+  - auto
+description: "Production integrity review for durable state correctness, workflow atomicity, generated-output reconciliation, lifecycle recovery, runtime cutover controls, and assurance evidence."
+default_execution_mode: agent-team
+execution_fallback_order:
+  - subagent
+  - single-session
+stability_notes:
+  - "Brainstorm profile only; not registered in the bundled profile catalog."
+  - "Use after the stable security profile, treating unresolved security findings as launch gates."
+  - "Prior audit output may seed leads, but current code and docs must provide application evidence."
+non_goals:
+  - "Generic QA coverage review."
+  - "General maintainability or architecture critique."
+  - "Broad SRE maturity assessment."
+  - "Security re-review except importing unresolved high/critical security findings as launch gates."
+external_gate_sources:
+  - profile: security
+    import_severities:
+      - critical
+      - high
+    import_as: launch-gates

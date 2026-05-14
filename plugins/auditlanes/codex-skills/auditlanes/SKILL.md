@@ -8,8 +8,17 @@ description: Use when the user asks for an AuditLanes run, codebase audit, full 
 Run the AuditLanes multi-lane audit protocol for the target repository.
 
 Use this skill only when the operator explicitly asks for AuditLanes or for a
-structured security audit. The stable runnable profile is `security`.
-Default to requested `profile: security`, `strategy: auto`, and
+structured audit. The stable runnable profile is `security`.
+`production-integrity` and `architecture` are experimental metadata profiles;
+they may be inspected or compatibility-checked, but should not be run as
+production audit modes until their `profile.yaml` files set
+`implemented: true`.
+
+If the operator invokes a scan without an explicit profile, present a profile
+choice first. Recommend `security` when no recent security run exists.
+Recommend `production-integrity` only as a metadata preview for launch integrity
+until the sidecar schema and reducer are generalized. For the stable security
+path, default to requested `profile: security`, `strategy: auto`, and
 `overlays: [auto]`. Calibration must resolve that into a concrete strategy,
 overlay set, coverage mode, suggested checks, and agent-discretion flags in
 `state/relevance-plan.yaml`. Suggested checks frame the review; they do not

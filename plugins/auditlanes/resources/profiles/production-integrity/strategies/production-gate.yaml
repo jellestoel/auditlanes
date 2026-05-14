@@ -1,0 +1,115 @@
+version: 1
+id: production-gate
+profile: production-integrity
+status: experimental
+description: "Risk-ranked launch-integrity review across durable state correctness, workflow atomicity, generated-output reconciliation, lifecycle recovery, runtime cutover controls, and assurance evidence."
+recommended_default: true
+allowed_modes:
+  - readiness-sweep
+  - invariant-gap-fill
+  - control-clonehunt
+  - scenario-probe
+  - runtime-safe
+  - post-fix-resweep
+  - launch-gate-synthesis
+  - failure-scenario-synthesis
+batch_shape:
+  batch-01:
+    expected_families: profile_lanes
+    status: ran
+    mode: readiness-sweep
+  batch-02:
+    expected_families: profile_lanes
+    status: optional
+    mode: invariant-gap-fill
+  batch-03:
+    expected_families:
+      - launch-gate-synthesis
+      - failure-scenario-synthesis
+    status: optional
+    mode: launch-gate-synthesis
+required_sidecar_fields:
+  - strategy
+  - overlays
+  - workflow_updates
+  - invariant_updates
+  - side_effect_updates
+  - lifecycle_recovery_updates
+  - assurance_evidence_updates
+  - risk_signals
+  - incidental_leads
+  - proof_updates
+  - regression_recommendations
+required_state_artifacts:
+  - state/relevance-plan.yaml
+  - state/core-workflow-inventory.jsonl
+  - state/production-invariants.jsonl
+  - state/side-effect-map.jsonl
+  - state/lifecycle-recovery-map.jsonl
+  - state/assurance-evidence-map.jsonl
+  - state/proof-ledger.jsonl
+  - state/incidental-leads.jsonl
+  - state/risk-signals.jsonl
+  - state/run-local-checks.jsonl
+  - state/regression-plan.jsonl
+  - state/launch-gates.jsonl
+review_requirements:
+  - "Build a core workflow inventory before judging completeness."
+  - "For every high-risk workflow, identify the authoritative source of truth, historical snapshot boundary, status machine, side effects, and recovery path."
+  - "Prefer concrete code evidence over documentation. Documentation can establish intended behavior but cannot prove implementation."
+  - "Do not report generic QA, style, architecture, or SRE maturity issues unless tied to a named production invariant, workflow, lifecycle event, generated commitment, recovery path, or launch gate."
+  - "Every confirmed finding must state trigger condition, failure mode, missing control, impact boundary, detectability, and recoverability."
+  - "Evidence gaps must name the high-risk workflow and invariant whose proof is missing."
+  - "For each blocker, state whether it blocks launch, blocks a module, can launch with controls, or is an external security gate."
+  - "Prior high/critical security findings are imported into launch-gates, not duplicated as production-integrity findings."
+  - "Generated outputs and external commitments must be reconciled against authoritative state or explicit snapshots."
+finding_fields:
+  - owner_family
+  - workflow_id
+  - invariant_id
+  - control_objective
+  - trigger_condition
+  - failure_mode
+  - missing_control
+  - affected_authoritative_state
+  - affected_side_effects
+  - impact_boundary
+  - detectability
+  - recoverability
+  - launch_gate_effect
+  - severity
+  - confidence
+  - evidence_refs
+  - files
+  - entrypoints
+  - existing_controls_checked
+  - recommended_regression
+launch_gate_effect_values:
+  - none
+  - go-with-controls
+  - module-gated
+  - no-go
+  - external-security-gate
+detectability_values:
+  - automatically-detected
+  - dashboard-or-log-visible
+  - manual-reconciliation-required
+  - customer-or-finance-reported
+  - silent
+  - unknown
+recoverability_values:
+  - self-healing
+  - operator-visible-retryable
+  - manual-repair-required
+  - restore-required
+  - unrecoverable
+  - unknown
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_recommended: true
+  final_failure_scenario_review_recommended: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+  final_report_must_include_unresolved_incidental_leads: true

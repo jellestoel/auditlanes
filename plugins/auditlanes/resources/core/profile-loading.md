@@ -51,10 +51,10 @@ For the selected profile:
 
 ## Stability
 
-AuditLanes v0.4.13 ships the `security` profile as the only stable runnable
-profile. Other profiles may exist as experimental metadata, but must not be
-treated as production-ready audit modes unless their `profile.yaml` explicitly
-sets `implemented: true`.
+AuditLanes v0.4.14 ships the `security` profile as the only stable runnable
+profile. `architecture` and `production-integrity` exist as experimental
+metadata, but must not be treated as production-ready audit modes unless their
+`profile.yaml` explicitly sets `implemented: true`.
 
 `--allow-experimental` is limited to profile-loading and catalog compatibility
 checks. It does not make metadata-only profile sidecars valid against the

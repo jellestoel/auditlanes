@@ -47,6 +47,13 @@ class ClaudeSkillContractTests(unittest.TestCase):
         self.assertIn("more than six total", text)
         self.assertIn("orchestrator may improvise", text)
 
+    def test_skill_presents_profile_choice_before_strategy_choice(self):
+        text = SKILL.read_text(encoding="utf-8")
+        self.assertIn("profile choice before strategy choices", text)
+        self.assertIn("`security` - stable runnable profile", text)
+        self.assertIn("`production-integrity` - experimental metadata", text)
+        self.assertIn("only `security` may start a real scan", text)
+
     def test_codex_manifest_uses_codex_specific_skill_entrypoint(self):
         manifest = json.loads((PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))
         self.assertEqual(manifest["skills"], "./codex-skills/")

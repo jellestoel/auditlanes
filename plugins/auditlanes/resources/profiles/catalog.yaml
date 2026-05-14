@@ -22,6 +22,16 @@ profiles:
     profile_root: "resources/profiles/architecture"
     profile_file: "resources/profiles/architecture/profile.yaml"
     lanes_file: "resources/profiles/architecture/lanes.yaml"
+  - id: production-integrity
+    status: experimental
+    implemented: false
+    description: "Launch integrity profile metadata for durable state correctness, workflow atomicity, generated-output reconciliation, lifecycle recovery, cutover controls, and assurance evidence."
+    profile_root: "resources/profiles/production-integrity"
+    profile_file: "resources/profiles/production-integrity/profile.yaml"
+    lanes_file: "resources/profiles/production-integrity/lanes.yaml"
+    strategies_root: "resources/profiles/production-integrity/strategies"
+    overlays_root: "resources/profiles/production-integrity/overlays"
+    cross_lane_triggers_file: "resources/profiles/production-integrity/cross-lane-triggers.yaml"
   - id: performance
     status: planned
     implemented: false
@@ -40,7 +50,7 @@ profiles:
     description: "Privacy and data governance audit profile."
 
 rules:
-  - "AuditLanes v0.4.13 bundles only the security profile as a stable runnable profile."
+  - "AuditLanes v0.4.14 bundles only the security profile as a stable runnable profile."
   - "Experimental profile metadata may exist to exercise core/profile loading, but it is not a stable audit mode."
   - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."
   - "Executable validators derive strategy and overlay IDs from the selected profile instead of hardcoding them in report schemas."

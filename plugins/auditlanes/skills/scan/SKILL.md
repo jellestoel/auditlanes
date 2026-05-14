@@ -10,15 +10,30 @@ Run the AuditLanes multi-lane audit protocol for the target repository.
 
 Use this skill only when explicitly invoked by the operator.
 
-The default profile is `security`. Profile metadata is bundled at
+The default stable runnable profile is `security`. Profile metadata is bundled at
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/catalog.yaml`.
 
-v0.4.13 supports the `security` profile as the only stable runnable profile.
+v0.4.14 supports the `security` profile as the only stable runnable profile.
 Profile lane catalogs are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/<profile>/`. If the operator asks for
-architecture, explain that `architecture` is experimental metadata only and can
-be shown or compatibility-checked, but should not be run as a production audit
-profile yet.
+`architecture` or `production-integrity`, explain that the requested profile is
+experimental metadata only and can be shown or compatibility-checked, but should
+not be run as a production audit profile yet.
+
+When the operator invokes `/scan` without an explicit profile, present a
+profile choice before strategy choices:
+
+- `security` - stable runnable profile for authn/authz/data exposure/trust
+  boundaries. Recommend this when no recent security run exists.
+- `production-integrity` - experimental metadata for durable state correctness,
+  workflow atomicity, generated-output reconciliation, lifecycle recovery,
+  cutover controls, and assurance evidence. Recommend this only as a metadata
+  preview until the sidecar schema and reducer are generalized.
+- `architecture` - experimental metadata only.
+
+After the profile is selected, present strategy choices from that profile. For
+now, only `security` may start a real scan without an explicit experimental
+compatibility request.
 
 ## Invocation Arguments
 
@@ -30,6 +45,7 @@ Treat `$ARGUMENTS` as the operator request. Recognized forms:
 - `scan <target-root> --profile security --strategy auto`
 - `scan <target-root> --profile security --strategy invariant-audit`
 - `scan <target-root> --profile security --strategy invariant-audit --overlay webapp --overlay multi-tenant-saas`
+- `scan <target-root> --profile production-integrity --strategy production-gate`
 - `scan <target-root> --mode single-session`
 - `scan <target-root> --mode subagent`
 - `scan <target-root> --mode agent-team`
@@ -38,7 +54,7 @@ Treat `$ARGUMENTS` as the operator request. Recognized forms:
 Defaults:
 
 - target root: current working directory after repo-root validation
-- profile: `security`
+- profile: `security` when the operator chooses the stable runnable default
 - requested strategy: `auto`
 - overlays: `auto`
 - mode: `agent-team`

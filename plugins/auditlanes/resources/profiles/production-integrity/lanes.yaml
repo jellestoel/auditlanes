@@ -1,0 +1,22 @@
+version: 1
+profile: production-integrity
+lanes:
+  - id: state-model-integrity
+    owns: "Authoritative state, production invariants, relational constraints, uniqueness, status validity, temporal rules, and snapshot/live-state boundaries."
+  - id: workflow-atomicity
+    owns: "State transitions, approval flows, transaction boundaries, retries, idempotency, locking, concurrency, compensation, and partial-failure behavior."
+  - id: derived-output-reconciliation
+    owns: "Generated documents, invoices, reports, exports, PDFs, emails, delivery rows, accounting files, external commitments, and reconciliation between source state and outputs."
+  - id: lifecycle-recovery
+    owns: "Migrations, imports, backfills, retention, deletion/anonymization, backup/restore, private-file consistency, historical auditability, and recovery validation."
+  - id: runtime-cutover-controls
+    owns: "Production environment validation, deploy gates, migration execution, health/readiness checks, scheduled jobs, observability for core workflows, rollback, and production smoke controls."
+  - id: assurance-evidence
+    owns: "Evidence mapping for high-risk workflows, automated tests, scenario tests, smoke checks, CI gates, runtime proof, manual controls, and missing regression evidence."
+specialists:
+  - id: launch-gate-synthesis
+    owns: "Cross-lane launch decision, blocker grouping, external security gates, module gates, residual risk, and go/no-go synthesis."
+    mode: launch-gate-synthesis
+  - id: failure-scenario-synthesis
+    owns: "Concrete end-to-end production failure scenarios spanning lanes, especially durable state, generated commitments, files, jobs, deploys, and recovery."
+    mode: failure-scenario-synthesis

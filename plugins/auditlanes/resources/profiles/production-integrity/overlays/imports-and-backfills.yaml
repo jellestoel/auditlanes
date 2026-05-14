@@ -1,0 +1,29 @@
+version: 1
+id: imports-and-backfills
+profile: production-integrity
+status: experimental
+description: "Apps with CSV/XML/CAD imports, migrations, seed data, backfills, anonymization, bulk edits, or data repair tools."
+priority_surfaces:
+  - imports
+  - backfills
+  - seed-data
+  - anonymization
+  - bulk-update-tools
+  - migration-reruns
+invariant_templates:
+  - "Imports and backfills must be idempotent or explicitly non-rerunnable with detectable partial completion."
+  - "Bulk tools must enforce the same production invariants as normal workflows or state their compensating controls."
+  - "Anonymization and retention must preserve required historical, financial, legal, and recovery evidence."
+maps_to_lanes:
+  lifecycle-recovery:
+    - imports
+    - backfills
+    - anonymization
+  state-model-integrity:
+    - post-import-invariants
+  assurance-evidence:
+    - import-negative-tests
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+

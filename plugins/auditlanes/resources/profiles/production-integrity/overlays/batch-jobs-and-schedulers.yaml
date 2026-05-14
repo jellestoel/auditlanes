@@ -1,0 +1,30 @@
+version: 1
+id: batch-jobs-and-schedulers
+profile: production-integrity
+status: experimental
+description: "Apps with cron jobs, queues, recurring billing, cleanup, exports, imports, maintenance tasks, or long-running batches."
+priority_surfaces:
+  - scheduled-jobs
+  - batch-locks
+  - retry-side-effects
+  - missed-run-detection
+  - cleanup-retention
+  - export-reruns
+invariant_templates:
+  - "Scheduled jobs must be idempotent or protected by a lock that survives ordinary retry and overlap conditions."
+  - "Missed, stalled, failed, or duplicate jobs must be visible to operators before they corrupt or omit core workflow state."
+  - "Cleanup jobs must not destroy data required for auditability, recovery, or historical generated outputs."
+maps_to_lanes:
+  workflow-atomicity:
+    - locks
+    - idempotency
+    - retry-side-effects
+  runtime-cutover-controls:
+    - cadence-owner-observability
+    - missed-run-detection
+  lifecycle-recovery:
+    - cleanup-retention
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+

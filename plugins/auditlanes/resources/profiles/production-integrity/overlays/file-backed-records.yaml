@@ -1,0 +1,28 @@
+version: 1
+id: file-backed-records
+profile: production-integrity
+status: experimental
+description: "Apps where database records reference private files, generated PDFs, uploads, images, CAD files, documents, or blob objects."
+priority_surfaces:
+  - stored-file-records
+  - private-upload-roots
+  - generated-documents
+  - upload-download-routes
+  - backup-restore-file-state
+  - orphan-detection
+invariant_templates:
+  - "Every required file-backed record must have a detectable relationship between database state and file/blob state."
+  - "Backup and restore must preserve both the database row and the referenced file/blob."
+  - "Generated files must not be committed as successful unless the durable file write and database reference are both recoverable."
+maps_to_lanes:
+  lifecycle-recovery:
+    - backup-restore-file-state
+    - orphan-detection
+  derived-output-reconciliation:
+    - generated-documents
+  runtime-cutover-controls:
+    - private-storage-configuration
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+
