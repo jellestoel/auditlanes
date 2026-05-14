@@ -1,112 +1,109 @@
-# AuditLanes Marketplace
+# AuditLanes
 
-This repository packages AuditLanes as a Claude Code/Codex marketplace plugin
-for structured multi-lane security audits.
+AuditLanes is a Claude Code and Codex plugin for serious security reviews of
+real codebases.
 
-The installable plugin lives under `plugins/auditlanes/`. It defines how an
-agent orchestrator should plan work, control state, cap concurrency, suppress
-duplicate findings, share cross-family context, and produce a final report.
+Instead of asking one agent to "scan the repo" and hoping the result is
+coherent, AuditLanes gives the model a repeatable audit workflow:
 
-The protocol now has a core/profile split. v0.4.13 keeps the `security` profile
-as the only stable runnable profile and includes compact experimental
-architecture-profile metadata to prove lane catalogs can be loaded without
-bloating normal security runs.
+1. calibrate the project shape and risk surfaces
+2. split work across stable security lanes
+3. require evidence-backed machine-readable sidecars
+4. reduce duplicate lane findings into stable IDs
+5. carry forward leads, rejected claims, proof updates, and follow-up work
 
-## Current Status
+It is built for the kind of security bugs generic scanners miss: authorization
+drift, tenant boundary mistakes, session/auth gaps, unsafe file or export
+surfaces, integration trust issues, platform posture problems, and chains that
+only become obvious when multiple lanes compare notes.
 
-AuditLanes v0.4.13 is a protocol-first beta plugin package: a structured
-security-audit orchestration protocol with executable sidecar validation and a
-minimal deterministic reducer.
+AuditLanes is not a replacement for SAST, dependency scanners, or `npm audit`.
+It is a reasoning-driven audit harness that makes LLM security work more
+structured, reviewable, and repeatable.
 
-Included now:
+## Why Use It
 
-- Claude Code and Codex plugin manifests
-- host-specific Claude Code and Codex skill entrypoints
-- bundled `security` profile
-- profile-derived lane validation for sidecars and manifests
-- security strategy and overlay catalogs
-- security cross-lane trigger catalog
-- auto strategy resolution contract and small-app full-read strategy metadata
-- strategy and overlay validation for report sidecars
-- incidental lead, security smell, proof update, and regression recommendation sidecar fields
-- experimental architecture-profile metadata
-- security-profile orchestration contracts
-- report, batch, reducer, and state contracts
-- executable JSON Schema for report sidecars, batch manifests, and core security state artifacts
-- minimal `validate_run.py` script
-- minimal deterministic `reduce_run.py` script
-- static-only `scan_advisor.py` script
-- sample fixtures and compatibility tests
-- optional repo-local scaffold payload
-- generated outputs under `auditlanes/out/`
+- **Less duplicate noise.** Lanes can report from different angles; the reducer
+  merges matching root causes into stable findings.
+- **Better coverage discipline.** Calibration records what the model believes
+  the app contains before the lane work starts.
+- **Evidence first.** Findings are expected to cite concrete files, symbols,
+  line ranges, and rationale.
+- **Large-repo friendly.** Claude Code can use agent teams; Codex can use
+  subagents when available. The logical six-lane model stays the same.
+- **Safer by default.** Runs are static-only unless runtime-safe validation is
+  explicitly approved.
+- **Useful across runs.** Prior findings can seed leads, but old reports do not
+  become application evidence.
 
-Not included yet:
+## Current State
 
-- packaged `auditlanes` CLI
-- full orchestration reducer implementation
-- stable non-security audit profiles
-- generated profile-specific report contracts
+AuditLanes v0.4.13 is a protocol-first beta. The `security` profile is the only
+stable runnable profile.
 
-The YAML contract files remain agent/reducer guidance. Machine validation uses
-the JSON Schema files under `plugins/auditlanes/resources/schemas/` plus custom
-profile-aware checks in `scripts/validate_run.py`.
+What works today:
 
-The JSON Schema validates shape only. Profile-specific lane, strategy, and
-overlay validity, mode/family compatibility, runtime-safe constraints, and
-evidence path policy require `validate_run.py` or a generated profile-specific
-schema.
+- Claude Code and Codex marketplace plugin manifests
+- `/auditlanes:scan` for Claude Code and `@auditlanes` for Codex
+- static `scan_advisor.py` relevance preview
+- six security lanes, strategies, overlays, and cross-lane triggers
+- executable validation for report sidecars, manifests, and core state files
+- deterministic reducer state for findings, candidates, rejected claims,
+  incidental leads, proof updates, security smells, run-local checks, and
+  regression recommendations
+- stable finding IDs and basic dedupe across lane outputs
+- generated run output under `auditlanes/out/`
 
-v0.4.13 validates and reduces report sidecars into basic deterministic state,
-including incidental leads, security smells, proof updates, and regression
-recommendations. It also emits basic family directives from incidental leads and
-cross-lane trigger matches. It does not yet orchestrate the full audit
-automatically or implement the full reducer semantics described by the protocol.
-This release hardens agent-authored YAML parsing, preserves candidate report
-references, repairs stale reducer-owned JSONL state before the next reduce pass,
-honors ignored trees in the scan advisor, and allows small-app runs to emit the
-exploit-synthesis batch artifact.
-The auto strategy contract is metadata/scaffold guidance for calibration; a
-minimal static advisor now emits a relevance-plan preview, while the packaged
-CLI/orchestrator and interactive numbered-choice wizard are still planned.
+Still intentionally beta:
 
-## Preferred Use
+- no packaged `auditlanes` CLI yet
+- non-security profiles are metadata only
+- final report generation is still agent-led
+- reducer coverage ledgers and some full protocol semantics are still evolving
 
-Default install should be a marketplace plugin. The same plugin payload supports
-Claude Code and Codex through two thin platform manifests and host-specific skill
-entrypoints. A raw personal skill is the development/fallback path. Repo-local
-scaffolding is optional and mainly for teams, committed audit protocols, or
-non-plugin agents. The default profile is `security`, the requested strategy is
-`auto`, and the default overlay is `auto`. Calibration resolves that into a
-concrete strategy, overlays, coverage mode, suggested checks, and
-agent-discretion flags in `state/relevance-plan.yaml`. Generated run artifacts
-still go under `auditlanes/out/` in the target repo.
+## Quick Start
 
-Default execution is agent-team-first. Claude Code should try native agent-team
-mode for every AuditLanes run when agent teams are enabled, then automatically
-fall back to subagent lane execution when native teams are unavailable. Use
-single-session execution only when neither acceleration path is supported or
-when the operator explicitly requests it:
+Install the plugin, reload plugins, then run a scan from the target repository:
+
+```text
+/plugin marketplace add jellestoel/auditlanes
+/plugin install auditlanes@auditlanes
+/reload-plugins
+/auditlanes:scan .
+```
+
+For a larger repository, choose the **recommended** scan unless you deliberately
+want to pay for a deeper pass. The advisor will usually resolve that to
+`invariant-audit` with risk-ranked coverage.
+
+If you want the safest default posture, tell the agent:
+
+```text
+Static-only unless I explicitly approve runtime-safe checks.
+Do not scan auditlanes/out or prior reports as application evidence.
+```
+
+## Execution Model In One Paragraph
+
+AuditLanes defaults to agent-team-first execution. Claude Code should use native
+agent teams when available, then fall back to subagents, then single-session.
+Codex should use subagents when available. In every mode, the same six logical
+security lanes own the work, and the reducer owns cross-lane state.
 
 ```bash
 CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1 claude
 ```
 
-`agent-team` and `subagent` modes may cost more tokens and add coordination
-overhead, but they are the normal AuditLanes execution path. The protocol
-remains the same: persistent logical lanes, reducer-owned state, and a hard
-concurrency cap of six primary AuditLanes lane workers. Host-supported helper
-agents may be used beneath a lane for bounded research, clone expansion, or
-evidence verification, but they are not independent lanes and do not emit
-family sidecars unless explicitly assigned as primary lane workers.
+The cap is six **primary** AuditLanes lane workers. Host-supported helper agents
+may be used beneath a lane for bounded research or evidence verification, but
+they are not independent lanes and do not emit family sidecars unless explicitly
+assigned as primary lane workers.
 
 ## Install
 
-Install AuditLanes from a Git-backed marketplace or a local marketplace root.
-Raw `marketplace.json` URLs are not recommended for this repository layout
-because the manifests use relative plugin paths. For normal installs, do not
-pin the marketplace to a tag; leaving it unpinned lets marketplace and plugin
-update commands follow the repo's current release metadata. Pin a tag only when
-you need a reproducible fixed release.
+Install AuditLanes from the Git-backed marketplace. For normal installs, do not
+pin to a tag; unpinned installs can follow current release metadata. Pin only
+when you need a reproducible fixed release.
 
 ### Claude Code
 
@@ -154,22 +151,15 @@ For a deliberately pinned install, use `/plugin marketplace add
 jellestoel/auditlanes@v0.4.13` in Claude Code or `codex plugin marketplace add
 jellestoel/auditlanes --ref v0.4.13` in Codex.
 
-AuditLanes v0.4.13 is a protocol-first beta. It validates sidecars and reduces
-basic state, but does not yet run the full audit automatically or implement full
-reducer semantics.
+## What It Optimizes For
 
-## Design Goals
-
-- define persistent logical audit lanes
-- prefer Claude Code agent teams for every scan, then subagents when native
-  teams are unavailable
-- never run more than `6` primary AuditLanes lane workers concurrently
-- allow host-supported helper agents beneath a lane when available and safe
-- preserve lane ownership across the audit
-- allow later revisits of the same family without breaking the concurrency cap
-- calibrate the selected profile to the project before batch work starts
-- reduce rediscovery and false-positive churn
-- make coverage, finding ownership, and batch handoff explicit
+- persistent logical audit lanes instead of ad hoc prompts
+- project calibration before lane work starts
+- strict output shape for findings and candidates
+- reducer-owned stable IDs and dedupe
+- explicit runtime approval boundaries
+- repeatable run directories and state files
+- room for model judgment without letting repository text become instructions
 
 ## Bundled Security Lanes
 
