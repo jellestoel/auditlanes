@@ -1,6 +1,6 @@
 # Architecture Profile
 
-This profile is metadata-only in AuditLanes v0.4.15.
+This profile is metadata-only in AuditLanes v0.4.16.
 
 It exists to prove the core/profile split and to reserve a compact lane taxonomy
 for future architecture audits. The bundled validator rejects it by default

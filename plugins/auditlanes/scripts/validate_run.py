@@ -1113,21 +1113,28 @@ def validate_strategy_batch_shape(
         issues.append(ValidationIssue(manifest_path, "$.expected_families", message))
 
     required_status = batch_shape.get("status")
+    if required_status == "optional":
+        required_status = None
     required_mode = batch_shape.get("mode")
+    modes_by_family = batch_shape.get("modes_by_family")
+    if not isinstance(modes_by_family, dict):
+        modes_by_family = {}
     for index, item in enumerate(family_items):
         if not isinstance(item, dict):
             continue
+        family = item.get("family")
         if isinstance(required_status, str) and item.get("status") != required_status:
             if path_batch_id == "batch-01" and selected_profile["id"] == "security" and required_status == "ran":
                 message = "batch-01 security lanes must all run"
             else:
                 message = f"{path_batch_id} strategy {strategy_id!r} families must have status={required_status}"
             issues.append(ValidationIssue(manifest_path, f"$.families[{index}].status", message))
-        if isinstance(required_mode, str) and item.get("mode") != required_mode:
+        item_required_mode = modes_by_family.get(family, required_mode) if isinstance(family, str) else required_mode
+        if isinstance(item_required_mode, str) and item.get("mode") != item_required_mode:
             if path_batch_id == "batch-01" and selected_profile["id"] == "security" and required_mode == "canonical-sweep":
                 message = "batch-01 security lanes must run canonical-sweep"
             else:
-                message = f"{path_batch_id} strategy {strategy_id!r} families must run mode={required_mode}"
+                message = f"{path_batch_id} strategy {strategy_id!r} family {family!r} must run mode={item_required_mode}"
             issues.append(ValidationIssue(manifest_path, f"$.families[{index}].mode", message))
     return issues
 

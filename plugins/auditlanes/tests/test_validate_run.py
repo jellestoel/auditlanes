@@ -12,6 +12,7 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
+PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
 INVALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "invalid" / "run-missing-evidence"
 
 
@@ -39,10 +40,96 @@ class ValidateRunCliTests(unittest.TestCase):
         shutil.copytree(VALID_RUN, run_copy)
         return run_copy
 
+    def copied_production_run(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-production-integrity"
+        shutil.copytree(PRODUCTION_INTEGRITY_RUN, run_copy)
+        return run_copy
+
     def test_valid_fixture_passes(self):
         result = self.run_validator(VALID_RUN)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("validation passed", result.stdout)
+
+    def test_production_optional_batch_02_accepts_ran_families(self):
+        run_copy = self.copied_production_run()
+        batch_01 = run_copy / "reports" / "batch-01"
+        batch_02 = run_copy / "reports" / "batch-02"
+        shutil.copytree(batch_01, batch_02)
+        manifest = batch_02 / "manifest.yaml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            .replace("batch-01", "batch-02")
+            .replace("readiness-sweep", "invariant-gap-fill"),
+            encoding="utf-8",
+        )
+        for sidecar_path in batch_02.glob("*/report.json"):
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            sidecar["batch_id"] = "batch-02"
+            sidecar["mode"] = "invariant-gap-fill"
+            sidecar["sidecar_id"] = f"{sidecar['sidecar_id']}-batch-02"
+            sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy, "--profile", "production-integrity", "--batch-id", "batch-02")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_production_batch_03_accepts_synthesis_specialist_modes(self):
+        run_copy = self.copied_production_run()
+        batch_03 = run_copy / "reports" / "batch-03"
+        batch_03.mkdir()
+        base = json.loads((run_copy / "reports" / "batch-01" / "assurance-evidence" / "report.json").read_text(encoding="utf-8"))
+
+        for family, mode in (
+            ("launch-gate-synthesis", "launch-gate-synthesis"),
+            ("failure-scenario-synthesis", "failure-scenario-synthesis"),
+        ):
+            family_dir = batch_03 / family
+            family_dir.mkdir()
+            sidecar = dict(base)
+            sidecar.update({
+                "sidecar_id": f"sidecar-{family}-001",
+                "batch_id": "batch-03",
+                "family": family,
+                "mode": mode,
+                "overlays": ["auto"],
+                "reviewed_artifacts": [],
+                "reviewed_files_routes_helpers": [],
+                "coverage_units_touched": [],
+                "next_batch_recommendations": [],
+            })
+            (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+            (family_dir / "report.md").write_text(f"# {family}\n", encoding="utf-8")
+
+        (batch_03 / "manifest.yaml").write_text(
+            "\n".join([
+                "schema_version: 1",
+                "run_id: run-production-integrity",
+                "batch_id: batch-03",
+                'generated_at: "2026-05-14T00:00:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - launch-gate-synthesis",
+                "  - failure-scenario-synthesis",
+                "families:",
+                "  - family: launch-gate-synthesis",
+                "    status: ran",
+                "    mode: launch-gate-synthesis",
+                '    markdown: "${RUN_DIR}/reports/batch-03/launch-gate-synthesis/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-03/launch-gate-synthesis/report.json"',
+                "  - family: failure-scenario-synthesis",
+                "    status: ran",
+                "    mode: failure-scenario-synthesis",
+                '    markdown: "${RUN_DIR}/reports/batch-03/failure-scenario-synthesis/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-03/failure-scenario-synthesis/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+
+        result = self.run_validator(run_copy, "--profile", "production-integrity", "--batch-id", "batch-03")
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_batch_01_requires_all_security_lanes(self):
         run_copy = self.copied_run()

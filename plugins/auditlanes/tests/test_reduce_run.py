@@ -71,6 +71,38 @@ class ReduceRunTests(unittest.TestCase):
         proof = read_jsonl(run_copy / "state" / "proof-ledger.jsonl")
         self.assertRegex(proof[0]["subject_id"], r"^F-workflow-atomicity-[0-9a-f]{12}$")
 
+    def test_production_integrity_reducer_accepts_optional_batch_02(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / PRODUCTION_INTEGRITY_RUN.name
+        shutil.copytree(PRODUCTION_INTEGRITY_RUN, run_copy)
+        batch_01 = run_copy / "reports" / "batch-01"
+        batch_02 = run_copy / "reports" / "batch-02"
+        shutil.copytree(batch_01, batch_02)
+        manifest = batch_02 / "manifest.yaml"
+        manifest.write_text(
+            manifest.read_text(encoding="utf-8")
+            .replace("batch-01", "batch-02")
+            .replace("readiness-sweep", "invariant-gap-fill"),
+            encoding="utf-8",
+        )
+        for sidecar_path in batch_02.glob("*/report.json"):
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+            sidecar["batch_id"] = "batch-02"
+            sidecar["mode"] = "invariant-gap-fill"
+            sidecar["sidecar_id"] = f"{sidecar['sidecar_id']}-batch-02"
+            sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy), "--profile", "production-integrity", "--batch-id", "batch-02"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["records"], 1)
+
     def test_reducer_is_idempotent_for_same_inputs(self):
         run_copy, _ = self.run_reducer(VALID_RUN)
         state_files = [

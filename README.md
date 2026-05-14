@@ -38,7 +38,7 @@ structured, reviewable, and repeatable.
 
 ## Current State
 
-AuditLanes v0.4.15 is a protocol-first beta. The `security` profile is stable
+AuditLanes v0.4.16 is a protocol-first beta. The `security` profile is stable
 runnable. The `production-integrity` profile is experimental runnable.
 
 What works today:
@@ -150,8 +150,8 @@ Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
 
 For a deliberately pinned install, use `/plugin marketplace add
-jellestoel/auditlanes@v0.4.15` in Claude Code or `codex plugin marketplace add
-jellestoel/auditlanes --ref v0.4.15` in Codex.
+jellestoel/auditlanes@v0.4.16` in Claude Code or `codex plugin marketplace add
+jellestoel/auditlanes --ref v0.4.16` in Codex.
 
 ## What It Optimizes For
 
@@ -264,7 +264,7 @@ Metadata-only profiles are rejected by default. `--allow-experimental` is only
 for profile-loading/catalog compatibility checks; it does not make
 metadata-only profiles runnable sidecar audit modes.
 
-The v0.4.15 reducer imports confirmed findings, candidate findings, rejected
+The v0.4.16 reducer imports confirmed findings, candidate findings, rejected
 claims, profile feedback, chain candidates, incidental leads, security smells,
 production risk signals, proof updates, `run_local_checks`, and regression
 recommendations. Run-local checks let agents preserve repo-specific questions
@@ -497,7 +497,7 @@ AuditLanes Core
 
 ## Profiles
 
-AuditLanes v0.4.15 separates core workflow mechanics from profile lane catalogs:
+AuditLanes v0.4.16 separates core workflow mechanics from profile lane catalogs:
 
 - core: orchestration, output layout, validation scripts, reducer mechanics
 - stable runnable profile: `security`

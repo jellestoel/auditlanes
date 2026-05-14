@@ -27,7 +27,9 @@ batch_shape:
       - launch-gate-synthesis
       - failure-scenario-synthesis
     status: optional
-    mode: launch-gate-synthesis
+    modes_by_family:
+      launch-gate-synthesis: launch-gate-synthesis
+      failure-scenario-synthesis: failure-scenario-synthesis
 required_sidecar_fields:
   - strategy
   - overlays

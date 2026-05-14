@@ -1,6 +1,6 @@
 {
   "name": "auditlanes",
-  "version": "0.4.15",
+  "version": "0.4.16",
   "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
   "author": {
     "name": "AuditLanes"
