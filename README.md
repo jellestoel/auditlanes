@@ -95,21 +95,41 @@ workers.
 
 Install AuditLanes from a Git-backed marketplace or a local marketplace root.
 Raw `marketplace.json` URLs are not recommended for this repository layout
-because the manifests use relative plugin paths.
+because the manifests use relative plugin paths. For normal installs, do not
+pin the marketplace to a tag; leaving it unpinned lets marketplace and plugin
+update commands follow the repo's current release metadata. Pin a tag only when
+you need a reproducible fixed release.
 
 ### Claude Code
 
 ```text
-/plugin marketplace add jellestoel/auditlanes@v0.4.8
+/plugin marketplace add jellestoel/auditlanes
 /plugin install auditlanes@auditlanes
 /reload-plugins
 /auditlanes:scan .
 ```
 
+To update an existing install:
+
+```text
+/plugin marketplace update auditlanes
+/plugin update auditlanes@auditlanes
+/reload-plugins
+```
+
+If your marketplace was previously pinned to a tag, remove and re-add it once:
+
+```text
+/plugin marketplace remove auditlanes
+/plugin marketplace add jellestoel/auditlanes
+/plugin install auditlanes@auditlanes
+/reload-plugins
+```
+
 ### Codex
 
 ```bash
-codex plugin marketplace add jellestoel/auditlanes --ref v0.4.8
+codex plugin marketplace add jellestoel/auditlanes
 codex
 ```
 
@@ -121,6 +141,10 @@ Then open:
 
 Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
+
+For a deliberately pinned install, use `/plugin marketplace add
+jellestoel/auditlanes@v0.4.8` in Claude Code or `codex plugin marketplace add
+jellestoel/auditlanes --ref v0.4.8` in Codex.
 
 AuditLanes v0.4.8 is a protocol-first beta. It validates sidecars and reduces
 basic state, but does not yet run the full audit automatically or implement full
