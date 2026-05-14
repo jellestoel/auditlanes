@@ -1,4 +1,4 @@
-version: 0.4.11
+version: 0.4.12
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -29,6 +29,7 @@ product_shape:
     - "executable JSON Schema for report sidecars, batch manifests, and core security state artifacts"
     - "minimal validate-run script"
     - "minimal deterministic reduce-run script"
+    - "agent-authored YAML parsing and reducer-owned state repair hardening"
     - "static-only scan advisor script"
     - "sample validation fixtures and compatibility tests"
     - "optional repo-local scaffold payload"
@@ -126,7 +127,7 @@ validator_status:
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.11 ships a direct profile-aware validator script."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.12 ships a direct profile-aware validator script."
 
 advisor_status:
   current_release: "minimal-script"
@@ -150,7 +151,7 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.11 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.12 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
 
 profile_status:
   implemented:
@@ -378,7 +379,7 @@ cli:
     - "auditlanes upgrade ."
 
 known_limitations:
-  - "v0.4.11 bundles only the security profile as a stable runnable profile."
+  - "v0.4.12 bundles only the security profile as a stable runnable profile."
   - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable against the security report schema."
   - "strategy:auto and small-app-invariant-audit are protocol contracts; a packaged CLI/orchestrator that performs automatic relevance scoring is still planned."
   - "scan_advisor.py performs minimal static relevance scoring; an interactive numbered-choice wizard is still planned."

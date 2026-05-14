@@ -11,7 +11,7 @@
   "overlays": [
     "auto"
   ],
-  "profile_version": "0.4.11",
+  "profile_version": "0.4.12",
   "baseline_commit": null,
   "reviewed_artifacts": [
     "pyproject.toml"

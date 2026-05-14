@@ -417,6 +417,8 @@ object_schemas:
         type: object_list
         item_schema: evidence_ref
         min_items: 1
+      report_refs:
+        type: string_list
       lead_source_refs:
         type: string_list
 

@@ -82,6 +82,26 @@ class ReduceRunTests(unittest.TestCase):
         self.assertEqual(len(record["provisional_ids"]), 2)
         self.assertEqual(len(record["source_reports"]), 2)
 
+    def test_candidate_report_refs_are_preserved(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-candidate-dupes"
+        shutil.copytree(CANDIDATE_DUPES_RUN, run_copy)
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["candidate_findings"][0]["report_refs"] = ["reports/batch-01/session-auth/report.md#candidate-order"]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = read_jsonl(run_copy / "state" / "finding-inventory.jsonl")
+        self.assertIn("reports/batch-01/session-auth/report.md#candidate-order", records[0]["report_refs"])
+
     def test_same_id_status_transition_prefers_later_valid_state(self):
         run_copy, _ = self.run_reducer(VALID_RUN)
         batch_dir = run_copy / "reports" / "batch-05"
@@ -325,6 +345,72 @@ class ReduceRunTests(unittest.TestCase):
         self.assertTrue(any(event["event_type"] == "out-of-lane-lead-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "run-local-check-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "cross-lane-trigger-matched" for event in events))
+
+    def test_reducer_repairs_stale_extra_fields_in_owned_state(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-good"
+        shutil.copytree(VALID_RUN, run_copy)
+        state_dir = run_copy / "state"
+        state_dir.mkdir(exist_ok=True)
+        (state_dir / "security-smells.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "smell_id": "SMELL-stale-001",
+            "category": "direct-object-reference",
+            "source_family": "session-auth",
+            "source_reports": [],
+            "first_seen_batch": "batch-01",
+            "last_touched_batch": "batch-01",
+            "path": "routes.py",
+            "line_start": 1,
+            "description": "Stale reducer row carried an invalid merge field.",
+            "recommended_owner": "object-auth",
+            "status": "needs-triage",
+            "files": ["routes.py"],
+        }) + "\n", encoding="utf-8")
+        (state_dir / "regression-plan.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "regression_id": "REG-123456789abc",
+            "finding_id": "F-existing-123",
+            "source_family": "session-auth",
+            "source_reports": [],
+            "last_touched_batch": "batch-01",
+            "recommended_regression": "integration test",
+            "test_name": "test_existing_guard",
+            "guard_asserted": "require object owner",
+            "automation_status": "proposed",
+            "trigger_evidence_refs": [{"path": "routes.py"}],
+        }) + "\n", encoding="utf-8")
+        (state_dir / "run-local-checks.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "check_id": "local.stale-check",
+            "source_family": "session-auth",
+            "recommended_owner_family": "object-auth",
+            "source_reports": [],
+            "first_seen_batch": "batch-01",
+            "last_touched_batch": "batch-01",
+            "reason": "Run-local state had stale reducer fields.",
+            "trigger_evidence_refs": [{"path": "routes.py"}],
+            "extends_checks": ["commerce.object-ownership"],
+            "scope_impact": "Check object ownership.",
+            "regression_impact": None,
+            "status": "active",
+            "evidence_refs": [{"path": "routes.py"}],
+        }) + "\n", encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        smell = read_jsonl(state_dir / "security-smells.jsonl")[0]
+        regression = read_jsonl(state_dir / "regression-plan.jsonl")[0]
+        local_check = read_jsonl(state_dir / "run-local-checks.jsonl")[0]
+        self.assertNotIn("files", smell)
+        self.assertNotIn("trigger_evidence_refs", regression)
+        self.assertNotIn("evidence_refs", local_check)
 
     def test_proof_updates_map_provisional_ids_and_keep_strongest_level(self):
         tmp = tempfile.TemporaryDirectory()

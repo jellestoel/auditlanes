@@ -40,7 +40,7 @@ profiles:
     description: "Privacy and data governance audit profile."
 
 rules:
-  - "AuditLanes v0.4.11 bundles only the security profile as a stable runnable profile."
+  - "AuditLanes v0.4.12 bundles only the security profile as a stable runnable profile."
   - "Experimental profile metadata may exist to exercise core/profile loading, but it is not a stable audit mode."
   - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."
   - "Executable validators derive strategy and overlay IDs from the selected profile instead of hardcoding them in report schemas."

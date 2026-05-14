@@ -86,11 +86,16 @@ def load_json_or_yaml(path: Path) -> Any:
         pass
 
     try:
+        return parse_simple_yaml(text)
+    except Exception as simple_exc:  # noqa: BLE001
+        simple_error = simple_exc
+
+    try:
         import yaml  # type: ignore
 
         return yaml.safe_load(text)
-    except ModuleNotFoundError:
-        return parse_simple_yaml(text)
+    except ModuleNotFoundError as exc:
+        raise simple_error from exc
 
 
 def parse_simple_yaml(text: str) -> Any:
@@ -107,23 +112,117 @@ def parse_simple_yaml(text: str) -> Any:
         indent = len(raw) - len(raw.lstrip(" "))
         lines.append((indent, raw.strip()))
 
+    def split_flow_items(content: str) -> list[str]:
+        items: list[str] = []
+        current: list[str] = []
+        quote: str | None = None
+        escaped = False
+        depth = 0
+        for char in content:
+            if quote:
+                current.append(char)
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                continue
+            if char in {"'", '"'}:
+                quote = char
+                current.append(char)
+                continue
+            if char in "[{":
+                depth += 1
+                current.append(char)
+                continue
+            if char in "]}":
+                depth -= 1
+                current.append(char)
+                continue
+            if char == "," and depth == 0:
+                item = "".join(current).strip()
+                if item:
+                    items.append(item)
+                current = []
+                continue
+            current.append(char)
+        if quote or depth != 0:
+            raise ValueError(f"unterminated flow collection: {content!r}")
+        item = "".join(current).strip()
+        if item:
+            items.append(item)
+        return items
+
+    def split_flow_key_value(content: str) -> tuple[str, str]:
+        quote: str | None = None
+        escaped = False
+        depth = 0
+        for index, char in enumerate(content):
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                continue
+            if char in {"'", '"'}:
+                quote = char
+                continue
+            if char in "[{":
+                depth += 1
+                continue
+            if char in "]}":
+                depth -= 1
+                continue
+            if char == ":" and depth == 0:
+                return content[:index].strip(), content[index + 1:].strip()
+        raise ValueError(f"expected flow key/value item: {content!r}")
+
     def scalar(value: str) -> Any:
         value = value.strip()
-        if value in {"null", "~"}:
+        normalized = value.lower()
+        if normalized in {"null", "~"}:
             return None
         if value == "[]":
             return []
         if value == "{}":
             return {}
-        if value == "true":
+        if normalized == "true":
             return True
-        if value == "false":
+        if normalized == "false":
             return False
         if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
             return value[1:-1]
+        if len(value) >= 2 and value[0] == "[" and value[-1] == "]":
+            inner = value[1:-1].strip()
+            if not inner:
+                return []
+            return [scalar(item) for item in split_flow_items(inner)]
+        if len(value) >= 2 and value[0] == "{" and value[-1] == "}":
+            inner = value[1:-1].strip()
+            if not inner:
+                return {}
+            result: dict[str, Any] = {}
+            for item in split_flow_items(inner):
+                key, item_value = split_flow_key_value(item)
+                if len(key) >= 2 and key[0] == key[-1] and key[0] in {"'", '"'}:
+                    key = key[1:-1]
+                result[key] = scalar(item_value)
+            return result
         if re.fullmatch(r"-?[0-9]+", value):
             return int(value)
         return value
+
+    def looks_like_list_mapping(item_text: str, index: int, indent: int) -> bool:
+        if ":" not in item_text:
+            return False
+        key, _ = item_text.split(":", 1)
+        key = key.strip()
+        if not re.fullmatch(r"[a-z_][a-z0-9_]*", key):
+            return False
+        return index < len(lines) and lines[index][0] > indent
 
     def split_key_value(content: str) -> tuple[str, str | None]:
         if ":" not in content:
@@ -175,7 +274,7 @@ def parse_simple_yaml(text: str) -> Any:
             if not item_text:
                 item, index = parse_block(index, indent + 2)
                 result.append(item)
-            elif ":" in item_text:
+            elif looks_like_list_mapping(item_text, index, indent):
                 key, value = split_key_value(item_text)
                 item_dict: dict[str, Any] = {
                     key: scalar(value) if value is not None else {}

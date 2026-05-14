@@ -1164,6 +1164,18 @@ add cross-lane trigger config
 add reducer directives from cross-lane triggers
 ```
 
+## v0.4.12
+
+Validator and reducer hardening.
+
+```text
+harden YAML subset parsing for agent-authored relevance plans
+preserve candidate report references through reduction
+repair stale reducer-owned JSONL state before validation
+prune reducer-owned auxiliary rows to their executable schemas
+add regression coverage for live-run validation cleanup failures
+```
+
 ## v0.5.0
 
 Stable invariant-audit strategy.

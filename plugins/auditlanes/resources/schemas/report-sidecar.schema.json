@@ -360,6 +360,7 @@
           "minItems": 1,
           "items": { "$ref": "#/$defs/evidenceRef" }
         },
+        "report_refs": { "$ref": "#/$defs/stringList" },
         "lead_source_refs": { "$ref": "#/$defs/stringList" }
       }
     },

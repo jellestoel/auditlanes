@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -12,6 +13,14 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 INVALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "invalid" / "run-missing-evidence"
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("auditlanes_validate_run", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
 
 
 class ValidateRunCliTests(unittest.TestCase):
@@ -102,6 +111,38 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertIn("expected_families", result.stderr)
         self.assertIn("families", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
+
+    def test_simple_yaml_parser_handles_agent_authored_relevance_plan_shapes(self):
+        validator = load_validator_module()
+        parsed = validator.parse_simple_yaml(
+            "\n".join([
+                "schema_version: 1",
+                "profile: security",
+                "requested_strategy: auto",
+                "resolved_strategy: invariant-audit",
+                "resolved_overlays: [python, webapp, \"payment-flow\"]",
+                "coverage_mode: full-read",
+                "resolution_reason: Small codebase: use invariant audit.",
+                "uncertainty:",
+                "  - Small codebase: changed-file inputs were not available.",
+                "  - runtime-safe: approval was not granted.",
+                "selected_checks:",
+                "  - id: commerce.client-supplied-value-trust",
+                "    reason: Checkout flow accepts client supplied value.",
+                "advisor:",
+                "  tool: scan_advisor.py",
+                "  version: {major: 1, minor: 0}",
+                "",
+            ])
+        )
+
+        self.assertEqual(parsed["resolved_overlays"], ["python", "webapp", "payment-flow"])
+        self.assertEqual(parsed["uncertainty"], [
+            "Small codebase: changed-file inputs were not available.",
+            "runtime-safe: approval was not granted.",
+        ])
+        self.assertEqual(parsed["selected_checks"][0]["id"], "commerce.client-supplied-value-trust")
+        self.assertEqual(parsed["advisor"]["version"], {"major": 1, "minor": 0})
 
     def test_missing_manifest_message_hints_at_manifest_yaml(self):
         run_copy = self.copied_run()

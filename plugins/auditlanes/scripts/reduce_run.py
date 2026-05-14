@@ -44,6 +44,14 @@ STATUS_TRANSITIONS = {
     "fixed": {"reswept-open", "reswept-closed", "duplicate"},
     "blocked": {"candidate", "confirmed-static", "rejected"},
 }
+REPAIRABLE_STATE_SCHEMAS = {
+    "incidental-leads.jsonl": "incidental-lead.schema.json",
+    "proof-ledger.jsonl": "proof-ledger.schema.json",
+    "regression-plan.jsonl": "regression-plan.schema.json",
+    "run-local-checks.jsonl": "run-local-check.schema.json",
+    "security-smells.jsonl": "security-smell.schema.json",
+}
+SCHEMA_ALLOWED_PROPERTIES: dict[str, set[str]] = {}
 
 
 def normalize_text(value: Any) -> str:
@@ -133,6 +141,48 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
             if line:
                 rows.append(json.loads(line))
     return rows
+
+
+def schema_allowed_properties(schema_name: str) -> set[str]:
+    if schema_name not in SCHEMA_ALLOWED_PROPERTIES:
+        schema = validate_run.load_json(validate_run.DEFAULT_SCHEMAS_DIR / schema_name)
+        properties = schema.get("properties", {})
+        if not isinstance(properties, dict):
+            raise SystemExit(f"state schema {schema_name} does not declare object properties")
+        SCHEMA_ALLOWED_PROPERTIES[schema_name] = set(properties)
+    return SCHEMA_ALLOWED_PROPERTIES[schema_name]
+
+
+def prune_rows_to_schema(rows: list[dict[str, Any]], schema_name: str) -> list[dict[str, Any]]:
+    allowed = schema_allowed_properties(schema_name)
+    pruned: list[dict[str, Any]] = []
+    for row in rows:
+        clean = {key: value for key, value in row.items() if key in allowed}
+        if "schema_version" in allowed:
+            clean["schema_version"] = STATE_SCHEMA_VERSION
+        pruned.append(clean)
+    return pruned
+
+
+def repair_reducer_owned_state(run_dir: Path) -> None:
+    state_dir = run_dir / "state"
+    if not state_dir.exists():
+        return
+    if state_dir.is_symlink():
+        return
+    for filename, schema_name in sorted(REPAIRABLE_STATE_SCHEMAS.items()):
+        path = state_dir / filename
+        if not path.exists() or path.is_symlink():
+            continue
+        try:
+            rows = read_jsonl(path)
+        except Exception:  # noqa: BLE001
+            continue
+        if not all(isinstance(row, dict) for row in rows):
+            continue
+        repaired = prune_rows_to_schema(rows, schema_name)
+        if repaired != rows:
+            atomic_write_jsonl(path, repaired)
 
 
 def secure_state_temp(path: Path) -> tuple[int, Path]:
@@ -302,7 +352,7 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
         "related_findings": [],
         "files": candidate.get("files", []),
         "evidence_refs": candidate.get("evidence_refs", []),
-        "report_refs": [],
+        "report_refs": candidate.get("report_refs", []),
         "lead_source_refs": candidate.get("lead_source_refs", []),
         "widespread_pattern": False,
         "estimated_clone_count": None,
@@ -1050,6 +1100,7 @@ def reduce_run(
     allow_experimental: bool = False,
 ) -> dict[str, int]:
     run_dir = run_dir.resolve()
+    repair_reducer_owned_state(run_dir)
     issues = validate_run.validate_run(
         run_dir,
         validate_run.DEFAULT_SCHEMAS_DIR,
@@ -1198,6 +1249,11 @@ def reduce_run(
     merged_proof_updates = merge_proof_records(existing_proof_updates + proof_updates)
     merged_regression_recommendations = merge_aux_records_by_key(existing_regression_recommendations + regression_recommendations, "regression_id")
     merged_run_local_checks = merge_aux_records_by_key(existing_run_local_checks + run_local_checks, "check_id")
+    merged_incidental_leads = prune_rows_to_schema(merged_incidental_leads, "incidental-lead.schema.json")
+    merged_security_smells = prune_rows_to_schema(merged_security_smells, "security-smell.schema.json")
+    merged_proof_updates = prune_rows_to_schema(merged_proof_updates, "proof-ledger.schema.json")
+    merged_regression_recommendations = prune_rows_to_schema(merged_regression_recommendations, "regression-plan.schema.json")
+    merged_run_local_checks = prune_rows_to_schema(merged_run_local_checks, "run-local-check.schema.json")
     family_directives = build_family_directives(
         selected_profile,
         merged_incidental_leads,
@@ -1266,7 +1322,8 @@ def merge_aux_records_by_key(records: list[dict[str, Any]], key: str) -> list[di
         existing = dict(by_key[value])
         merged = {**existing, **record}
         for list_field in ("source_reports", "files", "evidence_refs", "trigger_evidence_refs", "extends_checks"):
-            merged[list_field] = unique_sorted(existing.get(list_field, []) + record.get(list_field, []))
+            if list_field in existing or list_field in record:
+                merged[list_field] = unique_sorted(existing.get(list_field, []) + record.get(list_field, []))
         if "first_seen_batch" in existing and "first_seen_batch" in record:
             merged["first_seen_batch"] = min(existing["first_seen_batch"], record["first_seen_batch"])
         if "last_touched_batch" in existing and "last_touched_batch" in record:

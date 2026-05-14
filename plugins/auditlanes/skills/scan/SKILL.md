@@ -13,7 +13,7 @@ Use this skill only when explicitly invoked by the operator.
 The default profile is `security`. Profile metadata is bundled at
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/catalog.yaml`.
 
-v0.4.11 supports the `security` profile as the only stable runnable profile.
+v0.4.12 supports the `security` profile as the only stable runnable profile.
 Profile lane catalogs are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/<profile>/`. If the operator asks for
 architecture, explain that `architecture` is experimental metadata only and can
