@@ -9,7 +9,10 @@ python3 -m unittest discover -s plugins/auditlanes/tests
 python3 plugins/auditlanes/scripts/validate_run.py plugins/auditlanes/resources/fixtures/valid/run-good
 python3 plugins/auditlanes/scripts/validate_run.py plugins/auditlanes/resources/fixtures/valid/run-candidate-dupes
 python3 -m json.tool .agents/plugins/marketplace.json >/dev/null
+python3 -m json.tool .claude-plugin/marketplace.json >/dev/null
 python3 -m json.tool plugins/auditlanes/.codex-plugin/plugin.json >/dev/null
+python3 -m json.tool plugins/auditlanes/.claude-plugin/plugin.json >/dev/null
+find plugins/auditlanes/resources/schemas -name '*.json' -exec python3 -m json.tool {} \; >/dev/null
 claude plugin validate .
 ```
 
@@ -48,10 +51,10 @@ plugins/auditlanes/.codex-plugin/plugin.json
 ```bash
 git status
 git add .
-git commit -m "Release AuditLanes v0.4.7"
-git tag -a v0.4.7 -m "AuditLanes v0.4.7"
+git commit -m "Release AuditLanes v0.4.8"
+git tag -a v0.4.8 -m "AuditLanes v0.4.8"
 git push origin main
-git push origin v0.4.7
+git push origin v0.4.8
 ```
 
 ## Claude Team Onboarding
@@ -66,7 +69,7 @@ A consuming repository can advertise and enable the marketplace through
       "source": {
         "source": "github",
         "repo": "OWNER/REPO",
-        "ref": "v0.4.7"
+        "ref": "v0.4.8"
       }
     }
   },

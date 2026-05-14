@@ -389,6 +389,120 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertIn("affected_families", result.stderr)
         self.assertIn("not a lane in profile", result.stderr)
 
+    def test_unknown_strategy_is_rejected(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["strategy"] = "unknown-strategy"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("strategy 'unknown-strategy' is not defined by profile 'security'", result.stderr)
+
+    def test_unknown_overlay_is_rejected(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["overlays"] = ["auto", "unknown-overlay"]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("overlay 'unknown-overlay' is not defined by profile 'security'", result.stderr)
+
+    def test_strategy_restricts_sidecar_mode(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["strategy"] = "runtime-validation"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("mode 'canonical-sweep' is not allowed by strategy 'runtime-validation'", result.stderr)
+
+    def test_incidental_lead_owner_must_be_normal_lane(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["incidental_leads"] = [{
+            "lead_id": "LEAD-session-auth-001",
+            "noticed_by_family": "session-auth",
+            "proposed_owner_family": "exploit-synthesis",
+            "summary": "Synthetic out-of-lane issue.",
+            "confidence": "probable",
+            "severity_hint": "high",
+            "blocker_to_confirmation": "Needs owner-lane confirmation.",
+            "files": ["routes.py"],
+            "evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("incidental_leads", result.stderr)
+        self.assertIn("not a lane in profile", result.stderr)
+
+    def test_run_local_checks_are_allowed_with_evidence(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["run_local_checks"] = [{
+            "check_id": "local.custom-state-machine",
+            "reason": "Repo-specific state transition needs a custom security check.",
+            "trigger_evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
+            "extends_checks": ["authz.admin-surface"],
+            "recommended_owner_family": "object-auth",
+            "scope_impact": "Add state-machine ownership checks to this run.",
+            "regression_impact": "Add a custom static rule if confirmed.",
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_run_local_check_id_must_be_local(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["run_local_checks"] = [{
+            "check_id": "checkout.custom-state-machine",
+            "reason": "Bad global-looking local check id.",
+            "trigger_evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
+            "scope_impact": "Should be rejected.",
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("run_local_checks", result.stderr)
+        self.assertIn("check_id", result.stderr)
+
     def test_batch_01_cannot_mark_late_canonical(self):
         run_copy = self.copied_run()
         sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"

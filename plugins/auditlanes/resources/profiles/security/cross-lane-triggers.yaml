@@ -1,0 +1,66 @@
+version: 1
+profile: security
+triggers:
+  - id: object-id-route
+    description: "Object, tenant, organization, account, or invoice identifiers on route-shaped evidence should notify object authorization."
+    when:
+      evidence_type: route-definition
+      patterns:
+        - object_id
+        - tenant_id
+        - org_id
+        - account_id
+        - invoice_id
+    notify:
+      - object-auth
+
+  - id: export-download-route
+    description: "Export, download, file, blob, or attachment surfaces should notify data-surface and object authorization lanes."
+    when:
+      patterns:
+        - download
+        - export
+        - file
+        - blob
+        - attachment
+    notify:
+      - data-surfaces
+      - object-auth
+
+  - id: admin-route
+    description: "Admin, support, staff, or moderation surfaces should notify role matrix."
+    when:
+      patterns:
+        - admin
+        - support
+        - staff
+        - moderation
+    notify:
+      - role-matrix
+
+  - id: webhook-callback-route
+    description: "Webhook, callback, signature, state, or nonce surfaces should notify integration trust and session auth."
+    when:
+      patterns:
+        - webhook
+        - callback
+        - signature
+        - state
+        - nonce
+    notify:
+      - integration-trust
+      - session-auth
+
+  - id: platform-config-change
+    description: "Platform, dependency, CI/CD, container, or IaC paths should notify platform posture."
+    when:
+      paths:
+        - ".github/**"
+        - "Dockerfile"
+        - "docker-compose.yml"
+        - "terraform/**"
+        - "k8s/**"
+        - "package.json"
+        - "pyproject.toml"
+    notify:
+      - platform-posture

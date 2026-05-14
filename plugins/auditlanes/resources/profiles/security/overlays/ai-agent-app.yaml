@@ -1,0 +1,13 @@
+version: 1
+id: ai-agent-app
+profile: security
+status: beta
+description: "AI agent application emphasis for tool permissions, prompt/data boundaries, retrieval exposure, indirect prompt injection, and delegated actions."
+priority_surfaces:
+  - agent-tools
+  - retrieval-indexes
+  - delegated-actions
+  - model-boundary-data
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

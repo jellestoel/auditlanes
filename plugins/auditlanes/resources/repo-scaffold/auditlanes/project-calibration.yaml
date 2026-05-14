@@ -1,7 +1,7 @@
 version: 1
 name: auditlanes-project-calibration
 
-mission: "Derive a project-specific security scan profile before family audit work begins."
+mission: "Derive a project-specific security scan profile and evidence-backed relevance plan before audit work begins."
 
 inputs:
   repo_root: "."
@@ -75,6 +75,12 @@ tasks:
   - "Use ${PROTOCOL_ROOT}/profiles/project.yaml only as a template for repo-local scaffolding."
   - "Merge ${TARGET_ROOT}/auditlanes/profiles/project.yaml only when repo-local scaffolding was explicitly requested or provenance is verified."
   - "Discover repository shape using only static inspection unless approval has been granted."
+  - "Infer the requested auto strategy into a concrete resolved strategy, overlays, coverage mode, and suggested checks."
+  - "For small repositories, prefer full-read small-app-invariant-audit over lane partitioning when complete static review is feasible."
+  - "Record selected, deprioritized, and not-applicable checks with evidence-backed reasons and agent_discretion flags."
+  - "Treat selected checks as starting prompts, not a complete or exclusive checklist, unless a check is explicitly marked as universal/non-discretionary."
+  - "Agents may add run-local checks for unmodeled risks when they record the trigger evidence and explain why existing packs were insufficient."
+  - "Enable universal obvious-risk checks even when specific checks are deprioritized."
   - "Generate a project-specific security profile with cited evidence."
   - "Map discovered surfaces to persistent family lanes."
   - "Generate concrete coverage units for each family."
@@ -90,6 +96,7 @@ profile_locking:
   - "Only the reducer may update family scope, coverage units, priority targets, or exclusions after batch completion."
 
 required_outputs:
+  - "${RUN_DIR}/state/relevance-plan.yaml"
   - "${RUN_DIR}/state/project-security-profile.yaml"
   - "${RUN_DIR}/state/project-security-profile.initial.yaml"
   - "${RUN_DIR}/state/attack-surface-inventory.jsonl"
@@ -99,6 +106,21 @@ required_outputs:
   - "${RUN_DIR}/state/calibration-notes.md"
 
 output_contract:
+  relevance_plan:
+    format: yaml
+    required_sections:
+      - profile
+      - requested_strategy
+      - resolved_strategy
+      - resolved_overlays
+      - coverage_mode
+      - repo_observations
+      - selected_checks
+      - deprioritized_checks
+      - universal_checks_enabled
+      - agent_discretion_enabled
+      - uncertainty
+      - coverage_gaps
   project_security_profile:
     required_sections:
       - project

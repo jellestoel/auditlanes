@@ -13,6 +13,8 @@
     "family",
     "mode",
     "profile",
+    "strategy",
+    "overlays",
     "baseline_commit",
     "reviewed_artifacts",
     "reviewed_files_routes_helpers",
@@ -25,10 +27,14 @@
     "chain_candidates",
     "coverage_gaps",
     "profile_feedback",
+    "incidental_leads",
+    "security_smells",
+    "proof_updates",
+    "regression_recommendations",
     "next_batch_recommendations"
   ],
   "properties": {
-    "schema_version": { "const": 2 },
+    "schema_version": { "const": 3 },
     "sidecar_id": { "type": "string", "minLength": 1 },
     "generated_at": { "type": "string", "minLength": 1, "format": "date-time" },
     "run_id": { "type": "string", "minLength": 1 },
@@ -36,6 +42,11 @@
     "family": { "$ref": "#/$defs/family" },
     "mode": { "$ref": "#/$defs/mode" },
     "profile": { "$ref": "#/$defs/profileId" },
+    "strategy": { "$ref": "#/$defs/strategyId" },
+    "overlays": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/overlayId" }
+    },
     "profile_version": { "type": ["string", "null"] },
     "baseline_commit": { "type": ["string", "null"] },
     "reviewed_artifacts": { "$ref": "#/$defs/stringList" },
@@ -81,6 +92,31 @@
       "description": "Profile-scope feedback proposed by the reporting family. Feedback may be cross-lane: use affected_families when the suggested scope change impacts lanes other than the reporting family.",
       "items": { "$ref": "#/$defs/profileFeedback" }
     },
+    "incidental_leads": {
+      "type": "array",
+      "description": "Out-of-lane or opportunistic serious security observations preserved for reducer-owned triage.",
+      "items": { "$ref": "#/$defs/incidentalLead" }
+    },
+    "security_smells": {
+      "type": "array",
+      "description": "Weak but interesting security signals that need triage before becoming candidates.",
+      "items": { "$ref": "#/$defs/securitySmell" }
+    },
+    "proof_updates": {
+      "type": "array",
+      "description": "Proof-ladder updates for findings, candidates, or leads.",
+      "items": { "$ref": "#/$defs/proofUpdate" }
+    },
+    "regression_recommendations": {
+      "type": "array",
+      "description": "Recurrence-prevention recommendations associated with confirmed findings.",
+      "items": { "$ref": "#/$defs/regressionRecommendation" }
+    },
+    "run_local_checks": {
+      "type": "array",
+      "description": "Checks invented by the reviewing agent for unmodeled repo-specific scenarios. These frame follow-up work without changing the global profile catalog.",
+      "items": { "$ref": "#/$defs/runLocalCheck" }
+    },
     "next_batch_recommendations": { "$ref": "#/$defs/stringList" }
   },
   "$defs": {
@@ -93,6 +129,14 @@
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
     "profileId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "strategyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "overlayId": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
@@ -112,6 +156,16 @@
     },
     "confidence": {
       "enum": ["certain", "probable", "speculative"]
+    },
+    "proofLevel": {
+      "enum": [
+        "P0-lead",
+        "P1-candidate",
+        "P2-static-confirmed",
+        "P3-reachability-confirmed",
+        "P4-runtime-confirmed",
+        "P5-regression-backed"
+      ]
     },
     "confirmedConfidence": {
       "enum": ["certain", "probable"]
@@ -390,6 +444,128 @@
           "items": { "$ref": "#/$defs/evidenceRef" }
         },
         "urgency": { "enum": ["high", "medium", "low"] }
+      }
+    },
+    "incidentalLead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lead_id",
+        "noticed_by_family",
+        "proposed_owner_family",
+        "summary",
+        "confidence",
+        "severity_hint",
+        "blocker_to_confirmation",
+        "files",
+        "evidence_refs"
+      ],
+      "properties": {
+        "lead_id": { "type": "string", "minLength": 1 },
+        "noticed_by_family": { "$ref": "#/$defs/family" },
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "summary": { "type": "string", "minLength": 1 },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "severity_hint": { "$ref": "#/$defs/severity" },
+        "why_noticed": { "type": "string" },
+        "blocker_to_confirmation": { "type": "string", "minLength": 1 },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        }
+      }
+    },
+    "securitySmell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["smell_id", "category", "path", "description", "recommended_owner", "status"],
+      "properties": {
+        "smell_id": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "line_start": { "type": ["integer", "null"], "minimum": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "recommended_owner": { "$ref": "#/$defs/ownerFamily" },
+        "status": { "enum": ["needs-triage", "promoted", "rejected"] }
+      }
+    },
+    "proofUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "proof_level", "evidence_summary"],
+      "properties": {
+        "subject_id": { "type": "string", "minLength": 1 },
+        "proof_level": { "$ref": "#/$defs/proofLevel" },
+        "evidence_summary": { "type": "string", "minLength": 1 },
+        "runtime_validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "approved": { "type": "boolean" },
+            "reason": { "type": "string" }
+          }
+        },
+        "regression_status": { "type": ["string", "null"] },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" }
+        }
+      }
+    },
+    "regressionRecommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "recommended_regression", "test_name", "guard_asserted", "automation_status"],
+      "properties": {
+        "finding_id": { "type": "string", "minLength": 1 },
+        "recommended_regression": {
+          "enum": [
+            "unit test",
+            "integration test",
+            "policy test",
+            "configuration assertion",
+            "custom static rule",
+            "dependency/policy gate",
+            "manual compensating control",
+            "documented not-feasible reason"
+          ]
+        },
+        "test_name": { "type": "string", "minLength": 1 },
+        "guard_asserted": { "type": "string", "minLength": 1 },
+        "automation_status": { "enum": ["proposed", "implemented", "not-feasible"] },
+        "owner_hint": { "type": ["string", "null"] }
+      }
+    },
+    "runLocalCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "reason",
+        "trigger_evidence_refs",
+        "scope_impact"
+      ],
+      "properties": {
+        "check_id": { "type": "string", "pattern": "^local\\.[a-z0-9][a-z0-9.-]*$" },
+        "reason": { "type": "string", "minLength": 1 },
+        "trigger_evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidenceRef" },
+          "minItems": 1
+        },
+        "extends_checks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "recommended_owner_family": { "$ref": "#/$defs/family" },
+        "scope_impact": { "type": "string", "minLength": 1 },
+        "regression_impact": { "type": ["string", "null"] }
       }
     }
   }

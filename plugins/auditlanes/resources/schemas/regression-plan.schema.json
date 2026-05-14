@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/regression-plan.schema.json",
+  "title": "AuditLanes regression plan JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "regression_id",
+    "finding_id",
+    "source_family",
+    "source_reports",
+    "last_touched_batch",
+    "recommended_regression",
+    "test_name",
+    "guard_asserted",
+    "automation_status"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "regression_id": { "type": "string", "pattern": "^REG-[0-9a-f]{12}$" },
+    "finding_id": { "type": "string", "minLength": 1 },
+    "source_family": { "type": "string", "minLength": 1 },
+    "source_reports": { "type": "array", "items": { "type": "object" } },
+    "last_touched_batch": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "recommended_regression": {
+      "enum": [
+        "unit test",
+        "integration test",
+        "policy test",
+        "configuration assertion",
+        "custom static rule",
+        "dependency/policy gate",
+        "manual compensating control",
+        "documented not-feasible reason"
+      ]
+    },
+    "test_name": { "type": "string", "minLength": 1 },
+    "guard_asserted": { "type": "string", "minLength": 1 },
+    "automation_status": { "enum": ["proposed", "implemented", "not-feasible"] },
+    "owner_hint": { "type": ["string", "null"] }
+  }
+}

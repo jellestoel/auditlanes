@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/incidental-lead.schema.json",
+  "title": "AuditLanes incidental lead JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lead_id",
+    "noticed_by_family",
+    "proposed_owner_family",
+    "source_reports",
+    "first_seen_batch",
+    "last_touched_batch",
+    "severity_hint",
+    "confidence",
+    "summary",
+    "blocker_to_confirmation",
+    "files",
+    "evidence_refs",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "lead_id": { "type": "string", "minLength": 1 },
+    "noticed_by_family": { "type": "string", "minLength": 1 },
+    "proposed_owner_family": { "type": "string", "minLength": 1 },
+    "source_reports": { "type": "array", "items": { "type": "object" } },
+    "first_seen_batch": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "last_touched_batch": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "severity_hint": { "enum": ["critical", "high", "medium", "low", "info"] },
+    "confidence": { "enum": ["certain", "probable", "speculative"] },
+    "summary": { "type": "string", "minLength": 1 },
+    "why_noticed": { "type": ["string", "null"] },
+    "blocker_to_confirmation": { "type": "string", "minLength": 1 },
+    "files": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "minItems": 1, "items": { "type": "object" } },
+    "status": { "enum": ["needs-triage", "promoted", "rejected"] }
+  }
+}

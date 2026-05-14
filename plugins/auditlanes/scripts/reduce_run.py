@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -301,6 +302,408 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
     }
 
 
+def incidental_lead_record(sidecar: dict[str, Any], lead: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "lead_id": lead["lead_id"],
+        "noticed_by_family": lead["noticed_by_family"],
+        "proposed_owner_family": lead["proposed_owner_family"],
+        "source_reports": [source_report(batch_id, family, report_path, lead["lead_id"])],
+        "first_seen_batch": batch_id,
+        "last_touched_batch": batch_id,
+        "severity_hint": lead["severity_hint"],
+        "confidence": lead["confidence"],
+        "summary": lead["summary"],
+        "why_noticed": lead.get("why_noticed"),
+        "blocker_to_confirmation": lead["blocker_to_confirmation"],
+        "files": lead.get("files", []),
+        "evidence_refs": lead.get("evidence_refs", []),
+        "status": "needs-triage",
+    }
+
+
+def security_smell_record(sidecar: dict[str, Any], smell: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "smell_id": smell["smell_id"],
+        "category": smell["category"],
+        "source_family": family,
+        "source_reports": [source_report(batch_id, family, report_path, smell["smell_id"])],
+        "first_seen_batch": batch_id,
+        "last_touched_batch": batch_id,
+        "path": smell["path"],
+        "line_start": smell.get("line_start"),
+        "description": smell["description"],
+        "recommended_owner": smell["recommended_owner"],
+        "status": smell["status"],
+    }
+
+
+def proof_update_record(sidecar: dict[str, Any], update: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "subject_id": update["subject_id"],
+        "proof_level": update["proof_level"],
+        "source_family": family,
+        "source_reports": [source_report(batch_id, family, report_path, update["subject_id"])],
+        "last_touched_batch": batch_id,
+        "evidence_summary": update["evidence_summary"],
+        "runtime_validation": update.get("runtime_validation"),
+        "regression_status": update.get("regression_status"),
+        "evidence_refs": update.get("evidence_refs", []),
+    }
+
+
+def regression_recommendation_id(recommendation: dict[str, Any]) -> str:
+    short = stable_hash([
+        recommendation["finding_id"],
+        recommendation["recommended_regression"],
+        recommendation["test_name"],
+        recommendation["guard_asserted"],
+    ])
+    return f"REG-{short}"
+
+
+def regression_recommendation_record(sidecar: dict[str, Any], recommendation: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "regression_id": regression_recommendation_id(recommendation),
+        "finding_id": recommendation["finding_id"],
+        "source_family": family,
+        "source_reports": [source_report(batch_id, family, report_path, recommendation["finding_id"])],
+        "last_touched_batch": batch_id,
+        "recommended_regression": recommendation["recommended_regression"],
+        "test_name": recommendation["test_name"],
+        "guard_asserted": recommendation["guard_asserted"],
+        "automation_status": recommendation["automation_status"],
+        "owner_hint": recommendation.get("owner_hint"),
+    }
+
+
+def run_local_check_record(sidecar: dict[str, Any], local_check: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "check_id": local_check["check_id"],
+        "source_family": family,
+        "recommended_owner_family": local_check.get("recommended_owner_family"),
+        "source_reports": [source_report(batch_id, family, report_path, local_check["check_id"])],
+        "first_seen_batch": batch_id,
+        "last_touched_batch": batch_id,
+        "reason": local_check["reason"],
+        "trigger_evidence_refs": local_check.get("trigger_evidence_refs", []),
+        "extends_checks": local_check.get("extends_checks", []),
+        "scope_impact": local_check["scope_impact"],
+        "regression_impact": local_check.get("regression_impact"),
+        "status": "active",
+    }
+
+
+def scalar_strings(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, bool):
+        return ["true" if value else "false"]
+    if isinstance(value, (int, float)):
+        return [str(value)]
+    if isinstance(value, list):
+        values: list[str] = []
+        for item in value:
+            values.extend(scalar_strings(item))
+        return values
+    if isinstance(value, dict):
+        values = []
+        for item in value.values():
+            values.extend(scalar_strings(item))
+        return values
+    return [str(value)]
+
+
+def evidence_refs_from_item(item: dict[str, Any]) -> list[dict[str, Any]]:
+    refs = item.get("evidence_refs", item.get("trigger_evidence_refs", []))
+    return refs if isinstance(refs, list) else []
+
+
+def paths_from_item(item: dict[str, Any]) -> list[str]:
+    paths: list[str] = []
+    files = item.get("files")
+    if isinstance(files, list):
+        paths.extend(path for path in files if isinstance(path, str))
+    path = item.get("path")
+    if isinstance(path, str):
+        paths.append(path)
+    for ref in evidence_refs_from_item(item):
+        if isinstance(ref, dict) and isinstance(ref.get("path"), str):
+            paths.append(ref["path"])
+    return unique_sorted(paths)
+
+
+def source_id_for_item(kind: str, item: dict[str, Any]) -> str:
+    for field in (
+        "provisional_finding_id",
+        "candidate_id",
+        "lead_id",
+        "smell_id",
+        "check_id",
+        "surface_id",
+        "matrix_id",
+        "invariant_id",
+    ):
+        value = item.get(field)
+        if isinstance(value, str) and value:
+            return value
+    return f"{kind}-{stable_hash([item])}"
+
+
+def signal_from_item(kind: str, sidecar: dict[str, Any] | None, item: dict[str, Any]) -> dict[str, Any]:
+    refs = evidence_refs_from_item(item)
+    evidence_types = {
+        ref["evidence_type"]
+        for ref in refs
+        if isinstance(ref, dict) and isinstance(ref.get("evidence_type"), str)
+    }
+    paths = paths_from_item(item)
+    searchable_refs = [
+        {
+            "path": ref.get("path"),
+            "symbol": ref.get("symbol"),
+            "evidence_type": ref.get("evidence_type"),
+        }
+        for ref in refs
+        if isinstance(ref, dict)
+    ]
+    text_parts = scalar_strings({
+        "kind": kind,
+        "summary": item.get("summary") if kind in {"incidental-lead", "security-smell"} else None,
+        "reason": item.get("reason"),
+        "description": item.get("description"),
+        "scope_impact": item.get("scope_impact"),
+        "regression_impact": item.get("regression_impact"),
+        "entrypoint": item.get("entrypoint"),
+        "category": item.get("category"),
+        "assets": item.get("assets"),
+        "actions": item.get("actions"),
+        "guards": item.get("guards"),
+        "trust_boundaries": item.get("trust_boundaries"),
+        "principal_types": item.get("principal_types"),
+        "paths": paths,
+        "evidence_refs": searchable_refs,
+    })
+    return {
+        "source_id": source_id_for_item(kind, item),
+        "source_kind": kind,
+        "family": sidecar.get("family") if sidecar else item.get("owner_family"),
+        "text": " ".join(text_parts).lower(),
+        "paths": paths,
+        "evidence_types": evidence_types,
+        "priority_targets": paths,
+    }
+
+
+def sidecar_signals(sidecar: dict[str, Any]) -> list[dict[str, Any]]:
+    signals: list[dict[str, Any]] = []
+    for collection, kind in (
+        ("confirmed_findings", "confirmed-finding"),
+        ("candidate_findings", "candidate-finding"),
+        ("incidental_leads", "incidental-lead"),
+        ("security_smells", "security-smell"),
+        ("run_local_checks", "run-local-check"),
+    ):
+        for item in sidecar.get(collection, []):
+            if isinstance(item, dict):
+                signals.append(signal_from_item(kind, sidecar, item))
+    return signals
+
+
+def state_surface_signals(state_dir: Path) -> list[dict[str, Any]]:
+    signals: list[dict[str, Any]] = []
+    for filename, kind in (
+        ("attack-surface-inventory.jsonl", "attack-surface-inventory"),
+        ("attack-surface-graph.jsonl", "attack-surface-graph"),
+        ("authorization-matrix.jsonl", "authorization-matrix"),
+        ("security-invariants.jsonl", "security-invariant"),
+    ):
+        for row in read_jsonl(state_dir / filename):
+            signals.append(signal_from_item(kind, None, row))
+    return signals
+
+
+def trigger_matches_signal(trigger: dict[str, Any], signal: dict[str, Any]) -> bool:
+    when = trigger.get("when", {})
+    if not isinstance(when, dict):
+        return False
+
+    evidence_type = when.get("evidence_type")
+    if isinstance(evidence_type, str) and evidence_type not in signal.get("evidence_types", set()):
+        return False
+
+    patterns = when.get("patterns", [])
+    if isinstance(patterns, list) and patterns:
+        text = signal.get("text", "")
+        if not any(isinstance(pattern, str) and pattern.lower() in text for pattern in patterns):
+            return False
+
+    path_patterns = when.get("paths", [])
+    if isinstance(path_patterns, list) and path_patterns:
+        paths = signal.get("paths", [])
+        if not any(
+            isinstance(pattern, str)
+            and any(fnmatch.fnmatch(path, pattern) or path == pattern for path in paths)
+            for pattern in path_patterns
+        ):
+            return False
+
+    return bool(evidence_type or patterns or path_patterns)
+
+
+def directive_mode_for_source(source_kind: str) -> str:
+    if source_kind in {"confirmed-finding", "candidate-finding"}:
+        return "clonehunt"
+    return "canonical-gap-fill"
+
+
+def add_directive(
+    directives: dict[str, dict[str, Any]],
+    family: str,
+    next_mode: str,
+    reason: str,
+    priority_targets: list[str],
+    source_id: str,
+) -> None:
+    existing = directives.get(family)
+    if existing is None:
+        directives[family] = {
+            "family": family,
+            "next_mode": next_mode,
+            "reason": reason,
+            "priority_targets": unique_sorted(priority_targets),
+            "source_ids": [source_id],
+        }
+        return
+
+    if existing["next_mode"] != "canonical-gap-fill" and next_mode == "canonical-gap-fill":
+        existing["next_mode"] = next_mode
+    existing["reason"] = "; ".join(unique_sorted([existing["reason"], reason]))
+    existing["priority_targets"] = unique_sorted(existing.get("priority_targets", []) + priority_targets)
+    existing["source_ids"] = unique_sorted(existing.get("source_ids", []) + [source_id])
+
+
+def build_family_directives(
+    selected_profile: dict[str, Any],
+    incidental_lead_rows: list[dict[str, Any]],
+    run_local_check_rows: list[dict[str, Any]],
+    signals: list[dict[str, Any]],
+    source_batches: set[str],
+    events: list[dict[str, Any]],
+    input_hashes: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    lanes = selected_profile["lanes"]
+    directives: dict[str, dict[str, Any]] = {}
+
+    for lead in incidental_lead_rows:
+        family = lead.get("proposed_owner_family")
+        if not isinstance(family, str) or family not in lanes:
+            continue
+        add_directive(
+            directives,
+            family,
+            "canonical-gap-fill",
+            f"Triaging incidental lead {lead.get('lead_id')}: {lead.get('summary')}",
+            lead.get("files", []),
+            lead.get("lead_id", "unknown-lead"),
+        )
+
+    for local_check in run_local_check_rows:
+        family = local_check.get("recommended_owner_family") or local_check.get("source_family")
+        if not isinstance(family, str) or family not in lanes:
+            continue
+        targets = paths_from_item(local_check)
+        add_directive(
+            directives,
+            family,
+            "canonical-gap-fill",
+            f"Run-local check {local_check.get('check_id')}: {local_check.get('scope_impact')}",
+            targets,
+            local_check.get("check_id", "unknown-local-check"),
+        )
+
+    for trigger in selected_profile.get("cross_lane_triggers", []):
+        notify = trigger.get("notify", [])
+        for signal in signals:
+            if not trigger_matches_signal(trigger, signal):
+                continue
+            source_id = signal["source_id"]
+            for family in notify:
+                if family not in lanes:
+                    continue
+                add_directive(
+                    directives,
+                    family,
+                    directive_mode_for_source(signal["source_kind"]),
+                    f"Cross-lane trigger {trigger['id']} matched {signal['source_kind']} {source_id}.",
+                    signal.get("priority_targets", []),
+                    source_id,
+                )
+                events.append(make_event(
+                    "cross-lane-trigger-matched",
+                    ",".join(sorted(source_batches)) if source_batches else None,
+                    family,
+                    "info",
+                    f"Trigger {trigger['id']} matched {signal['source_kind']} {source_id}.",
+                    input_hashes,
+                ))
+
+    return [directives[family] for family in sorted(directives)]
+
+
+def yaml_quote(value: Any) -> str:
+    text = "" if value is None else str(value)
+    return json.dumps(text)
+
+
+def family_directives_yaml(directives: list[dict[str, Any]], source_batches: set[str]) -> str:
+    lines = [
+        "schema_version: 1",
+        "generated_by: reduce_run.py",
+    ]
+    if source_batches:
+        lines.append("source_batches:")
+        for batch in sorted(source_batches):
+            lines.append(f"  - {yaml_quote(batch)}")
+    else:
+        lines.append("source_batches: []")
+    if directives:
+        lines.append("directives:")
+    else:
+        lines.append("directives: []")
+    for directive in directives:
+        lines.append(f"  - family: {yaml_quote(directive['family'])}")
+        lines.append(f"    next_mode: {yaml_quote(directive['next_mode'])}")
+        lines.append(f"    reason: {yaml_quote(directive['reason'])}")
+        targets = directive.get("priority_targets", [])
+        if targets:
+            lines.append("    priority_targets:")
+            for target in targets:
+                lines.append(f"      - {yaml_quote(target)}")
+        else:
+            lines.append("    priority_targets: []")
+        lines.append("    source_ids:")
+        for source_id in directive.get("source_ids", []):
+            lines.append(f"      - {yaml_quote(source_id)}")
+    return "\n".join(lines) + "\n"
+
+
 def choose_better_record(existing: dict[str, Any], incoming: dict[str, Any]) -> dict[str, Any]:
     old_status = existing.get("status", "")
     new_status = incoming.get("status", "")
@@ -429,6 +832,7 @@ def reduce_run(
         formatted = "\n".join(issue.format() for issue in issues)
         raise SystemExit(f"validation failed before reduce:\n{formatted}")
 
+    selected_profile = validate_run.load_profile(profile, profiles_dir)
     state_dir = ensure_state_dir(run_dir)
     existing_inventory = read_jsonl(state_dir / "finding-inventory.jsonl")
     existing_records = {
@@ -439,11 +843,22 @@ def reduce_run(
     existing_rejected = read_jsonl(state_dir / "rejected-claims.jsonl")
     existing_profile_feedback = read_jsonl(state_dir / "profile-feedback.jsonl")
     existing_chains = read_jsonl(state_dir / "chain-inventory.jsonl")
+    existing_incidental_leads = read_jsonl(state_dir / "incidental-leads.jsonl")
+    existing_security_smells = read_jsonl(state_dir / "security-smells.jsonl")
+    existing_proof_updates = read_jsonl(state_dir / "proof-ledger.jsonl")
+    existing_regression_recommendations = read_jsonl(state_dir / "regression-plan.jsonl")
+    existing_run_local_checks = read_jsonl(state_dir / "run-local-checks.jsonl")
     events = read_jsonl(state_dir / "run-events.jsonl")
     records: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     profile_feedback: list[dict[str, Any]] = []
     chain_records: list[dict[str, Any]] = []
+    incidental_leads: list[dict[str, Any]] = []
+    security_smells: list[dict[str, Any]] = []
+    proof_updates: list[dict[str, Any]] = []
+    regression_recommendations: list[dict[str, Any]] = []
+    run_local_checks: list[dict[str, Any]] = []
+    trigger_signals = state_surface_signals(state_dir)
 
     manifests = load_manifests(run_dir, batch_id)
     input_hashes = validate_run.collect_input_hashes(run_dir, batch_id)
@@ -466,10 +881,38 @@ def reduce_run(
                 continue
             report_path = resolve_report_path(run_dir, manifest_path, item["json"])
             sidecar = validate_run.load_json(report_path)
+            trigger_signals.extend(sidecar_signals(sidecar))
             for finding in sidecar.get("confirmed_findings", []):
                 records.append(confirmed_record(sidecar, finding, report_path.relative_to(run_dir)))
             for candidate in sidecar.get("candidate_findings", []):
                 records.append(candidate_record(sidecar, candidate, report_path.relative_to(run_dir)))
+            for lead in sidecar.get("incidental_leads", []):
+                incidental_leads.append(incidental_lead_record(sidecar, lead, report_path.relative_to(run_dir)))
+                if lead.get("noticed_by_family") != lead.get("proposed_owner_family"):
+                    events.append(make_event(
+                        "out-of-lane-lead-imported",
+                        current_batch,
+                        sidecar.get("family"),
+                        "info",
+                        f"Imported incidental lead {lead.get('lead_id')} from {lead.get('noticed_by_family')} for {lead.get('proposed_owner_family')}.",
+                        input_hashes,
+                    ))
+            for smell in sidecar.get("security_smells", []):
+                security_smells.append(security_smell_record(sidecar, smell, report_path.relative_to(run_dir)))
+            for proof_update in sidecar.get("proof_updates", []):
+                proof_updates.append(proof_update_record(sidecar, proof_update, report_path.relative_to(run_dir)))
+            for recommendation in sidecar.get("regression_recommendations", []):
+                regression_recommendations.append(regression_recommendation_record(sidecar, recommendation, report_path.relative_to(run_dir)))
+            for local_check in sidecar.get("run_local_checks", []):
+                run_local_checks.append(run_local_check_record(sidecar, local_check, report_path.relative_to(run_dir)))
+                events.append(make_event(
+                    "run-local-check-imported",
+                    current_batch,
+                    sidecar.get("family"),
+                    "info",
+                    f"Imported run-local check {local_check.get('check_id')}.",
+                    input_hashes,
+                ))
             for claim in sidecar.get("rejected_claims", []):
                 rejected.append({
                     "schema_version": STATE_SCHEMA_VERSION,
@@ -506,6 +949,20 @@ def reduce_run(
     incoming_merged = merge_records(records)
     incoming_merged = enforce_status_transitions(existing_records, incoming_merged, events)
     merged = merge_inventory(existing_inventory, incoming_merged)
+    merged_incidental_leads = merge_aux_records_by_key(existing_incidental_leads + incidental_leads, "lead_id")
+    merged_security_smells = merge_aux_records_by_key(existing_security_smells + security_smells, "smell_id")
+    merged_proof_updates = merge_aux_records_by_key(existing_proof_updates + proof_updates, "subject_id")
+    merged_regression_recommendations = merge_aux_records_by_key(existing_regression_recommendations + regression_recommendations, "regression_id")
+    merged_run_local_checks = merge_aux_records_by_key(existing_run_local_checks + run_local_checks, "check_id")
+    family_directives = build_family_directives(
+        selected_profile,
+        merged_incidental_leads,
+        merged_run_local_checks,
+        trigger_signals,
+        processed_batches,
+        events,
+        input_hashes,
+    )
     events.append(make_event(
         "reducer-run",
         ",".join(sorted(processed_batches)) if processed_batches else batch_id,
@@ -519,7 +976,13 @@ def reduce_run(
     atomic_write_jsonl(state_dir / "rejected-claims.jsonl", merge_records_by_key(existing_rejected + rejected, "claim_id"))
     atomic_write_jsonl(state_dir / "profile-feedback.jsonl", merge_records_by_key(existing_profile_feedback + profile_feedback, "profile_gap_id"))
     atomic_write_jsonl(state_dir / "chain-inventory.jsonl", merge_records_by_key(existing_chains + chain_records, "chain_id"))
+    atomic_write_jsonl(state_dir / "incidental-leads.jsonl", merged_incidental_leads)
+    atomic_write_jsonl(state_dir / "security-smells.jsonl", merged_security_smells)
+    atomic_write_jsonl(state_dir / "proof-ledger.jsonl", merged_proof_updates)
+    atomic_write_jsonl(state_dir / "regression-plan.jsonl", merged_regression_recommendations)
+    atomic_write_jsonl(state_dir / "run-local-checks.jsonl", merged_run_local_checks)
     atomic_write_jsonl(state_dir / "run-events.jsonl", merge_records_by_key(events, "event_id"))
+    atomic_write_text(state_dir / "family-directives.yaml", family_directives_yaml(family_directives, processed_batches))
     atomic_write_text(state_dir / "shared-context-summary.md", shared_context_summary(merged))
 
     return {
@@ -528,6 +991,12 @@ def reduce_run(
         "rejected": len(rejected),
         "profile_feedback": len(profile_feedback),
         "chains": len(chain_records),
+        "incidental_leads": len(incidental_leads),
+        "security_smells": len(security_smells),
+        "proof_updates": len(proof_updates),
+        "regression_recommendations": len(regression_recommendations),
+        "run_local_checks": len(run_local_checks),
+        "family_directives": len(family_directives),
     }
 
 
@@ -537,6 +1006,27 @@ def merge_records_by_key(records: list[dict[str, Any]], key: str) -> list[dict[s
         if key not in record:
             continue
         by_key[record[key]] = record
+    return [by_key[value] for value in sorted(by_key)]
+
+
+def merge_aux_records_by_key(records: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:
+    by_key: dict[str, dict[str, Any]] = {}
+    for record in records:
+        if key not in record:
+            continue
+        value = record[key]
+        if value not in by_key:
+            by_key[value] = record
+            continue
+        existing = dict(by_key[value])
+        merged = {**existing, **record}
+        for list_field in ("source_reports", "files", "evidence_refs", "trigger_evidence_refs", "extends_checks"):
+            merged[list_field] = unique_sorted(existing.get(list_field, []) + record.get(list_field, []))
+        if "first_seen_batch" in existing and "first_seen_batch" in record:
+            merged["first_seen_batch"] = min(existing["first_seen_batch"], record["first_seen_batch"])
+        if "last_touched_batch" in existing and "last_touched_batch" in record:
+            merged["last_touched_batch"] = max(existing["last_touched_batch"], record["last_touched_batch"])
+        by_key[value] = merged
     return [by_key[value] for value in sorted(by_key)]
 
 

@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "sidecar_id": "sidecar-integration-trust-candidate-nosignal",
   "generated_at": "2026-05-11T00:00:00Z",
   "run_id": "run-candidate-dupes",
@@ -7,7 +7,11 @@
   "family": "integration-trust",
   "mode": "canonical-sweep",
   "profile": "security",
-  "profile_version": "0.4.7",
+  "strategy": "invariant-audit",
+  "overlays": [
+    "auto"
+  ],
+  "profile_version": "0.4.8",
   "baseline_commit": null,
   "reviewed_artifacts": [
     "src/api/integrations.py"
@@ -32,5 +36,9 @@
   "chain_candidates": [],
   "coverage_gaps": [],
   "profile_feedback": [],
+  "incidental_leads": [],
+  "security_smells": [],
+  "proof_updates": [],
+  "regression_recommendations": [],
   "next_batch_recommendations": []
 }

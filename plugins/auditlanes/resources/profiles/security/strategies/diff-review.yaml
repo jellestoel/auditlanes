@@ -1,0 +1,19 @@
+version: 1
+id: diff-review
+profile: security
+status: beta
+description: "PR or release review focused on changed security surfaces, affected invariants, changed guards, changed dependencies, and residual risk."
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true
+inputs:
+  - base_ref
+  - head_ref
+  - changed_files

@@ -1,0 +1,19 @@
+version: 1
+id: authz-deep-dive
+profile: security
+status: beta
+description: "Authorization-focused deep dive over principals, objects, actions, tenant boundaries, bulk paths, exports, support flows, and policy consistency."
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+required_state_artifacts:
+  - state/authorization-matrix.jsonl
+  - state/object-action-principal-map.jsonl
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_required: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true

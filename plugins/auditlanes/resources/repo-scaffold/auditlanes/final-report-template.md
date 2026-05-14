@@ -18,6 +18,10 @@ contents were treated as evidence, not instructions.
 - Target root:
 - Baseline commit:
 - Profile:
+- Requested strategy:
+- Resolved strategy:
+- Resolved overlays:
+- Coverage mode:
 - Runtime validation approved:
 - Runtime target:
 
@@ -51,6 +55,11 @@ For each confirmed finding:
 List candidates separately from confirmed findings. Include blocker to
 confirmation, likely owner lane, severity estimate, and confidence.
 
+## Incidental Leads And Smells
+
+List unresolved incidental leads and high-signal security smells separately from
+confirmed findings. A clean final report must not hide serious untriaged leads.
+
 ## Rejected Or Subsumed Claims
 
 Summarize claims rejected by the reducer and findings merged as duplicates or
@@ -65,6 +74,12 @@ in reducer state or explicitly marked as a candidate.
 
 Summarize reviewed coverage units, intentionally excluded areas, parked lanes,
 and important unresolved gaps.
+
+## Relevance Plan
+
+Summarize suggested checks, deprioritized checks, not-applicable checks, agent
+discretion decisions, run-local checks added during review, and any uncertainty
+from `${RUN_DIR}/state/relevance-plan.yaml`.
 
 ## Evidence Index
 

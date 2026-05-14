@@ -1,0 +1,18 @@
+version: 1
+id: full
+profile: security
+status: stable
+description: "Broad security audit flow for repositories that need full-lane coverage and exploit synthesis."
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+  - post-fix-resweep
+  - exploit-synthesis
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_required: true
+  final_adversarial_review_required: true

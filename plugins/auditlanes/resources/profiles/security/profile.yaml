@@ -3,5 +3,11 @@ id: security
 status: stable
 implemented: true
 lane_source: lanes.yaml
+strategy_source: strategies
+overlay_source: overlays
+cross_lane_trigger_source: cross-lane-triggers.yaml
+default_strategy: auto
+default_overlays:
+  - auto
 description: "Authentication, authorization, data exposure, trust boundary, and platform security audit profile."
 default_execution_mode: single-session

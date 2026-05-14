@@ -1,4 +1,4 @@
-version: 2
+version: 3
 name: auditlanes-report-sidecar
 format: json
 
@@ -13,6 +13,8 @@ schema_contract:
     - family
     - mode
     - profile
+    - strategy
+    - overlays
     - baseline_commit
     - reviewed_artifacts
     - reviewed_files_routes_helpers
@@ -25,6 +27,10 @@ schema_contract:
     - chain_candidates
     - coverage_gaps
     - profile_feedback
+    - incidental_leads
+    - security_smells
+    - proof_updates
+    - regression_recommendations
     - next_batch_recommendations
 
 reference_semantics:
@@ -37,6 +43,10 @@ enums:
     values_from: "selected_profile.lanes plus selected_profile.specialists"
   owner_family:
     values_from: "selected_profile.lanes"
+  strategy:
+    values_from: "selected_profile.strategies"
+  overlay:
+    values_from: "selected_profile.overlays"
   mode:
     - canonical-sweep
     - canonical-gap-fill
@@ -104,6 +114,13 @@ enums:
     - high
     - medium
     - low
+  proof_level:
+    - P0-lead
+    - P1-candidate
+    - P2-static-confirmed
+    - P3-reachability-confirmed
+    - P4-runtime-confirmed
+    - P5-regression-backed
 
 top_level_fields:
   schema_version:
@@ -124,6 +141,12 @@ top_level_fields:
     values_from: mode
   profile:
     type: string
+  strategy:
+    type: enum
+    values_from: strategy
+  overlays:
+    type: string_list
+    values_from: overlay
   profile_version:
     type: string_or_null
   baseline_commit:
@@ -170,6 +193,24 @@ top_level_fields:
     notes:
       - "The reporting family may propose cross-lane scope corrections here."
       - "Use affected_families when the suggested profile change impacts lanes other than the reporting family."
+  incidental_leads:
+    type: object_list
+    item_schema: incidental_lead
+  security_smells:
+    type: object_list
+    item_schema: security_smell
+  proof_updates:
+    type: object_list
+    item_schema: proof_update
+  regression_recommendations:
+    type: object_list
+    item_schema: regression_recommendation
+  run_local_checks:
+    type: object_list
+    item_schema: run_local_check
+    notes:
+      - "Optional checks invented by the reviewing agent for unmodeled repo-specific risks."
+      - "Use local.* IDs and cite trigger evidence; do not mutate the global profile catalog mid-run."
   next_batch_recommendations:
     type: string_list
 
@@ -520,3 +561,161 @@ object_schemas:
       urgency:
         type: enum
         values_from: profile_feedback_urgency
+
+  incidental_lead:
+    additional_properties: false
+    notes:
+      - "Out-of-lane leads preserve serious observations for reducer-owned triage."
+      - "proposed_owner_family must be a normal lane, not a specialist."
+    required:
+      - lead_id
+      - noticed_by_family
+      - proposed_owner_family
+      - summary
+      - confidence
+      - severity_hint
+      - blocker_to_confirmation
+      - files
+      - evidence_refs
+    properties:
+      lead_id:
+        type: string
+      noticed_by_family:
+        type: enum
+        values_from: family
+      proposed_owner_family:
+        type: enum
+        values_from: owner_family
+      summary:
+        type: string
+      confidence:
+        type: enum
+        values_from: confidence
+      severity_hint:
+        type: enum
+        values_from: severity
+      why_noticed:
+        type: string
+      blocker_to_confirmation:
+        type: string
+      files:
+        type: string_list
+        min_items: 1
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+        min_items: 1
+
+  security_smell:
+    additional_properties: false
+    required:
+      - smell_id
+      - category
+      - path
+      - description
+      - recommended_owner
+      - status
+    properties:
+      smell_id:
+        type: string
+      category:
+        type: string
+      path:
+        type: string
+      line_start:
+        type: integer_or_null
+      description:
+        type: string
+      recommended_owner:
+        type: enum
+        values_from: owner_family
+      status:
+        type: enum
+        values:
+          - needs-triage
+          - promoted
+          - rejected
+
+  proof_update:
+    additional_properties: false
+    required:
+      - subject_id
+      - proof_level
+      - evidence_summary
+    properties:
+      subject_id:
+        type: string
+      proof_level:
+        type: enum
+        values_from: proof_level
+      evidence_summary:
+        type: string
+      runtime_validation:
+        type: object
+      regression_status:
+        type: string_or_null
+      evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+
+  regression_recommendation:
+    additional_properties: false
+    required:
+      - finding_id
+      - recommended_regression
+      - test_name
+      - guard_asserted
+      - automation_status
+    properties:
+      finding_id:
+        type: string
+      recommended_regression:
+        type: enum
+        values:
+          - unit test
+          - integration test
+          - policy test
+          - configuration assertion
+          - custom static rule
+          - dependency/policy gate
+          - manual compensating control
+          - documented not-feasible reason
+      test_name:
+        type: string
+      guard_asserted:
+        type: string
+      automation_status:
+        type: enum
+        values:
+          - proposed
+          - implemented
+          - not-feasible
+      owner_hint:
+        type: string_or_null
+
+  run_local_check:
+    additional_properties: false
+    required:
+      - check_id
+      - reason
+      - trigger_evidence_refs
+      - scope_impact
+    properties:
+      check_id:
+        type: string
+        pattern: "^local\\.[a-z0-9][a-z0-9.-]*$"
+      reason:
+        type: string
+      trigger_evidence_refs:
+        type: object_list
+        item_schema: evidence_ref
+        min_items: 1
+      extends_checks:
+        type: string_list
+      recommended_owner_family:
+        type: enum
+        values_from: family
+      scope_impact:
+        type: string
+      regression_impact:
+        type: string_or_null

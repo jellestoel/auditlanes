@@ -1,0 +1,19 @@
+version: 1
+id: payment-flow
+profile: security
+status: stable
+description: "Payment-flow emphasis for provider sessions, callbacks, webhooks, authenticity, idempotency, order binding, amount/currency integrity, and fulfillment gates."
+priority_surfaces:
+  - payment-provider-client
+  - checkout-session-create
+  - payment-webhook
+  - payment-callback
+  - fulfillment-gate
+invariant_templates:
+  - "Payment provider sessions must not trust client-supplied amount, currency, product metadata, or order identity."
+  - "Webhook and callback handlers must verify provider authenticity before state changes."
+  - "Webhook handling must be idempotent and must not double-fulfill or double-credit duplicate events."
+  - "Order state must only transition to paid/fulfilled after a trusted provider success signal."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

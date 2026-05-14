@@ -1,0 +1,11 @@
+version: 1
+id: runtime-validation
+profile: security
+status: beta
+description: "Opt-in runtime-safe validation strategy for pre-identified findings where approved execution can materially raise proof level."
+allowed_modes:
+  - runtime-safe
+anti_tunnel:
+  universal_reportability: true
+  reducer_assigns_final_owner: true
+runtime_policy: opt-in

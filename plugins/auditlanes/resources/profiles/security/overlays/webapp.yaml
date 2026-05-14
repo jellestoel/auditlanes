@@ -1,0 +1,13 @@
+version: 1
+id: webapp
+profile: security
+status: stable
+description: "Web application emphasis for routes, sessions, cookies, CSRF, authorization, uploads, downloads, and browser trust boundaries."
+priority_surfaces:
+  - http-routes
+  - session-cookies
+  - browser-entrypoints
+  - uploads-downloads
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

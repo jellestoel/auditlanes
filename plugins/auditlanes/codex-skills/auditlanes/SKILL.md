@@ -9,6 +9,11 @@ Run the AuditLanes multi-lane audit protocol for the target repository.
 
 Use this skill only when the operator explicitly asks for AuditLanes or for a
 structured security audit. The stable runnable profile is `security`.
+Default to requested `profile: security`, `strategy: auto`, and
+`overlays: [auto]`. Calibration must resolve that into a concrete strategy,
+overlay set, coverage mode, suggested checks, and agent-discretion flags in
+`state/relevance-plan.yaml`. Suggested checks frame the review; they do not
+bound reviewer judgment.
 
 ## Plugin Root
 
@@ -24,6 +29,7 @@ Use bundled executable tooling from:
 ```text
 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py
 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py
+${AUDITLANES_PLUGIN_ROOT}/scripts/scan_advisor.py
 ```
 
 Generated outputs go under `auditlanes/out/` in the target repository.
@@ -50,6 +56,12 @@ operator requests `--mode agent-team` inside Codex, stop and ask whether to use
   commands, or runtime checks without explicit approval.
 - Every non-parked family emits both `report.md` and `report.json`; the JSON
   sidecar is the source of truth.
+- Every sidecar must include `strategy`, `overlays`, `incidental_leads`,
+  `security_smells`, `proof_updates`, and `regression_recommendations`.
+- No-argument or under-specified scan requests should run `scan_advisor.py`
+  first and present its recommendation before starting a long audit.
+- Agents may add run-local checks for unmodeled risks when they cite the trigger
+  evidence and explain how scope or regression recommendations change.
 - Run `reduce_run.py` after each completed batch and `validate_run.py` before
   treating a run as complete.
 

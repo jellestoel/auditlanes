@@ -1,0 +1,8 @@
+version: 1
+id: auto
+profile: security
+status: stable
+description: "Let calibration infer project-shape emphasis while preserving full security reportability."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

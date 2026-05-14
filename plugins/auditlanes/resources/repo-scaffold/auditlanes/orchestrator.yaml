@@ -42,6 +42,10 @@ variables:
   baseline_commit: "${BASELINE_COMMIT}"
   target_environment: "${TARGET_ENV}"
   run_dir: "${RUN_DIR}"
+  profile: "security"
+  strategy: "auto"
+  overlays:
+    - auto
 
 policy:
   max_concurrent_agentteams: 6
@@ -77,6 +81,7 @@ inputs:
 
 outputs:
   project_security_profile: "${RUN_DIR}/state/project-security-profile.yaml"
+  relevance_plan: "${RUN_DIR}/state/relevance-plan.yaml"
   attack_surface_inventory: "${RUN_DIR}/state/attack-surface-inventory.jsonl"
   family_scope_map: "${RUN_DIR}/state/family-scope-map.yaml"
   excluded_roots: "${RUN_DIR}/state/excluded-roots.yaml"
@@ -89,6 +94,14 @@ outputs:
   family_directives: "${RUN_DIR}/state/family-directives.yaml"
   profile_adjustments: "${RUN_DIR}/state/profile-adjustments.yaml"
   profile_feedback_inventory: "${RUN_DIR}/state/profile-feedback.jsonl"
+  incidental_leads: "${RUN_DIR}/state/incidental-leads.jsonl"
+  security_smells: "${RUN_DIR}/state/security-smells.jsonl"
+  proof_ledger: "${RUN_DIR}/state/proof-ledger.jsonl"
+  regression_plan: "${RUN_DIR}/state/regression-plan.jsonl"
+  security_invariants: "${RUN_DIR}/state/security-invariants.jsonl"
+  attack_surface_graph: "${RUN_DIR}/state/attack-surface-graph.jsonl"
+  authorization_matrix: "${RUN_DIR}/state/authorization-matrix.jsonl"
+  unowned_surfaces: "${RUN_DIR}/state/unowned-surfaces.jsonl"
   shared_context_summary: "${RUN_DIR}/state/shared-context-summary.md"
   pre_fix_findings: "${RUN_DIR}/final/pre-fix-findings.md"
   pre_fix_summary: "${RUN_DIR}/final/pre-fix-summary.md"
@@ -118,10 +131,17 @@ global_requirements:
   - "When trusted repo-local scaffolding is explicitly enabled or provenance-verified, treat known AuditLanes control files under auditlanes/ as control-plane files, not application evidence."
   - "Before calibration, verify repo_root contains .git or was explicitly provided by the operator; stop with target-root-required rather than scanning a multi-repo parent."
   - "Project calibration must cite concrete code, config, manifest, route, or repository-structure evidence."
+  - "Project calibration must resolve strategy:auto into a concrete strategy, overlay set, coverage mode, and evidence-backed suggested checks in relevance-plan.yaml."
+  - "relevance-plan.yaml frames the starting audit strategy; it must not be treated as an exclusive checklist or a boundary on reviewer judgment."
+  - "For small repositories where complete static review is feasible, prefer full-read small-app-invariant-audit over six lane workers."
   - "Batch-01 families must use the generated project-security-profile.yaml and family-scope-map.yaml as primary scope sources."
   - "Batch 1 always runs all six canonical families; low-applicability families emit a short no-signal report unless explicitly disabled by operator policy."
   - "Only the reducer may update family scope, coverage units, priority targets, or exclusions after calibration."
   - "One family owns the root cause of each finding."
+  - "A lane is an ownership mechanism, not a visibility boundary."
+  - "Reviewers must preserve obvious serious out-of-lane observations as incidental leads."
+  - "Reviewers may add run-local checks for unmodeled scenarios when they cite the trigger evidence and explain the scope impact."
+  - "Overlays may add focus but must not hide unrelated high-severity findings."
   - "Clones, runtime results, and chain notes must reference existing finding IDs when possible."
   - "Dedupe and coverage updates happen after every batch through the reducer."
   - "Late canonicals are allowed, but they must be flagged as introduced after batch 1."
@@ -175,6 +195,7 @@ phases:
     driver: "${PROTOCOL_ROOT}/project-calibration.yaml"
     goal: "Discover repo shape and generate the project-specific security profile used by preflight and all family lanes."
     emits:
+      - "${RUN_DIR}/state/relevance-plan.yaml"
       - "${RUN_DIR}/state/project-security-profile.yaml"
       - "${RUN_DIR}/state/project-security-profile.initial.yaml"
       - "${RUN_DIR}/state/attack-surface-inventory.jsonl"

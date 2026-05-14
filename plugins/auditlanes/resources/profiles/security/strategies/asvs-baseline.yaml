@@ -1,0 +1,16 @@
+version: 1
+id: asvs-baseline
+profile: security
+status: planned
+description: "Control-baseline strategy for mapping web security evidence to ASVS-style requirement status."
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+required_state_artifacts:
+  - state/control-assessment.jsonl
+  - state/requirement-map.jsonl
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true

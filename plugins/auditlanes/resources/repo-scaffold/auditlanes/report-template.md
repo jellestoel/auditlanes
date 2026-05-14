@@ -10,6 +10,8 @@
 - `family`:
 - `mode`:
 - `profile`:
+- `strategy`:
+- `overlays`:
 - `baseline_commit`:
 - `reviewed_artifacts`:
 
@@ -117,6 +119,49 @@ fields:
 - `suspected_missing_guard`
 - `impact_boundary`
 
+## Incidental Leads
+
+Use this section for obvious serious issues noticed outside the lane's primary
+mission. The reducer owns final triage and ownership.
+
+- `lead_id`:
+- `noticed_by_family`:
+- `proposed_owner_family`:
+- `summary`:
+- `confidence`:
+- `severity_hint`:
+- `why_noticed`:
+- `blocker_to_confirmation`:
+- `files`:
+- `evidence_refs`:
+
+## Security Smells
+
+Use this section for weak but interesting signals that should not yet become
+candidate findings.
+
+- `smell_id`:
+- `category`:
+- `path`:
+- `line_start`:
+- `description`:
+- `recommended_owner`:
+- `status`:
+
+## Run-Local Checks
+
+Use this section when repo evidence reveals a security question that is not
+covered well by the relevance plan or bundled risk packs. These checks are
+run-scoped; they do not mutate the global catalog.
+
+- `check_id`: use `local.*`
+- `reason`:
+- `trigger_evidence_refs`:
+- `extends_checks`:
+- `recommended_owner_family`:
+- `scope_impact`:
+- `regression_impact`:
+
 ## Rejected / Downranked Claims
 
 For each rejected or downranked claim:
@@ -182,6 +227,30 @@ If calibration missed or mis-scoped part of the project, report it here and in
 `family` is the reporting family. Use `affected_families` for cross-lane
 feedback, for example when `platform-posture` observes a scope issue that should
 change `integration-trust` or `data-surfaces` coverage.
+
+## Proof Updates
+
+Use proof levels `P0-lead`, `P1-candidate`, `P2-static-confirmed`,
+`P3-reachability-confirmed`, `P4-runtime-confirmed`, or
+`P5-regression-backed`.
+
+- `subject_id`:
+- `proof_level`:
+- `evidence_summary`:
+- `runtime_validation`:
+- `regression_status`:
+- `evidence_refs`:
+
+## Regression Recommendations
+
+For every confirmed finding, propose recurrence prevention when feasible.
+
+- `finding_id`:
+- `recommended_regression`:
+- `test_name`:
+- `guard_asserted`:
+- `automation_status`:
+- `owner_hint`:
 
 ## Next-Batch Recommendations
 

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/attack-surface.schema.json",
+  "title": "AuditLanes attack-surface graph JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "surface_id",
+    "entrypoint",
+    "principal_types",
+    "assets",
+    "actions",
+    "guards",
+    "trust_boundaries",
+    "risk_score",
+    "owner_family",
+    "secondary_families",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "surface_id": { "type": "string", "minLength": 1 },
+    "entrypoint": { "type": "string", "minLength": 1 },
+    "principal_types": { "type": "array", "items": { "type": "string" } },
+    "assets": { "type": "array", "items": { "type": "string" } },
+    "actions": { "type": "array", "items": { "type": "string" } },
+    "guards": { "type": "array", "items": { "type": "string" } },
+    "trust_boundaries": { "type": "array", "items": { "type": "string" } },
+    "risk_score": { "type": "integer", "minimum": 0 },
+    "owner_family": { "type": "string", "minLength": 1 },
+    "secondary_families": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "object" } }
+  }
+}

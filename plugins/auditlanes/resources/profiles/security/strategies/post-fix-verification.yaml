@@ -1,0 +1,10 @@
+version: 1
+id: post-fix-verification
+profile: security
+status: beta
+description: "Post-remediation verification strategy for resweeps, proof updates, and regression closure."
+allowed_modes:
+  - post-fix-resweep
+anti_tunnel:
+  universal_reportability: true
+  reducer_assigns_final_owner: true

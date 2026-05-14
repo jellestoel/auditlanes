@@ -60,6 +60,17 @@ class SidecarCompatibilityTests(unittest.TestCase):
         self.assertIsNotNone(wrong_lane)
         self.assertIn("normal lanes must not run specialist modes", wrong_lane.message)
 
+    def test_security_profile_loads_auto_strategy_and_relevance_overlays(self):
+        validator = load_validator_module()
+        profile = validator.load_profile("security", PLUGIN_ROOT / "resources" / "profiles")
+        self.assertEqual(profile["default_strategy"], "auto")
+        self.assertIn("auto", profile["strategies"])
+        self.assertIn("small-app-invariant-audit", profile["strategies"])
+        self.assertIn("python", profile["overlays"])
+        self.assertIn("checkout", profile["overlays"])
+        self.assertIn("payment-flow", profile["overlays"])
+        self.assertTrue(profile["cross_lane_triggers"])
+
 
 if __name__ == "__main__":
     unittest.main()

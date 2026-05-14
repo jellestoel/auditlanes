@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/relevance-plan.schema.json",
+  "title": "AuditLanes relevance plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "requested_strategy",
+    "resolved_strategy",
+    "resolved_overlays",
+    "coverage_mode",
+    "repo_observations",
+    "selected_checks",
+    "deprioritized_checks",
+    "universal_checks_enabled",
+    "agent_discretion_enabled"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "profile": { "type": "string", "minLength": 1 },
+    "requested_strategy": { "type": "string", "minLength": 1 },
+    "resolved_strategy": { "type": "string", "minLength": 1 },
+    "resolved_overlays": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "coverage_mode": { "enum": ["full-read", "focused-lanes", "risk-ranked", "hybrid"] },
+    "resolution_reason": { "type": ["string", "null"] },
+    "runtime_validation": { "type": "boolean" },
+    "output_style": { "enum": ["compact", "structured"] },
+    "repo_observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "languages",
+        "approximate_loc",
+        "detected_frameworks",
+        "detected_surfaces",
+        "inferred_archetypes"
+      ],
+      "properties": {
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "approximate_loc": { "type": ["integer", "null"], "minimum": 0 },
+        "detected_frameworks": { "type": "array", "items": { "type": "string" } },
+        "detected_surfaces": { "type": "array", "items": { "type": "string" } },
+        "inferred_archetypes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "selected_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checkDecision" }
+    },
+    "deprioritized_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/checkDecision" }
+    },
+    "universal_checks_enabled": { "type": "boolean" },
+    "agent_discretion_enabled": { "type": "boolean" },
+    "uncertainty": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "coverage_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "advisor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_root",
+        "git_detected",
+        "prior_auditlanes_runs_detected",
+        "config_files"
+      ],
+      "properties": {
+        "target_root": { "type": "string", "minLength": 1 },
+        "git_detected": { "type": "boolean" },
+        "prior_auditlanes_runs_detected": { "type": "boolean" },
+        "config_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "checkDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "reason", "evidence", "agent_discretion"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "status": {
+          "enum": [
+            "required",
+            "recommended",
+            "opportunistic",
+            "not-applicable",
+            "deferred"
+          ]
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "evidence": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "agent_discretion": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -1,0 +1,23 @@
+version: 1
+id: checkout
+profile: security
+status: stable
+description: "Checkout application emphasis for cart, order, price, coupon, payment session, confirmation, fulfillment, refund, and receipt flows."
+priority_surfaces:
+  - cart
+  - checkout
+  - payment-session
+  - order-confirmation
+  - fulfillment
+  - refund-cancel
+invariant_templates:
+  - "Client-supplied price, total, currency, tax, discount, shipping, or product metadata must never be trusted."
+  - "Final charge amount must be computed server-side from trusted product/order state."
+  - "Payment session or intent must be bound to exactly one order, amount, currency, and user/session."
+  - "Fulfillment must happen only after a trusted paid/succeeded signal."
+  - "Cart and order operations must only affect the current user/session's cart or order."
+  - "Quantity, coupon, shipping, and price inputs must reject negative, zero-abuse, overflow, type-confusion, and rounding cases."
+  - "Order lookup must not expose another user's order, address, email, payment status, or receipt."
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

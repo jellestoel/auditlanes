@@ -1,0 +1,45 @@
+version: 1
+id: small-app-invariant-audit
+profile: security
+status: stable
+description: "Single-session full-read invariant audit for small applications where complete code review is cheaper and safer than lane partitioning."
+execution_shape:
+  default_mode: single-session
+  coverage_mode: full-read
+  lane_workers: false
+  lanes_as_owner_labels_only: true
+  recommended_max_loc: 2000
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - runtime-safe
+  - post-fix-resweep
+required_sidecar_fields:
+  - strategy
+  - overlays
+  - incidental_leads
+  - security_smells
+  - proof_updates
+  - regression_recommendations
+required_state_artifacts:
+  - state/relevance-plan.yaml
+  - state/security-invariants.jsonl
+  - state/incidental-leads.jsonl
+  - state/security-smells.jsonl
+  - state/regression-plan.jsonl
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_required: true
+  final_adversarial_review_required: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+  final_report_must_include_unresolved_incidental_leads: true
+review_flow:
+  - "Read every application file in scope."
+  - "Build a compact flow map before findings."
+  - "Derive security invariants from observed flows."
+  - "Review every flow against the invariants."
+  - "Run a broad obvious-risk sweep."
+  - "Use lanes only as ownership labels after discovery."

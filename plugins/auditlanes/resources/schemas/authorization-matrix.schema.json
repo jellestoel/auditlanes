@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/authorization-matrix.schema.json",
+  "title": "AuditLanes authorization matrix JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "matrix_id",
+    "principal",
+    "object",
+    "action",
+    "expected",
+    "observed_guard",
+    "status",
+    "surface_id",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "matrix_id": { "type": "string", "minLength": 1 },
+    "principal": { "type": "string", "minLength": 1 },
+    "object": { "type": "string", "minLength": 1 },
+    "action": { "type": "string", "minLength": 1 },
+    "expected": { "type": "string", "minLength": 1 },
+    "observed_guard": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["pass", "fail", "needs-review", "not-reviewed"] },
+    "surface_id": { "type": "string", "minLength": 1 },
+    "evidence_refs": { "type": "array", "items": { "type": "object" } }
+  }
+}

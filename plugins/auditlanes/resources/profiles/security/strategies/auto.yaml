@@ -1,0 +1,31 @@
+version: 1
+id: auto
+profile: security
+status: stable
+description: "Infer the appropriate security strategy, overlays, check set, and coverage shape from static repository calibration."
+resolution:
+  small_repo_threshold_loc: 2000
+  default_small_repo_strategy: small-app-invariant-audit
+  default_large_repo_strategy: invariant-audit
+  overlays: auto
+  require_universal_sanity_pass: true
+  require_selected_check_report: true
+  output_artifact: state/relevance-plan.yaml
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+  - post-fix-resweep
+  - exploit-synthesis
+required_state_artifacts:
+  - state/relevance-plan.yaml
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_required: true
+  final_adversarial_review_required: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+  final_report_must_include_unresolved_incidental_leads: true

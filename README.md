@@ -7,14 +7,14 @@ The installable plugin lives under `plugins/auditlanes/`. It defines how an
 agent orchestrator should plan work, control state, cap concurrency, suppress
 duplicate findings, share cross-family context, and produce a final report.
 
-The protocol now has a core/profile split. v0.4.7 keeps the `security` profile
+The protocol now has a core/profile split. v0.4.8 keeps the `security` profile
 as the only stable runnable profile and includes compact experimental
 architecture-profile metadata to prove lane catalogs can be loaded without
 bloating normal security runs.
 
 ## Current Status
 
-AuditLanes v0.4.7 is a protocol-first beta plugin package: a structured
+AuditLanes v0.4.8 is a protocol-first beta plugin package: a structured
 security-audit orchestration protocol with executable sidecar validation and a
 minimal deterministic reducer.
 
@@ -24,12 +24,18 @@ Included now:
 - host-specific Claude Code and Codex skill entrypoints
 - bundled `security` profile
 - profile-derived lane validation for sidecars and manifests
+- security strategy and overlay catalogs
+- security cross-lane trigger catalog
+- auto strategy resolution contract and small-app full-read strategy metadata
+- strategy and overlay validation for report sidecars
+- incidental lead, security smell, proof update, and regression recommendation sidecar fields
 - experimental architecture-profile metadata
 - security-profile orchestration contracts
 - report, batch, reducer, and state contracts
-- executable JSON Schema for report sidecars and batch manifests
+- executable JSON Schema for report sidecars, batch manifests, and core security state artifacts
 - minimal `validate_run.py` script
 - minimal deterministic `reduce_run.py` script
+- static-only `scan_advisor.py` script
 - sample fixtures and compatibility tests
 - optional repo-local scaffold payload
 - generated outputs under `auditlanes/out/`
@@ -45,13 +51,19 @@ The YAML contract files remain agent/reducer guidance. Machine validation uses
 the JSON Schema files under `plugins/auditlanes/resources/schemas/` plus custom
 profile-aware checks in `scripts/validate_run.py`.
 
-The JSON Schema validates shape only. Profile-specific lane validity,
-mode/family compatibility, runtime-safe constraints, and evidence path policy
-require `validate_run.py` or a generated profile-specific schema.
+The JSON Schema validates shape only. Profile-specific lane, strategy, and
+overlay validity, mode/family compatibility, runtime-safe constraints, and
+evidence path policy require `validate_run.py` or a generated profile-specific
+schema.
 
-v0.4.7 validates and reduces report sidecars into basic deterministic state. It
-does not yet orchestrate the full audit automatically or implement the full
-reducer semantics described by the protocol.
+v0.4.8 validates and reduces report sidecars into basic deterministic state,
+including incidental leads, security smells, proof updates, and regression
+recommendations. It also emits basic family directives from incidental leads and
+cross-lane trigger matches. It does not yet orchestrate the full audit
+automatically or implement the full reducer semantics described by the protocol.
+The auto strategy contract is metadata/scaffold guidance for calibration; a
+minimal static advisor now emits a relevance-plan preview, while the packaged
+CLI/orchestrator and interactive numbered-choice wizard are still planned.
 
 ## Preferred Use
 
@@ -59,7 +71,10 @@ Default install should be a marketplace plugin. The same plugin payload supports
 Claude Code and Codex through two thin platform manifests and host-specific skill
 entrypoints. A raw personal skill is the development/fallback path. Repo-local
 scaffolding is optional and mainly for teams, committed audit protocols, or
-non-plugin agents. The default profile is `security`. Generated run artifacts
+non-plugin agents. The default profile is `security`, the requested strategy is
+`auto`, and the default overlay is `auto`. Calibration resolves that into a
+concrete strategy, overlays, coverage mode, suggested checks, and
+agent-discretion flags in `state/relevance-plan.yaml`. Generated run artifacts
 still go under `auditlanes/out/` in the target repo.
 
 Default execution mode is `single-session`, where the family lanes run
@@ -85,7 +100,7 @@ because the manifests use relative plugin paths.
 ### Claude Code
 
 ```text
-/plugin marketplace add jellestoel/auditlanes@v0.4.7
+/plugin marketplace add jellestoel/auditlanes@v0.4.8
 /plugin install auditlanes@auditlanes
 /reload-plugins
 /auditlanes:scan .
@@ -94,7 +109,7 @@ because the manifests use relative plugin paths.
 ### Codex
 
 ```bash
-codex plugin marketplace add jellestoel/auditlanes --ref v0.4.7
+codex plugin marketplace add jellestoel/auditlanes --ref v0.4.8
 codex
 ```
 
@@ -107,7 +122,7 @@ Then open:
 Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
 
-AuditLanes v0.4.7 is a protocol-first beta. It validates sidecars and reduces
+AuditLanes v0.4.8 is a protocol-first beta. It validates sidecars and reduces
 basic state, but does not yet run the full audit automatically or implement full
 reducer semantics.
 
@@ -149,15 +164,16 @@ plugins/auditlanes/
   skills/scan/SKILL.md              # Claude Code workflow skill exposed as /auditlanes:scan
   codex-skills/auditlanes/SKILL.md  # Codex workflow skill
   package-manifest.yaml             # install, upgrade, adapter, and resource metadata
+  scripts/scan_advisor.py           # static-only pre-scan advisor
   scripts/validate_run.py           # minimal run validator
   scripts/reduce_run.py             # minimal deterministic reducer
   tests/                            # focused validator and compatibility tests
   resources/
     core/profile-loading.md         # core/profile split and lane resolution rules
     profiles/catalog.yaml           # bundled and planned audit profiles
-    profiles/security/              # stable security lane catalog
+    profiles/security/              # stable security lanes, strategies, and overlays
     profiles/architecture/          # experimental metadata-only lane catalog
-    schemas/                        # executable JSON Schema files
+    schemas/                        # executable JSON Schema files for sidecars, manifests, and state rows
     fixtures/                       # compact valid/invalid validation fixtures
     repo-scaffold/auditlanes/       # optional payload copied into target repos
       orchestrator.yaml
@@ -197,21 +213,38 @@ To reduce valid sidecars into deterministic state files, use:
 python3 plugins/auditlanes/scripts/reduce_run.py auditlanes/out/runs/<run-id>
 ```
 
+To preview recommended scan parameters before a run, use:
+
+```bash
+python3 plugins/auditlanes/scripts/scan_advisor.py .
+python3 plugins/auditlanes/scripts/scan_advisor.py . --json
+```
+
 From an installed plugin, use the installed plugin root:
 
 ```bash
 python3 "$AUDITLANES_PLUGIN_ROOT/scripts/validate_run.py" auditlanes/out/runs/<run-id>
 python3 "$AUDITLANES_PLUGIN_ROOT/scripts/reduce_run.py" auditlanes/out/runs/<run-id>
+python3 "$AUDITLANES_PLUGIN_ROOT/scripts/scan_advisor.py" .
 ```
 
-Both scripts accept `--profile security`. Experimental profiles are rejected by
-default. `--allow-experimental` is only for profile-loading/catalog compatibility
-checks; it does not make metadata-only profiles runnable sidecar audit modes.
+The validator and reducer accept `--profile security`. The advisor emits a
+security relevance preview with agent discretion enabled so suggested checks
+frame the review without bounding it. Sidecars also declare a selected strategy
+and overlays. Audit runs normally request `strategy: auto`, then calibration
+writes `state/relevance-plan.yaml` with the resolved strategy and overlay set.
+Experimental profiles are rejected by default.
+`--allow-experimental` is only for profile-loading/catalog compatibility checks;
+it does not make metadata-only profiles runnable sidecar audit modes.
 
-The v0.4.7 reducer imports confirmed findings, candidate findings, rejected
-claims, profile feedback, and chain candidates. It preserves existing state when
-reducing a selected batch. It does not yet update coverage ledgers, runtime
-status, clone maps, family directives, final reports, or calibrated scope.
+The v0.4.8 reducer imports confirmed findings, candidate findings, rejected
+claims, profile feedback, chain candidates, incidental leads, security smells,
+proof updates, `run_local_checks`, and regression recommendations. Run-local
+checks let agents preserve repo-specific security questions outside the bundled
+packs. It preserves existing state when reducing a selected batch. It emits
+basic `family-directives.yaml` guidance from incidental leads, run-local checks,
+and cross-lane triggers. It does not yet update coverage ledgers, runtime
+status, clone maps, final reports, or calibrated scope.
 
 ## Contract Coverage
 
@@ -219,6 +252,10 @@ status, clone maps, family directives, final reports, or calibrated scope.
 | --- | --- | --- |
 | JSON sidecar and manifest shape | yes | no |
 | Lane IDs from selected profile | yes | partially |
+| Strategy IDs from selected profile | yes | no |
+| Overlay IDs from selected profile | yes | no |
+| Strategy-allowed sidecar modes | yes | no |
+| Cross-lane trigger notification lanes | yes | yes |
 | Batch-01 security lanes are the six profile lanes | yes | no |
 | Batch-01 lanes all ran canonical-sweep | yes | no |
 | Batch-04 exploit synthesis uses the specialist | yes | no |
@@ -231,6 +268,11 @@ status, clone maps, family directives, final reports, or calibrated scope.
 | Evidence/reviewed paths are repo-relative and outside `auditlanes/out/**` | yes | no |
 | Evidence line ranges are sane | yes | no |
 | Affected profile-feedback families are selected-profile lanes | yes | yes |
+| Incidental leads require evidence and normal lane owners | yes | yes |
+| Security smells import into structured state | yes | yes |
+| Proof updates import into proof ledger | yes | yes |
+| Regression recommendations import into regression plan | yes | yes |
+| Basic family directives from incidental leads and trigger matches | no | yes |
 | Coverage ledger updates | no | no |
 | Clone maps processed into stable state | no | no |
 | Final reports generated from reducer state | no | no |
@@ -408,7 +450,7 @@ AuditLanes Core
 
 ## Profiles
 
-AuditLanes v0.4.7 separates core workflow mechanics from profile lane catalogs:
+AuditLanes v0.4.8 separates core workflow mechanics from profile lane catalogs:
 
 - core: orchestration, output layout, validation scripts, reducer mechanics
 - stable profile: `security`

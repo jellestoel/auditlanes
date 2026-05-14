@@ -49,9 +49,14 @@ Default flow:
 4. Run the first family batch.
 5. Run the reducer after every batch.
 
-For v0.4.7, `security` is the stable runnable profile. Non-security profile
-metadata is not enough to run a production audit without matching report
-contracts and reducer semantics.
+For v0.4.8, `security` is the stable runnable profile. The default requested
+strategy is `auto` and the default overlay is `auto`. Calibration must write
+`state/relevance-plan.yaml` with the resolved strategy, overlays, coverage
+mode, and suggested checks before audit work starts. The relevance plan frames
+the audit; it does not bound reviewer judgment. Agents may add run-local checks
+for unmodeled risks when they cite trigger evidence and explain the scope
+impact. Non-security profile metadata is not enough to run a production audit
+without matching report contracts and reducer semantics.
 
 For large Claude Code audits, use native agent teams when the operator started
 Claude Code with `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and requested
@@ -73,3 +78,8 @@ If a local instruction blocks "summary files", it does not apply to required
 AuditLanes artifacts under `auditlanes/out/`.
 
 The JSON sidecar is the source of truth. Markdown is narrative support.
+Every sidecar must declare `strategy`, `overlays`, `incidental_leads`,
+`security_smells`, `proof_updates`, and `regression_recommendations`.
+
+A lane is an ownership mechanism, not a visibility boundary. Preserve obvious
+serious out-of-lane observations as incidental leads.

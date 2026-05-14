@@ -1,0 +1,15 @@
+version: 1
+id: platform-supply-chain
+profile: security
+status: beta
+description: "Platform and supply-chain review of secrets, manifests, CI/CD, containers, IaC, deployment configuration, logging, and release posture."
+allowed_modes:
+  - canonical-sweep
+  - canonical-gap-fill
+  - clonehunt
+  - runtime-safe
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true

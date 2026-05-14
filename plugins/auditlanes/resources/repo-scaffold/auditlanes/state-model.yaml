@@ -47,6 +47,49 @@ common_types:
         type: string_or_null
 
 records:
+  relevance_plan:
+    format: yaml
+    fields:
+      - name: schema_version
+        type: integer
+      - name: profile
+        type: string
+      - name: requested_strategy
+        type: string
+      - name: resolved_strategy
+        type: string
+      - name: resolved_overlays
+        type: string_list
+      - name: coverage_mode
+        type: enum
+        values:
+          - full-read
+          - focused-lanes
+          - risk-ranked
+          - hybrid
+      - name: resolution_reason
+        type: string_or_null
+      - name: repo_observations
+        type: object
+      - name: runtime_validation
+        type: boolean
+      - name: output_style
+        type: string
+      - name: selected_checks
+        type: object_list
+      - name: deprioritized_checks
+        type: object_list
+      - name: universal_checks_enabled
+        type: boolean
+      - name: agent_discretion_enabled
+        type: boolean
+      - name: uncertainty
+        type: string_list
+      - name: coverage_gaps
+        type: string_list
+      - name: advisor
+        type: object
+
   finding_inventory:
     format: jsonl
     fields:
@@ -242,6 +285,177 @@ records:
       - name: reducer_reason
         type: string_or_null
 
+  incidental_leads:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: lead_id
+        type: string
+      - name: noticed_by_family
+        type: string
+      - name: proposed_owner_family
+        type: string
+      - name: source_reports
+        type: object_list
+      - name: first_seen_batch
+        type: string
+      - name: last_touched_batch
+        type: string
+      - name: severity_hint
+        type: enum
+        values:
+          - critical
+          - high
+          - medium
+          - low
+          - info
+      - name: confidence
+        type: enum
+        values:
+          - certain
+          - probable
+          - speculative
+      - name: summary
+        type: string
+      - name: why_noticed
+        type: string_or_null
+      - name: blocker_to_confirmation
+        type: string
+      - name: files
+        type: string_list
+      - name: evidence_refs
+        type: evidence_ref_list
+      - name: status
+        type: enum
+        values:
+          - needs-triage
+          - promoted
+          - rejected
+
+  security_smells:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: smell_id
+        type: string
+      - name: category
+        type: string
+      - name: source_family
+        type: string
+      - name: source_reports
+        type: object_list
+      - name: first_seen_batch
+        type: string
+      - name: last_touched_batch
+        type: string
+      - name: path
+        type: string
+      - name: line_start
+        type: integer_or_null
+      - name: description
+        type: string
+      - name: recommended_owner
+        type: string
+      - name: status
+        type: enum
+        values:
+          - needs-triage
+          - promoted
+          - rejected
+
+  proof_ledger:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: subject_id
+        type: string
+      - name: proof_level
+        type: enum
+        values:
+          - P0-lead
+          - P1-candidate
+          - P2-static-confirmed
+          - P3-reachability-confirmed
+          - P4-runtime-confirmed
+          - P5-regression-backed
+      - name: source_family
+        type: string
+      - name: source_reports
+        type: object_list
+      - name: last_touched_batch
+        type: string
+      - name: evidence_summary
+        type: string
+      - name: runtime_validation
+        type: object_or_null
+      - name: regression_status
+        type: string_or_null
+      - name: evidence_refs
+        type: evidence_ref_list
+
+  regression_plan:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: regression_id
+        type: string
+      - name: finding_id
+        type: string
+      - name: source_family
+        type: string
+      - name: source_reports
+        type: object_list
+      - name: last_touched_batch
+        type: string
+      - name: recommended_regression
+        type: string
+      - name: test_name
+        type: string
+      - name: guard_asserted
+        type: string
+      - name: automation_status
+        type: string
+      - name: owner_hint
+        type: string_or_null
+
+  run_local_checks:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: check_id
+        type: string
+      - name: source_family
+        type: string
+      - name: recommended_owner_family
+        type: string_or_null
+      - name: source_reports
+        type: object_list
+      - name: first_seen_batch
+        type: string
+      - name: last_touched_batch
+        type: string
+      - name: reason
+        type: string
+      - name: trigger_evidence_refs
+        type: evidence_ref_list
+      - name: extends_checks
+        type: string_list
+      - name: scope_impact
+        type: string
+      - name: regression_impact
+        type: string_or_null
+      - name: status
+        type: enum
+        values:
+          - active
+          - promoted
+          - retired
+
   attack_surface_inventory:
     format: jsonl
     fields:
@@ -260,6 +474,98 @@ records:
       - name: evidence_refs
         type: evidence_ref_list
 
+  security_invariants:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: invariant_id
+        type: string
+      - name: summary
+        type: string
+      - name: asset_types
+        type: string_list
+      - name: principal_types
+        type: string_list
+      - name: actions
+        type: string_list
+      - name: expected_controls
+        type: string_list
+      - name: owner_family
+        type: string
+      - name: secondary_families
+        type: string_list
+      - name: evidence_refs
+        type: evidence_ref_list
+
+  attack_surface_graph:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: surface_id
+        type: string
+      - name: entrypoint
+        type: string
+      - name: principal_types
+        type: string_list
+      - name: assets
+        type: string_list
+      - name: actions
+        type: string_list
+      - name: guards
+        type: string_list
+      - name: trust_boundaries
+        type: string_list
+      - name: risk_score
+        type: integer
+      - name: owner_family
+        type: string
+      - name: secondary_families
+        type: string_list
+      - name: evidence_refs
+        type: evidence_ref_list
+
+  authorization_matrix:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: matrix_id
+        type: string
+      - name: principal
+        type: string
+      - name: object
+        type: string
+      - name: action
+        type: string
+      - name: expected
+        type: string
+      - name: observed_guard
+        type: string
+      - name: status
+        type: string
+      - name: surface_id
+        type: string
+      - name: evidence_refs
+        type: evidence_ref_list
+
+  unowned_surfaces:
+    format: jsonl
+    fields:
+      - name: schema_version
+        type: integer
+      - name: surface_id
+        type: string
+      - name: reason
+        type: string
+      - name: paths
+        type: string_list
+      - name: risk_hint
+        type: string
+      - name: status
+        type: string
+
   family_directives:
     format: yaml
     fields:
@@ -272,6 +578,8 @@ records:
       - name: reason
         type: string
       - name: priority_targets
+        type: string_list
+      - name: source_ids
         type: string_list
 
   run_events:

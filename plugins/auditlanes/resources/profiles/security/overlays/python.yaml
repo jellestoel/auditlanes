@@ -1,0 +1,27 @@
+version: 1
+id: python
+profile: security
+status: stable
+description: "Python application emphasis for unsafe APIs, framework debug/session posture, dependency/config hazards, and Python-specific logic bugs."
+priority_surfaces:
+  - python-entrypoints
+  - framework-config
+  - dependency-manifests
+  - unsafe-python-apis
+universal_checks:
+  - hardcoded-secrets
+  - debug-mode
+  - eval-exec
+  - pickle-loads
+  - unsafe-yaml-load
+  - subprocess-shell
+  - os-system
+  - sql-string-interpolation
+  - unsafe-redirects
+  - path-traversal
+  - weak-session-secret
+  - csrf-browser-forms
+  - sensitive-data-logging
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

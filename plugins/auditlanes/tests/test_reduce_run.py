@@ -167,6 +167,161 @@ class ReduceRunTests(unittest.TestCase):
         feedback = read_jsonl(run_copy / "state" / "profile-feedback.jsonl")
         self.assertEqual(feedback[0]["affected_families"], ["object-auth", "integration-trust"])
 
+    def test_reducer_imports_incidental_leads_and_auxiliary_state(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-good"
+        shutil.copytree(VALID_RUN, run_copy)
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["incidental_leads"] = [{
+            "lead_id": "LEAD-session-auth-001",
+            "noticed_by_family": "session-auth",
+            "proposed_owner_family": "object-auth",
+            "summary": "Export route appears to trust caller supplied org_id.",
+            "confidence": "probable",
+            "severity_hint": "high",
+            "why_noticed": "Seen while reviewing session-bearing routes.",
+            "blocker_to_confirmation": "Object policy helper was not fully reviewed by this lane.",
+            "files": ["routes.py"],
+            "evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
+        }]
+        sidecar["security_smells"] = [{
+            "smell_id": "SMELL-001",
+            "category": "direct-object-reference",
+            "path": "routes.py",
+            "line_start": 1,
+            "description": "Route accepts org_id and invoice_id in the same handler.",
+            "recommended_owner": "object-auth",
+            "status": "needs-triage",
+        }]
+        sidecar["proof_updates"] = [{
+            "subject_id": "LEAD-session-auth-001",
+            "proof_level": "P0-lead",
+            "evidence_summary": "Out-of-lane lead preserved with route evidence.",
+            "runtime_validation": {
+                "approved": False,
+                "reason": "No runtime approval was granted.",
+            },
+            "regression_status": "proposed",
+        }]
+        sidecar["regression_recommendations"] = [{
+            "finding_id": "PF-session-auth-001",
+            "recommended_regression": "integration test",
+            "test_name": "test_user_cannot_export_other_tenant_invoice",
+            "guard_asserted": "require target org membership",
+            "automation_status": "proposed",
+            "owner_hint": "backend",
+        }]
+        sidecar["run_local_checks"] = [{
+            "check_id": "local.invoice-export-state",
+            "reason": "Invoice export has repo-specific state transitions.",
+            "trigger_evidence_refs": [{
+                "path": "routes.py",
+                "line_start": 1,
+                "line_end": 1,
+                "symbol": None,
+                "evidence_type": "route-definition",
+                "snippet_hash": None,
+                "rationale": "Synthetic fixture evidence."
+            }],
+            "extends_checks": ["commerce.object-ownership"],
+            "recommended_owner_family": "object-auth",
+            "scope_impact": "Review invoice export state and ownership together.",
+            "regression_impact": "Add export state transition test if confirmed.",
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["incidental_leads"], 1)
+        self.assertEqual(summary["security_smells"], 1)
+        self.assertEqual(summary["proof_updates"], 1)
+        self.assertEqual(summary["regression_recommendations"], 1)
+        self.assertEqual(summary["run_local_checks"], 1)
+        self.assertGreaterEqual(summary["family_directives"], 2)
+
+        leads = read_jsonl(run_copy / "state" / "incidental-leads.jsonl")
+        self.assertEqual(leads[0]["proposed_owner_family"], "object-auth")
+        smells = read_jsonl(run_copy / "state" / "security-smells.jsonl")
+        self.assertEqual(smells[0]["recommended_owner"], "object-auth")
+        proof = read_jsonl(run_copy / "state" / "proof-ledger.jsonl")
+        self.assertEqual(proof[0]["proof_level"], "P0-lead")
+        regression = read_jsonl(run_copy / "state" / "regression-plan.jsonl")
+        self.assertRegex(regression[0]["regression_id"], r"^REG-[0-9a-f]{12}$")
+        local_checks = read_jsonl(run_copy / "state" / "run-local-checks.jsonl")
+        self.assertEqual(local_checks[0]["check_id"], "local.invoice-export-state")
+        directives_text = (run_copy / "state" / "family-directives.yaml").read_text(encoding="utf-8")
+        self.assertIn("object-auth", directives_text)
+        self.assertIn("data-surfaces", directives_text)
+        self.assertIn("LEAD-session-auth-001", directives_text)
+        self.assertIn("local.invoice-export-state", directives_text)
+        events = read_jsonl(run_copy / "state" / "run-events.jsonl")
+        self.assertTrue(any(event["event_type"] == "out-of-lane-lead-imported" for event in events))
+        self.assertTrue(any(event["event_type"] == "run-local-check-imported" for event in events))
+        self.assertTrue(any(event["event_type"] == "cross-lane-trigger-matched" for event in events))
+
+    def test_cross_lane_triggers_create_directives_from_attack_surface_graph(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-good"
+        shutil.copytree(VALID_RUN, run_copy)
+        state_dir = run_copy / "state"
+        state_dir.mkdir(exist_ok=True)
+        with (state_dir / "attack-surface-graph.jsonl").open("w", encoding="utf-8") as handle:
+            handle.write(json.dumps({
+                "schema_version": 1,
+                "surface_id": "SURF-invoice-export",
+                "entrypoint": "GET /orgs/:org_id/invoices/export",
+                "principal_types": ["tenant-user"],
+                "assets": ["invoice"],
+                "actions": ["export"],
+                "guards": ["require_session"],
+                "trust_boundaries": ["browser", "tenant-boundary", "csv-download"],
+                "risk_score": 86,
+                "owner_family": "object-auth",
+                "secondary_families": ["data-surfaces"],
+                "evidence_refs": [{
+                    "path": "routes.py",
+                    "line_start": 1,
+                    "line_end": 1,
+                    "symbol": None,
+                    "evidence_type": "route-definition",
+                    "snippet_hash": None,
+                    "rationale": "Synthetic fixture evidence."
+                }],
+            }) + "\n")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertGreaterEqual(summary["family_directives"], 2)
+        directives_text = (state_dir / "family-directives.yaml").read_text(encoding="utf-8")
+        self.assertIn("object-auth", directives_text)
+        self.assertIn("data-surfaces", directives_text)
+        self.assertIn("SURF-invoice-export", directives_text)
+        events = read_jsonl(state_dir / "run-events.jsonl")
+        self.assertTrue(any(event["event_type"] == "cross-lane-trigger-matched" for event in events))
+
     @unittest.skipUnless(hasattr(os, "symlink"), "symlink support required")
     def test_reducer_rejects_symlinked_state_directory(self):
         tmp = tempfile.TemporaryDirectory()
@@ -176,7 +331,8 @@ class ReduceRunTests(unittest.TestCase):
         state_dir = run_copy / "state"
         outside_state = Path(tmp.name) / "outside-state"
         outside_state.mkdir()
-        shutil.rmtree(state_dir)
+        if state_dir.exists():
+            shutil.rmtree(state_dir)
         os.symlink(outside_state, state_dir, target_is_directory=True)
 
         result = subprocess.run(
@@ -195,6 +351,7 @@ class ReduceRunTests(unittest.TestCase):
         run_copy = Path(tmp.name) / "run-good"
         shutil.copytree(VALID_RUN, run_copy)
         state_dir = run_copy / "state"
+        state_dir.mkdir(exist_ok=True)
         outside_target = Path(tmp.name) / "outside-temp-target"
         outside_target.write_text("unchanged", encoding="utf-8")
         os.symlink(outside_target, state_dir / ".finding-inventory.jsonl.tmp")

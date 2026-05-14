@@ -11,6 +11,9 @@ profiles:
     profile_root: "resources/profiles/security"
     profile_file: "resources/profiles/security/profile.yaml"
     lanes_file: "resources/profiles/security/lanes.yaml"
+    strategies_root: "resources/profiles/security/strategies"
+    overlays_root: "resources/profiles/security/overlays"
+    cross_lane_triggers_file: "resources/profiles/security/cross-lane-triggers.yaml"
     scaffold_root: "resources/repo-scaffold/auditlanes"
   - id: architecture
     status: experimental
@@ -37,6 +40,9 @@ profiles:
     description: "Privacy and data governance audit profile."
 
 rules:
-  - "AuditLanes v0.4.7 bundles only the security profile as a stable runnable profile."
+  - "AuditLanes v0.4.8 bundles only the security profile as a stable runnable profile."
   - "Experimental profile metadata may exist to exercise core/profile loading, but it is not a stable audit mode."
   - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."
+  - "Executable validators derive strategy and overlay IDs from the selected profile instead of hardcoding them in report schemas."
+  - "Executable validators derive cross-lane trigger notification lanes from the selected profile instead of hardcoding them in reducer code."
+  - "strategy:auto is resolved during calibration and must produce state/relevance-plan.yaml with the concrete strategy, overlays, coverage mode, suggested checks, and agent-discretion flags."

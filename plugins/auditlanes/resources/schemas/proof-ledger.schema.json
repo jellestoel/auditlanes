@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/proof-ledger.schema.json",
+  "title": "AuditLanes proof ledger JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "subject_id",
+    "proof_level",
+    "source_family",
+    "source_reports",
+    "last_touched_batch",
+    "evidence_summary",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "subject_id": { "type": "string", "minLength": 1 },
+    "proof_level": {
+      "enum": [
+        "P0-lead",
+        "P1-candidate",
+        "P2-static-confirmed",
+        "P3-reachability-confirmed",
+        "P4-runtime-confirmed",
+        "P5-regression-backed"
+      ]
+    },
+    "source_family": { "type": "string", "minLength": 1 },
+    "source_reports": { "type": "array", "items": { "type": "object" } },
+    "last_touched_batch": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "evidence_summary": { "type": "string", "minLength": 1 },
+    "runtime_validation": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "approved": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    },
+    "regression_status": { "type": ["string", "null"] },
+    "evidence_refs": { "type": "array", "items": { "type": "object" } }
+  }
+}

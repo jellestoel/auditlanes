@@ -1,0 +1,13 @@
+version: 1
+id: library-package
+profile: security
+status: stable
+description: "Library/package emphasis for public APIs, dependency and release posture, build scripts, package metadata, and consumer trust boundaries."
+priority_surfaces:
+  - public-api
+  - package-manifests
+  - release-workflows
+  - lifecycle-scripts
+anti_tunnel:
+  universal_reportability: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true

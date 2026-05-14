@@ -403,6 +403,91 @@ def collect_input_hashes(run_dir: Path, batch_id: str | None = None) -> list[dic
     ]
 
 
+def load_catalog_items(profile_root: Path, source: Any, item_kind: str) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    if source is None:
+        return {}, []
+    if not isinstance(source, str) or not source:
+        raise ValueError(f"profile {item_kind}_source must be a non-empty string when present")
+
+    source_path = profile_root / source
+    if not source_path.exists():
+        raise FileNotFoundError(f"{item_kind} source does not exist: {source_path}")
+
+    if source_path.is_dir():
+        paths = sorted(source_path.glob("*.yaml")) + sorted(source_path.glob("*.yml")) + sorted(source_path.glob("*.json"))
+    else:
+        paths = [source_path]
+
+    items: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for path in paths:
+        data = load_json_or_yaml(path)
+        raw_items = data.get(item_kind, data) if isinstance(data, dict) else data
+        if isinstance(raw_items, dict):
+            raw_items = [raw_items]
+        if not isinstance(raw_items, list):
+            raise ValueError(f"{item_kind} catalog must be an object or list: {path}")
+        for index, item in enumerate(raw_items):
+            if not isinstance(item, dict) or not isinstance(item.get("id"), str) or not item["id"]:
+                raise ValueError(f"{item_kind} entry {index} must contain an id in {path}")
+            item_id = item["id"]
+            if item_id in items:
+                raise ValueError(f"duplicate {item_kind} id {item_id!r} in {path}")
+            normalized = dict(item)
+            allowed_modes = normalized.get("allowed_modes")
+            if allowed_modes is None:
+                normalized["allowed_modes"] = set()
+            elif isinstance(allowed_modes, list) and all(isinstance(mode, str) for mode in allowed_modes):
+                normalized["allowed_modes"] = set(allowed_modes)
+            else:
+                raise ValueError(f"{item_kind} {item_id!r} allowed_modes must be a string list in {path}")
+            anti_tunnel = normalized.get("anti_tunnel")
+            if isinstance(anti_tunnel, dict) and anti_tunnel.get("universal_reportability") is False:
+                raise ValueError(f"{item_kind} {item_id!r} must not disable universal_reportability in {path}")
+            normalized["path"] = path
+            items[item_id] = normalized
+            order.append(item_id)
+    return items, order
+
+
+def load_cross_lane_triggers(profile_root: Path, source: Any, lanes: set[str]) -> list[dict[str, Any]]:
+    if source is None:
+        return []
+    if not isinstance(source, str) or not source:
+        raise ValueError("profile cross_lane_trigger_source must be a non-empty string when present")
+
+    path = profile_root / source
+    if not path.exists():
+        raise FileNotFoundError(f"cross-lane trigger source does not exist: {path}")
+    data = load_json_or_yaml(path)
+    raw_triggers = data.get("triggers", data) if isinstance(data, dict) else data
+    if not isinstance(raw_triggers, list):
+        raise ValueError(f"cross-lane trigger catalog must contain a triggers list: {path}")
+
+    triggers: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, trigger in enumerate(raw_triggers):
+        if not isinstance(trigger, dict) or not isinstance(trigger.get("id"), str) or not trigger["id"]:
+            raise ValueError(f"cross-lane trigger entry {index} must contain an id in {path}")
+        trigger_id = trigger["id"]
+        if trigger_id in seen:
+            raise ValueError(f"duplicate cross-lane trigger id {trigger_id!r} in {path}")
+        seen.add(trigger_id)
+        notify = trigger.get("notify")
+        if not isinstance(notify, list) or not notify or not all(isinstance(family, str) for family in notify):
+            raise ValueError(f"cross-lane trigger {trigger_id!r} notify must be a non-empty string list in {path}")
+        for family in notify:
+            if family not in lanes:
+                raise ValueError(f"cross-lane trigger {trigger_id!r} notifies unknown lane {family!r} in {path}")
+        when = trigger.get("when")
+        if not isinstance(when, dict):
+            raise ValueError(f"cross-lane trigger {trigger_id!r} must declare a when object in {path}")
+        normalized = dict(trigger)
+        normalized["path"] = path
+        triggers.append(normalized)
+    return triggers
+
+
 def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     profile_root = profiles_dir / profile_id
     profile_path = profile_root / "profile.yaml"
@@ -442,6 +527,10 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     if not lanes:
         raise ValueError(f"profile must define at least one lane: {lanes_path}")
 
+    strategies, strategy_order = load_catalog_items(profile_root, profile.get("strategy_source"), "strategies")
+    overlays, overlay_order = load_catalog_items(profile_root, profile.get("overlay_source"), "overlays")
+    cross_lane_triggers = load_cross_lane_triggers(profile_root, profile.get("cross_lane_trigger_source"), lanes)
+
     implemented = profile.get("implemented")
     if implemented is None:
         implemented = profile.get("status") in {"stable", "bundled"}
@@ -454,6 +543,13 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
         "specialists": specialists,
         "specialist_modes": specialist_modes,
         "families": lanes | specialists,
+        "strategies": strategies,
+        "strategy_order": strategy_order,
+        "overlays": overlays,
+        "overlay_order": overlay_order,
+        "default_strategy": profile.get("default_strategy"),
+        "default_overlays": profile.get("default_overlays", []),
+        "cross_lane_triggers": cross_lane_triggers,
         "profile_path": profile_path,
         "lanes_path": lanes_path,
     }
@@ -496,10 +592,33 @@ def validate_sidecar_profile(
     issues: list[ValidationIssue] = []
     lanes = selected_profile["lanes"]
     families = selected_profile["families"]
+    strategies = selected_profile.get("strategies", {})
+    overlays = selected_profile.get("overlays", {})
     profile_id = selected_profile["id"]
 
     if sidecar.get("profile") != profile_id:
         issues.append(ValidationIssue(sidecar_path, "$.profile", f"expected selected profile {profile_id!r}, got {sidecar.get('profile')!r}"))
+
+    strategy = sidecar.get("strategy")
+    if isinstance(strategy, str):
+        strategy_config = strategies.get(strategy)
+        if strategy_config is None:
+            issues.append(ValidationIssue(sidecar_path, "$.strategy", f"strategy {strategy!r} is not defined by profile {profile_id!r}"))
+        else:
+            allowed_modes = strategy_config.get("allowed_modes", set())
+            mode = sidecar.get("mode")
+            if isinstance(mode, str) and allowed_modes and mode not in allowed_modes:
+                issues.append(ValidationIssue(sidecar_path, "$.mode", f"mode {mode!r} is not allowed by strategy {strategy!r}"))
+    elif strategy is not None:
+        issues.append(ValidationIssue(sidecar_path, "$.strategy", "strategy must be a string"))
+
+    sidecar_overlays = sidecar.get("overlays", [])
+    if isinstance(sidecar_overlays, list):
+        for index, overlay in enumerate(sidecar_overlays):
+            if isinstance(overlay, str) and overlay not in overlays:
+                issues.append(ValidationIssue(sidecar_path, f"$.overlays[{index}]", f"overlay {overlay!r} is not defined by profile {profile_id!r}"))
+    elif sidecar_overlays is not None:
+        issues.append(ValidationIssue(sidecar_path, "$.overlays", "overlays must be an array of overlay ids"))
 
     family = sidecar.get("family")
     if isinstance(family, str) and family not in families:
@@ -552,6 +671,30 @@ def validate_sidecar_profile(
                 issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].dedupe_key.{field}", f"must mirror confirmed_finding.{field} exactly"))
         if sidecar.get("batch_id") == "batch-01" and finding.get("introduced_after_batch_01") is True:
             issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].introduced_after_batch_01", "batch-01 findings must not be marked introduced_after_batch_01"))
+
+    for index, lead in enumerate(sidecar.get("incidental_leads", [])):
+        if not isinstance(lead, dict):
+            continue
+        noticed_by = lead.get("noticed_by_family")
+        if isinstance(noticed_by, str) and noticed_by not in families:
+            issues.append(ValidationIssue(sidecar_path, f"$.incidental_leads[{index}].noticed_by_family", f"family {noticed_by!r} is not defined by profile {profile_id!r}"))
+        owner = lead.get("proposed_owner_family")
+        if isinstance(owner, str) and owner not in lanes:
+            issues.append(ValidationIssue(sidecar_path, f"$.incidental_leads[{index}].proposed_owner_family", f"owner family {owner!r} is not a lane in profile {profile_id!r}"))
+
+    for index, smell in enumerate(sidecar.get("security_smells", [])):
+        if not isinstance(smell, dict):
+            continue
+        owner = smell.get("recommended_owner")
+        if isinstance(owner, str) and owner not in lanes:
+            issues.append(ValidationIssue(sidecar_path, f"$.security_smells[{index}].recommended_owner", f"owner family {owner!r} is not a lane in profile {profile_id!r}"))
+
+    for index, local_check in enumerate(sidecar.get("run_local_checks", [])):
+        if not isinstance(local_check, dict):
+            continue
+        owner = local_check.get("recommended_owner_family")
+        if isinstance(owner, str) and owner not in lanes:
+            issues.append(ValidationIssue(sidecar_path, f"$.run_local_checks[{index}].recommended_owner_family", f"owner family {owner!r} is not a lane in profile {profile_id!r}"))
 
     for index, candidate in enumerate(sidecar.get("candidate_findings", [])):
         if not isinstance(candidate, dict):
@@ -622,7 +765,7 @@ def validate_sidecar_repo_paths(sidecar_path: Path, sidecar: dict[str, Any]) -> 
     for field in ("reviewed_artifacts", "reviewed_files_routes_helpers"):
         issues.extend(validate_path_list(sidecar_path, f"$.{field}", sidecar.get(field)))
 
-    for collection_name in ("confirmed_findings", "candidate_findings"):
+    for collection_name in ("confirmed_findings", "candidate_findings", "incidental_leads"):
         collection = sidecar.get(collection_name, [])
         if not isinstance(collection, list):
             continue
@@ -633,13 +776,29 @@ def validate_sidecar_repo_paths(sidecar_path: Path, sidecar: dict[str, Any]) -> 
                 issues.extend(validate_path_list(sidecar_path, f"$.{collection_name}[{index}].files", item.get("files")))
             issues.extend(validate_evidence_refs(sidecar_path, f"$.{collection_name}[{index}].evidence_refs", item.get("evidence_refs")))
 
-    for collection_name in ("runtime_updates", "profile_feedback"):
+    for collection_name in ("runtime_updates", "profile_feedback", "proof_updates"):
         collection = sidecar.get(collection_name, [])
         if not isinstance(collection, list):
             continue
         for index, item in enumerate(collection):
             if isinstance(item, dict):
                 issues.extend(validate_evidence_refs(sidecar_path, f"$.{collection_name}[{index}].evidence_refs", item.get("evidence_refs")))
+
+    run_local_checks = sidecar.get("run_local_checks", [])
+    if isinstance(run_local_checks, list):
+        for index, local_check in enumerate(run_local_checks):
+            if isinstance(local_check, dict):
+                issues.extend(validate_evidence_refs(sidecar_path, f"$.run_local_checks[{index}].trigger_evidence_refs", local_check.get("trigger_evidence_refs")))
+
+    security_smells = sidecar.get("security_smells", [])
+    if isinstance(security_smells, list):
+        for index, smell in enumerate(security_smells):
+            if not isinstance(smell, dict):
+                continue
+            issues.extend(validate_repo_relative_path_value(sidecar_path, f"$.security_smells[{index}].path", smell.get("path")))
+            line_start = smell.get("line_start")
+            if line_start is not None and (not isinstance(line_start, int) or isinstance(line_start, bool) or line_start < 1):
+                issues.append(ValidationIssue(sidecar_path, f"$.security_smells[{index}].line_start", "must be null or a 1-based line number"))
 
     clone_maps = sidecar.get("clone_maps", [])
     if isinstance(clone_maps, list):
