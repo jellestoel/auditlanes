@@ -108,7 +108,9 @@ required_outputs:
 output_contract:
   relevance_plan:
     format: yaml
+    schema: "${PROTOCOL_ROOT}/../../schemas/relevance-plan.schema.json"
     required_sections:
+      - schema_version
       - profile
       - requested_strategy
       - resolved_strategy
@@ -121,6 +123,29 @@ output_contract:
       - agent_discretion_enabled
       - uncertainty
       - coverage_gaps
+      - advisor
+    repo_observations:
+      required_fields:
+        - languages
+        - approximate_loc
+        - detected_frameworks
+        - detected_surfaces
+        - inferred_archetypes
+    check_decision:
+      required_fields:
+        - id
+        - status
+        - reason
+        - evidence
+        - agent_discretion
+      status_values:
+        - required
+        - recommended
+        - opportunistic
+        - not-applicable
+        - deferred
+      forbidden_fields:
+        - owner_family
   project_security_profile:
     required_sections:
       - project
@@ -139,6 +164,7 @@ output_contract:
   attack_surface_inventory:
     format: jsonl
     required_fields:
+      - schema_version
       - surface_id
       - category
       - owner_family

@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -149,6 +150,44 @@ class ScanAdvisorTests(unittest.TestCase):
         self.assertEqual(plan["coverage_mode"], "risk-ranked")
         self.assertIn("webapp", plan["resolved_overlays"])
         self.assertIn("api", plan["resolved_overlays"])
+
+    @unittest.skipUnless(shutil.which("git"), "git required")
+    def test_git_and_docker_ignored_trees_do_not_drive_detection(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name) / "ignored-noise-app"
+        root.mkdir()
+        subprocess.run(["git", "init"], cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        (root / ".gitignore").write_text("git-ignored/\n", encoding="utf-8")
+        (root / ".dockerignore").write_text("docker-ignored/\n", encoding="utf-8")
+        (root / "app.py").write_text(
+            "\n".join([
+                "from fastapi import FastAPI",
+                "app = FastAPI()",
+                "@app.get('/health')",
+                "def health():",
+                "    return {'ok': True}",
+            ]),
+            encoding="utf-8",
+        )
+        (root / "git-ignored").mkdir()
+        (root / "git-ignored" / "legacy.py").write_text(
+            "\n".join(["import django", "urlpatterns = []"] + [f"def ignored_{i}(): return {i}" for i in range(3000)]),
+            encoding="utf-8",
+        )
+        (root / "docker-ignored").mkdir()
+        (root / "docker-ignored" / "page.tsx").write_text(
+            "\n".join(["import React from 'react'", "export default function Page() { return <div /> }"] + ["// next"] * 3000),
+            encoding="utf-8",
+        )
+
+        plan = self.run_advisor_json(root)
+        observations = plan["repo_observations"]
+        self.assertLess(observations["approximate_loc"], 20)
+        self.assertIn("fastapi", observations["detected_frameworks"])
+        self.assertNotIn("django", observations["detected_frameworks"])
+        self.assertNotIn("nextjs", observations["detected_frameworks"])
+        self.assertNotIn("javascript-typescript", plan["resolved_overlays"])
 
     def test_developer_tool_overlay_for_repo_scanner_shape(self):
         tmp = tempfile.TemporaryDirectory()

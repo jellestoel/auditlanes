@@ -465,6 +465,53 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("must run mode 'exploit-synthesis'", result.stderr)
 
+    def test_small_app_strategy_allows_exploit_synthesis_batch(self):
+        run_copy = self.copied_run()
+        plan_path = run_copy / "state" / "relevance-plan.yaml"
+        plan_path.write_text(
+            plan_path.read_text(encoding="utf-8")
+            .replace("resolved_strategy: invariant-audit", "resolved_strategy: small-app-invariant-audit", 1),
+            encoding="utf-8",
+        )
+        batch = run_copy / "reports" / "batch-04"
+        family_dir = batch / "exploit-synthesis"
+        family_dir.mkdir(parents=True)
+        (family_dir / "report.md").write_text("# Exploit Synthesis\n", encoding="utf-8")
+        sidecar = json.loads((run_copy / "reports" / "batch-01" / "object-auth" / "report.json").read_text(encoding="utf-8"))
+        sidecar.update({
+            "sidecar_id": "sidecar-exploit-synthesis-small-app",
+            "batch_id": "batch-04",
+            "family": "exploit-synthesis",
+            "mode": "exploit-synthesis",
+            "strategy": "small-app-invariant-audit",
+        })
+        sidecar["confirmed_findings"] = []
+        sidecar["candidate_findings"] = []
+        (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        (batch / "manifest.yaml").write_text(
+            "\n".join([
+                "schema_version: 1",
+                "run_id: run-good",
+                "batch_id: batch-04",
+                'generated_at: "2026-05-11T00:00:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - exploit-synthesis",
+                "families:",
+                "  - family: exploit-synthesis",
+                "    status: ran",
+                "    mode: exploit-synthesis",
+                '    markdown: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+
+        result = self.run_validator(run_copy, "--batch-id", "batch-04")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_reswept_status_requires_post_fix_resweep_mode(self):
         run_copy = self.copied_run()
         sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"

@@ -15,12 +15,12 @@ triggers:
       - object-auth
 
   - id: export-download-route
-    description: "Export, download, file, blob, or attachment surfaces should notify data-surface and object authorization lanes."
+    description: "Export, download, blob, or attachment route/surface evidence should notify data-surface and object authorization lanes."
     when:
+      evidence_type: route-definition
       patterns:
         - download
         - export
-        - file
         - blob
         - attachment
     notify:

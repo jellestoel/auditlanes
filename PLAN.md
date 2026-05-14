@@ -1176,6 +1176,18 @@ prune reducer-owned auxiliary rows to their executable schemas
 add regression coverage for live-run validation cleanup failures
 ```
 
+## v0.4.13
+
+Advisor and protocol friction cleanup.
+
+```text
+honor gitignore and dockerignore in scan_advisor.py file discovery
+avoid Express false positives from Python app.get route decorators
+allow small-app-invariant-audit to run exploit-synthesis batch output
+align calibration scaffold output contract with relevance-plan and attack-surface schemas
+narrow export/download cross-lane trigger to route-definition evidence
+```
+
 ## v0.5.0
 
 Stable invariant-audit strategy.

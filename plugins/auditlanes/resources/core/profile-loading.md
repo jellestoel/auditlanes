@@ -51,7 +51,7 @@ For the selected profile:
 
 ## Stability
 
-AuditLanes v0.4.12 ships the `security` profile as the only stable runnable
+AuditLanes v0.4.13 ships the `security` profile as the only stable runnable
 profile. Other profiles may exist as experimental metadata, but must not be
 treated as production-ready audit modes unless their `profile.yaml` explicitly
 sets `implemented: true`.

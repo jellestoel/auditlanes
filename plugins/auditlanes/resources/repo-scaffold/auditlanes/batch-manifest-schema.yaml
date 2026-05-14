@@ -108,6 +108,8 @@ example_exploit_synthesis:
       json: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.json"
 
 write_policy:
+  - "markdown/json output paths may use ${RUN_DIR}/reports/... or run-relative reports/... paths."
+  - "Bare relative paths without ${RUN_DIR}/ or reports/ are resolved relative to the manifest directory and should be avoided in authored manifests."
   - "The orchestrator writes an in-progress manifest before a batch starts when possible."
   - "The orchestrator writes or atomically replaces the final manifest after the batch finishes."
   - "The final manifest records status for every expected work item."

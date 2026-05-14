@@ -9,8 +9,10 @@ installs, package scripts, containers, network calls, or runtime probes.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,6 +40,7 @@ EXCLUDED_DIR_NAMES = {
     "target",
     "vendor",
 }
+IGNORE_FILENAMES = (".gitignore", ".dockerignore")
 
 LINE_COUNT_EXTENSIONS = {
     ".py",
@@ -116,7 +119,7 @@ FRAMEWORK_PATTERNS = {
     "django": [r"\bdjango\b", r"\burlpatterns\b", r"\bmodels\.Model\b"],
     "fastapi": [r"\bfrom\s+fastapi\s+import\b", r"\bFastAPI\s*\("],
     "starlette": [r"\bfrom\s+starlette\b"],
-    "express": [r"\bexpress\s*\(", r"\bapp\.(get|post|put|delete|patch)\s*\("],
+    "express": [r"\brequire\(['\"]express['\"]\)", r"\bimport\s+express\s+from\s+['\"]express['\"]", r"\bexpress\s*\("],
     "nextjs": [r"\bnext\b", r"pages/api", r"app/api"],
     "react": [r"\bfrom\s+['\"]react['\"]", r"\bimport\s+React\b", r"\bReactDOM\b"],
     "vue": [r"\bfrom\s+['\"]vue['\"]", r"\bcreateApp\s*\("],
@@ -217,10 +220,88 @@ def is_excluded(root: Path, path: Path) -> bool:
     return any(part in EXCLUDED_DIR_NAMES for part in parts)
 
 
-def list_files(root: Path) -> list[Path]:
+def load_ignore_rules(root: Path, filenames: tuple[str, ...] = IGNORE_FILENAMES) -> list[tuple[str, bool]]:
+    rules: list[tuple[str, bool]] = []
+    for filename in filenames:
+        ignore_path = root / filename
+        if not ignore_path.is_file() or ignore_path.is_symlink():
+            continue
+        try:
+            lines = ignore_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+        for raw in lines:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            negated = line.startswith("!")
+            if negated:
+                line = line[1:].strip()
+            if line:
+                rules.append((line, negated))
+    return rules
+
+
+def ignore_rule_matches(pattern: str, rel: str) -> bool:
+    directory_only = pattern.endswith("/")
+    pattern = pattern.strip("/")
+    if not pattern:
+        return False
+    if directory_only:
+        return rel == pattern or rel.startswith(f"{pattern}/")
+    if "/" in pattern:
+        return fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(rel, f"{pattern}/**")
+    parts = rel.split("/")
+    return any(fnmatch.fnmatch(part, pattern) for part in parts)
+
+
+def is_ignored_by_rules(root: Path, path: Path, rules: list[tuple[str, bool]]) -> bool:
+    try:
+        rel = repo_relative(root, path)
+    except ValueError:
+        return True
+    ignored = False
+    for pattern, negated in rules:
+        if ignore_rule_matches(pattern, rel):
+            ignored = not negated
+    return ignored
+
+
+def git_list_files(root: Path) -> list[Path] | None:
+    if not (root / ".git").exists():
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-co", "--exclude-standard", "-z"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
     files: list[Path] = []
-    for path in root.rglob("*"):
+    for raw in result.stdout.split(b"\0"):
+        if not raw:
+            continue
+        try:
+            rel = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            continue
+        files.append(root / rel)
+    return files
+
+
+def list_files(root: Path) -> list[Path]:
+    git_files = git_list_files(root)
+    rules = load_ignore_rules(root, (".dockerignore",) if git_files is not None else IGNORE_FILENAMES)
+    files: list[Path] = []
+    candidates = git_files if git_files is not None else root.rglob("*")
+    for path in candidates:
         if is_excluded(root, path):
+            continue
+        if rules and is_ignored_by_rules(root, path, rules):
             continue
         if path.is_file() and not path.is_symlink():
             files.append(path)
