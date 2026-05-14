@@ -1,7 +1,8 @@
 version: 1
 id: production-integrity
 status: experimental
-implemented: false
+implemented: true
+report_sidecar_schema: production-integrity-report-sidecar.schema.json
 lane_source: lanes.yaml
 strategy_source: strategies
 overlay_source: overlays
@@ -15,7 +16,7 @@ execution_fallback_order:
   - subagent
   - single-session
 stability_notes:
-  - "Brainstorm profile only; not registered in the bundled profile catalog."
+  - "Experimental runnable profile; less stable than the security profile contract."
   - "Use after the stable security profile, treating unresolved security findings as launch gates."
   - "Prior audit output may seed leads, but current code and docs must provide application evidence."
 non_goals:

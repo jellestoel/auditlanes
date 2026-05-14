@@ -34,6 +34,7 @@ STATE_ARTIFACT_SCHEMAS = {
     "relevance-plan.yaml": "relevance-plan.schema.json",
     "relevance-plan.yml": "relevance-plan.schema.json",
     "run-local-checks.jsonl": "run-local-check.schema.json",
+    "risk-signals.jsonl": "risk-signal.schema.json",
     "security-invariants.jsonl": "security-invariant.schema.json",
     "security-smells.jsonl": "security-smell.schema.json",
     "unowned-surfaces.jsonl": "unowned-surface.schema.json",
@@ -42,6 +43,7 @@ STATE_LANE_FIELDS = {
     "attack-surface-graph.jsonl": ("owner_family",),
     "attack-surface-inventory.jsonl": ("owner_family",),
     "incidental-leads.jsonl": ("proposed_owner_family",),
+    "risk-signals.jsonl": ("recommended_owner",),
     "security-invariants.jsonl": ("owner_family",),
     "security-smells.jsonl": ("recommended_owner",),
 }
@@ -55,6 +57,7 @@ STATE_EVIDENCE_ARTIFACTS = {
     "authorization-matrix.jsonl",
     "incidental-leads.jsonl",
     "proof-ledger.jsonl",
+    "risk-signals.jsonl",
     "security-invariants.jsonl",
 }
 
@@ -698,6 +701,7 @@ def load_profile(profile_id: str, profiles_dir: Path) -> dict[str, Any]:
     return {
         "id": profile_id,
         "implemented": bool(implemented),
+        "report_sidecar_schema": profile.get("report_sidecar_schema", "report-sidecar.schema.json"),
         "lanes": lanes,
         "lane_order": lane_order,
         "specialists": specialists,
@@ -839,7 +843,11 @@ def validate_sidecar_profile(
         if isinstance(dedupe_owner, str) and dedupe_owner not in lanes:
             issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].dedupe_key.owner_family", f"owner family {dedupe_owner!r} is not a lane in profile {profile_id!r}"))
         dedupe_key = finding.get("dedupe_key") if isinstance(finding.get("dedupe_key"), dict) else {}
-        for field in ("owner_family", "security_invariant", "missing_guard", "entrypoint", "impact_boundary"):
+        if profile_id == "production-integrity":
+            mirror_fields = ("owner_family", "control_objective", "failure_mode", "missing_control", "impact_boundary")
+        else:
+            mirror_fields = ("owner_family", "security_invariant", "missing_guard", "entrypoint", "impact_boundary")
+        for field in mirror_fields:
             if field in finding and field in dedupe_key and finding[field] != dedupe_key[field]:
                 issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].dedupe_key.{field}", f"must mirror confirmed_finding.{field} exactly"))
         if sidecar.get("batch_id") == "batch-01" and finding.get("introduced_after_batch_01") is True:
@@ -862,6 +870,13 @@ def validate_sidecar_profile(
         if isinstance(owner, str) and owner not in lanes:
             issues.append(ValidationIssue(sidecar_path, f"$.security_smells[{index}].recommended_owner", f"owner family {owner!r} is not a lane in profile {profile_id!r}"))
 
+    for index, signal in enumerate(sidecar.get("risk_signals", [])):
+        if not isinstance(signal, dict):
+            continue
+        owner = signal.get("recommended_owner")
+        if isinstance(owner, str) and owner not in lanes:
+            issues.append(ValidationIssue(sidecar_path, f"$.risk_signals[{index}].recommended_owner", f"owner family {owner!r} is not a lane in profile {profile_id!r}"))
+
     for index, local_check in enumerate(sidecar.get("run_local_checks", [])):
         if not isinstance(local_check, dict):
             continue
@@ -879,7 +894,11 @@ def validate_sidecar_profile(
         if isinstance(dedupe_owner, str) and dedupe_owner not in lanes:
             issues.append(ValidationIssue(sidecar_path, f"$.candidate_findings[{index}].candidate_dedupe_key.proposed_owner_family", f"owner family {dedupe_owner!r} is not a lane in profile {profile_id!r}"))
         dedupe_key = candidate.get("candidate_dedupe_key") if isinstance(candidate.get("candidate_dedupe_key"), dict) else {}
-        for field in ("proposed_owner_family", "summary", "files", "suspected_missing_guard", "impact_boundary"):
+        if profile_id == "production-integrity":
+            mirror_fields = ("proposed_owner_family", "summary", "files", "suspected_missing_control", "impact_boundary")
+        else:
+            mirror_fields = ("proposed_owner_family", "summary", "files", "suspected_missing_guard", "impact_boundary")
+        for field in mirror_fields:
             if candidate.get(field) != dedupe_key.get(field):
                 issues.append(ValidationIssue(sidecar_path, f"$.candidate_findings[{index}].candidate_dedupe_key.{field}", f"must mirror candidate_finding.{field} exactly"))
 
@@ -974,6 +993,16 @@ def validate_sidecar_repo_paths(sidecar_path: Path, sidecar: dict[str, Any]) -> 
             line_start = smell.get("line_start")
             if line_start is not None and (not isinstance(line_start, int) or isinstance(line_start, bool) or line_start < 1):
                 issues.append(ValidationIssue(sidecar_path, f"$.security_smells[{index}].line_start", "must be null or a 1-based line number"))
+
+    risk_signals = sidecar.get("risk_signals", [])
+    if isinstance(risk_signals, list):
+        for index, signal in enumerate(risk_signals):
+            if not isinstance(signal, dict):
+                continue
+            issues.extend(validate_repo_relative_path_value(sidecar_path, f"$.risk_signals[{index}].path", signal.get("path")))
+            line_start = signal.get("line_start")
+            if line_start is not None and (not isinstance(line_start, int) or isinstance(line_start, bool) or line_start < 1):
+                issues.append(ValidationIssue(sidecar_path, f"$.risk_signals[{index}].line_start", "must be null or a 1-based line number"))
 
     clone_maps = sidecar.get("clone_maps", [])
     if isinstance(clone_maps, list):
@@ -1585,14 +1614,21 @@ def validate_run(
     allow_experimental: bool = False,
     batch_id: str | None = None,
 ) -> list[ValidationIssue]:
-    sidecar_schema = load_json(schemas_dir / "report-sidecar.schema.json")
-    manifest_schema = load_json(schemas_dir / "batch-manifest.schema.json")
     issues: list[ValidationIssue] = []
 
     try:
         selected_profile = load_profile(profile, profiles_dir)
     except Exception as exc:  # noqa: BLE001
         return [ValidationIssue(profiles_dir / profile, "$", f"could not load profile: {exc}")]
+
+    schema_name = selected_profile.get("report_sidecar_schema", "report-sidecar.schema.json")
+    if not isinstance(schema_name, str) or not schema_name:
+        return [ValidationIssue(selected_profile["profile_path"], "$.report_sidecar_schema", "must be a non-empty schema filename")]
+    sidecar_schema_path = schemas_dir / schema_name
+    if not sidecar_schema_path.exists():
+        return [ValidationIssue(sidecar_schema_path, "$", f"report sidecar schema for profile {profile!r} is missing")]
+    sidecar_schema = load_json(sidecar_schema_path)
+    manifest_schema = load_json(schemas_dir / "batch-manifest.schema.json")
 
     if not selected_profile["implemented"] and not allow_experimental:
         issues.append(ValidationIssue(selected_profile["profile_path"], "$.implemented", f"profile {profile!r} is not implemented; pass --allow-experimental only for metadata checks"))

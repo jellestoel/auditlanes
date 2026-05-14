@@ -1,0 +1,1 @@
+{"schema_version":1,"invariant_id":"inv.invoice-period-unique","summary":"Invoice generation is unique per participant and service period.","owner_family":"workflow-atomicity","evidence_refs":[{"path":"src/invoices.ts","line_start":10,"line_end":30,"symbol":"generateInvoice","evidence_type":"service_function","snippet_hash":null,"rationale":"Fixture invariant evidence."}]}

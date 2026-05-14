@@ -51,8 +51,8 @@ class ClaudeSkillContractTests(unittest.TestCase):
         text = SKILL.read_text(encoding="utf-8")
         self.assertIn("profile choice before strategy choices", text)
         self.assertIn("`security` - stable runnable profile", text)
-        self.assertIn("`production-integrity` - experimental metadata", text)
-        self.assertIn("only `security` may start a real scan", text)
+        self.assertIn("`production-integrity` - experimental runnable profile", text)
+        self.assertIn("After the profile is selected, present strategy choices", text)
 
     def test_codex_manifest_uses_codex_specific_skill_entrypoint(self):
         manifest = json.loads((PLUGIN_ROOT / ".codex-plugin" / "plugin.json").read_text(encoding="utf-8"))

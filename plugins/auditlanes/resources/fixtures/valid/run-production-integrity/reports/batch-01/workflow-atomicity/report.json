@@ -1,0 +1,118 @@
+{
+  "schema_version": 4,
+  "sidecar_id": "sidecar-workflow-atomicity-001",
+  "generated_at": "2026-05-14T00:00:00Z",
+  "run_id": "run-production-integrity",
+  "batch_id": "batch-01",
+  "family": "workflow-atomicity",
+  "mode": "readiness-sweep",
+  "profile": "production-integrity",
+  "strategy": "production-gate",
+  "overlays": ["money-documents-workflows"],
+  "baseline_commit": null,
+  "reviewed_artifacts": ["src/invoices.ts", "prisma/schema.prisma"],
+  "reviewed_files_routes_helpers": ["src/invoices.ts"],
+  "coverage_units_touched": ["workflow:wf.invoice-generation"],
+  "confirmed_findings": [
+    {
+      "provisional_finding_id": "PF-workflow-001",
+      "dedupe_key": {
+        "owner_family": "workflow-atomicity",
+        "control_objective": "Invoice generation must be idempotent per participant and service period.",
+        "failure_mode": "Retry can create a second invoice row for the same participant and period.",
+        "missing_control": "missing transactionally enforced idempotency key",
+        "affected_authoritative_state_or_commitment": "Invoice and InvoiceLine durable records",
+        "impact_boundary": "duplicate finance-facing invoice commitment"
+      },
+      "owner_family": "workflow-atomicity",
+      "workflow_id": "wf.invoice-generation",
+      "invariant_id": "inv.invoice-period-unique",
+      "control_objective": "Invoice generation must be idempotent per participant and service period.",
+      "trigger_condition": "An operator retries invoice generation after a timeout.",
+      "failure_mode": "Retry can create a second invoice row for the same participant and period.",
+      "missing_control": "missing transactionally enforced idempotency key",
+      "affected_authoritative_state": "Invoice and InvoiceLine durable records",
+      "affected_side_effects": ["invoice PDF"],
+      "impact_boundary": "duplicate finance-facing invoice commitment",
+      "detectability": "manual-reconciliation-required",
+      "recoverability": "manual-repair-required",
+      "launch_gate_effect": "go-with-controls",
+      "status": "confirmed-static",
+      "severity": "high",
+      "confidence": "probable",
+      "summary": "Invoice generation lacks a durable idempotency control in the fixture.",
+      "entrypoint": "POST /api/invoices/generate",
+      "entrypoints": ["POST /api/invoices/generate"],
+      "files": ["src/invoices.ts"],
+      "evidence_refs": [
+        {
+          "path": "src/invoices.ts",
+          "line_start": 10,
+          "line_end": 30,
+          "symbol": "generateInvoice",
+          "evidence_type": "service_function",
+          "snippet_hash": null,
+          "rationale": "Fixture evidence for invoice generation."
+        }
+      ],
+      "existing_controls_checked": ["prisma/schema.prisma"],
+      "recommended_regression": "Add an integration test for invoice generation retry idempotency.",
+      "severity_rationale": "Duplicate invoices are material finance-facing commitments.",
+      "why_confirmed": "The fixture intentionally models a missing durable idempotency control.",
+      "introduced_after_batch_01": false
+    }
+  ],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "incidental_leads": [],
+  "risk_signals": [
+    {
+      "signal_id": "RISK-workflow-001",
+      "category": "missing-idempotency",
+      "path": "src/invoices.ts",
+      "line_start": 10,
+      "description": "Invoice generation creates finance-facing records without a visible idempotency key.",
+      "recommended_owner": "workflow-atomicity",
+      "status": "needs-triage"
+    }
+  ],
+  "proof_updates": [
+    {
+      "subject_id": "PF-workflow-001",
+      "proof_level": "P2-static-confirmed",
+      "evidence_summary": "Static fixture evidence identifies the missing idempotency control.",
+      "evidence_refs": [
+        {
+          "path": "src/invoices.ts",
+          "line_start": 10,
+          "line_end": 30,
+          "symbol": "generateInvoice",
+          "evidence_type": "service_function",
+          "snippet_hash": null,
+          "rationale": "Fixture evidence for proof update."
+        }
+      ]
+    }
+  ],
+  "regression_recommendations": [
+    {
+      "finding_id": "PF-workflow-001",
+      "recommended_regression": "integration test",
+      "test_name": "test_invoice_generation_retry_is_idempotent",
+      "guard_asserted": "invoice generation idempotency key",
+      "automation_status": "proposed",
+      "owner_hint": "backend"
+    }
+  ],
+  "workflow_updates": [],
+  "invariant_updates": [],
+  "side_effect_updates": [],
+  "lifecycle_recovery_updates": [],
+  "assurance_evidence_updates": [],
+  "next_batch_recommendations": []
+}

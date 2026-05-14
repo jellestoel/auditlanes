@@ -1,4 +1,4 @@
-version: 0.4.14
+version: 0.4.15
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -11,7 +11,7 @@ resource_roots:
   adapters: "resources/adapters"
 
 product_shape:
-  protocol: "AuditLanes profile-aware protocol beta; security is the stable bundled profile"
+  protocol: "AuditLanes profile-aware protocol beta; security is stable and production-integrity is experimental runnable"
   preferred_interface: "host-specific Claude Code and Codex plugin skills"
   current_release:
     - "Claude Code and Codex plugin manifests"
@@ -25,9 +25,9 @@ product_shape:
     - "strategy and overlay validation for report sidecars"
     - "incidental lead, security smell, proof update, run-local check, and regression recommendation sidecar fields"
     - "experimental architecture profile metadata"
-    - "experimental production-integrity profile metadata"
+    - "experimental runnable production-integrity profile"
     - "agent/reducer contract files"
-    - "executable JSON Schema for report sidecars, batch manifests, and core security state artifacts"
+    - "executable JSON Schema for security and production-integrity report sidecars, batch manifests, and core state artifacts"
     - "minimal validate-run script"
     - "minimal deterministic reduce-run script"
     - "agent-authored YAML parsing and reducer-owned state repair hardening"
@@ -59,12 +59,20 @@ execution_modes:
     - "subagent"
     - "single-session"
   primary_lane_workers:
-    - "session-auth"
-    - "object-auth"
-    - "role-matrix"
-    - "data-surfaces"
-    - "integration-trust"
-    - "platform-posture"
+    security:
+      - "session-auth"
+      - "object-auth"
+      - "role-matrix"
+      - "data-surfaces"
+      - "integration-trust"
+      - "platform-posture"
+    production-integrity:
+      - "state-model-integrity"
+      - "workflow-atomicity"
+      - "derived-output-reconciliation"
+      - "lifecycle-recovery"
+      - "runtime-cutover-controls"
+      - "assurance-evidence"
   helper_agent_delegation:
     allowed_when_host_supports: true
     not_required_for_correctness: true
@@ -117,6 +125,7 @@ validator_status:
   current_release: "minimal-script"
   executable_schemas:
     - "resources/schemas/report-sidecar.schema.json"
+    - "resources/schemas/production-integrity-report-sidecar.schema.json"
     - "resources/schemas/batch-manifest.schema.json"
     - "resources/schemas/security-invariant.schema.json"
     - "resources/schemas/attack-surface.schema.json"
@@ -125,12 +134,13 @@ validator_status:
     - "resources/schemas/proof-ledger.schema.json"
     - "resources/schemas/incidental-lead.schema.json"
     - "resources/schemas/security-smell.schema.json"
+    - "resources/schemas/risk-signal.schema.json"
     - "resources/schemas/unowned-surface.schema.json"
     - "resources/schemas/regression-plan.schema.json"
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.14 ships a direct profile-aware validator script."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.15 ships a direct profile-aware validator script."
 
 advisor_status:
   current_release: "minimal-script"
@@ -154,11 +164,13 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.14 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.15 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
 
 profile_status:
   implemented:
     - "security"
+  experimental_runnable:
+    - "production-integrity"
   experimental_metadata:
     - "architecture"
   planned:
@@ -260,6 +272,7 @@ plugin_files:
   - "resources/profiles/production-integrity/overlays/rapid-build-app.yaml"
   - "resources/profiles/production-integrity/overlays/scoped-business-domain.yaml"
   - "resources/schemas/report-sidecar.schema.json"
+  - "resources/schemas/production-integrity-report-sidecar.schema.json"
   - "resources/schemas/batch-manifest.schema.json"
   - "resources/schemas/security-invariant.schema.json"
   - "resources/schemas/attack-surface.schema.json"
@@ -268,6 +281,7 @@ plugin_files:
   - "resources/schemas/proof-ledger.schema.json"
   - "resources/schemas/incidental-lead.schema.json"
   - "resources/schemas/security-smell.schema.json"
+  - "resources/schemas/risk-signal.schema.json"
   - "resources/schemas/unowned-surface.schema.json"
   - "resources/schemas/regression-plan.schema.json"
   - "resources/schemas/run-local-check.schema.json"
@@ -322,6 +336,31 @@ plugin_files:
   - "resources/fixtures/valid/run-candidate-dupes/state/security-invariants.jsonl"
   - "resources/fixtures/valid/run-candidate-dupes/state/security-smells.jsonl"
   - "resources/fixtures/valid/run-candidate-dupes/state/unowned-surfaces.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/manifest.yaml"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/state-model-integrity/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/state-model-integrity/report.json"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/workflow-atomicity/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/workflow-atomicity/report.json"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/derived-output-reconciliation/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/derived-output-reconciliation/report.json"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/lifecycle-recovery/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/lifecycle-recovery/report.json"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/runtime-cutover-controls/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/runtime-cutover-controls/report.json"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/assurance-evidence/report.md"
+  - "resources/fixtures/valid/run-production-integrity/reports/batch-01/assurance-evidence/report.json"
+  - "resources/fixtures/valid/run-production-integrity/state/relevance-plan.yaml"
+  - "resources/fixtures/valid/run-production-integrity/state/core-workflow-inventory.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/production-invariants.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/side-effect-map.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/lifecycle-recovery-map.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/assurance-evidence-map.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/proof-ledger.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/incidental-leads.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/risk-signals.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/run-local-checks.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/regression-plan.jsonl"
+  - "resources/fixtures/valid/run-production-integrity/state/launch-gates.jsonl"
   - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/manifest.yaml"
   - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/session-auth/report.md"
   - "resources/fixtures/invalid/run-missing-evidence/reports/batch-01/session-auth/report.json"
@@ -406,14 +445,14 @@ cli:
     - "auditlanes upgrade ."
 
 known_limitations:
-  - "v0.4.14 bundles only the security profile as a stable runnable profile."
-  - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable against the security report schema."
+  - "The security profile is stable runnable; production-integrity is experimental runnable."
+  - "The architecture profile is metadata-only; --allow-experimental is for profile-loading/catalog checks and does not make architecture sidecars runnable."
   - "strategy:auto and small-app-invariant-audit are protocol contracts; a packaged CLI/orchestrator that performs automatic relevance scoring is still planned."
   - "scan_advisor.py performs minimal static relevance scoring; an interactive numbered-choice wizard is still planned."
-  - "YAML contract files remain agent/reducer guidance; executable JSON Schema currently covers report sidecars and batch manifests; validate_run.py adds profile-specific semantic checks."
-  - "The reducer implementation imports confirmed findings, candidates, rejected claims, profile feedback, chain candidates, incidental leads, security smells, proof updates, run-local checks, and regression recommendations. It emits basic next-batch directives from incidental leads, run-local checks, and cross-lane triggers, but does not yet process coverage, runtime updates, clone maps, final reports, or scope mutation."
+  - "YAML contract files remain agent/reducer guidance; executable JSON Schema currently covers profile-specific report sidecars and batch manifests; validate_run.py adds profile-specific semantic checks."
+  - "The reducer implementation imports confirmed findings, candidates, rejected claims, profile feedback, chain candidates, incidental leads, security smells, production risk signals, proof updates, run-local checks, and regression recommendations. It emits basic next-batch directives from incidental leads, run-local checks, and cross-lane triggers, but does not yet process coverage, runtime updates, clone maps, final reports, or scope mutation."
   - "A packaged auditlanes CLI command is not included in this repository snapshot."
-  - "Stable non-security profiles require profile-specific report contracts and reducer semantics before use."
+  - "production-integrity is runnable but still experimental; its profile contract should be treated as less stable than security."
 
 upgrade_rules:
   - "Replace managed files that are unchanged from the previously installed version."

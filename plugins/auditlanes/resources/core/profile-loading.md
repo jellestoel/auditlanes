@@ -23,9 +23,10 @@ cross-lane-triggers.yaml
 
 `profile.yaml` declares whether the profile is implemented. `lanes.yaml`
 declares lane IDs and optional specialist work items. Stable profiles may also
-declare `strategy_source` and `overlay_source`; validators load those catalogs
-from the selected profile root. Security profiles may declare
-`cross_lane_trigger_source` for reducer-owned follow-up routing.
+declare `strategy_source`, `overlay_source`, and `report_sidecar_schema`;
+validators load those catalogs and the profile-specific report contract from
+the selected profile root. Profiles may declare `cross_lane_trigger_source` for
+reducer-owned follow-up routing.
 
 `strategy: auto` is a calibration-time request. It must resolve into a concrete
 strategy, overlays, coverage mode, suggested checks, and agent-discretion flags
@@ -45,17 +46,19 @@ For the selected profile:
 - every `overlays[]` entry must exist in the selected profile's overlay catalog.
 - sidecar `mode` must be allowed by the selected strategy when the strategy
   declares `allowed_modes`.
+- report sidecars are validated against the selected profile's
+  `report_sidecar_schema`, defaulting to the security-compatible v3 schema.
 - cross-lane trigger `notify` families must be normal lane IDs.
 - profile feedback `family` must be a lane ID.
 - batch manifest work item families must be lane IDs or specialist IDs.
 
 ## Stability
 
-AuditLanes v0.4.14 ships the `security` profile as the only stable runnable
-profile. `architecture` and `production-integrity` exist as experimental
-metadata, but must not be treated as production-ready audit modes unless their
-`profile.yaml` explicitly sets `implemented: true`.
+AuditLanes ships the `security` profile as the stable runnable profile.
+`production-integrity` is runnable but experimental. `architecture` exists as
+metadata only and must not be treated as a production-ready audit mode unless
+its `profile.yaml` explicitly sets `implemented: true`.
 
 `--allow-experimental` is limited to profile-loading and catalog compatibility
-checks. It does not make metadata-only profile sidecars valid against the
-security report schema or reducer semantics.
+checks. It does not make metadata-only profile sidecars valid against a runnable
+profile's report schema or reducer semantics.

@@ -71,10 +71,11 @@ class SidecarCompatibilityTests(unittest.TestCase):
         self.assertIn("payment-flow", profile["overlays"])
         self.assertTrue(profile["cross_lane_triggers"])
 
-    def test_production_integrity_profile_loads_as_experimental_metadata(self):
+    def test_production_integrity_profile_loads_as_experimental_runnable(self):
         validator = load_validator_module()
         profile = validator.load_profile("production-integrity", PLUGIN_ROOT / "resources" / "profiles")
-        self.assertFalse(profile["implemented"])
+        self.assertTrue(profile["implemented"])
+        self.assertEqual(profile["report_sidecar_schema"], "production-integrity-report-sidecar.schema.json")
         self.assertEqual(profile["default_strategy"], "auto")
         self.assertEqual(
             profile["lane_order"],

@@ -1,0 +1,1 @@
+{"schema_version":1,"workflow_id":"wf.invoice-generation","name":"Invoice generation","actors":["admin"],"entrypoints":["POST /api/invoices/generate"],"authoritative_records":["Invoice","InvoiceLine"],"side_effects":["invoice PDF"],"risk_rank":"high"}

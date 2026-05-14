@@ -2,11 +2,10 @@
 
 Experimental AuditLanes profile metadata for launch integrity reviews.
 
-This profile is intentionally not marked runnable yet. The stable security
-profile uses security-shaped sidecar and reducer fields. Production-integrity
-requires generic finding fields such as `control_objective`,
+This profile is experimental but runnable. It uses a profile-specific v4
+sidecar contract with generic finding fields such as `control_objective`,
 `trigger_condition`, `missing_control`, `detectability`, `recoverability`, and
-`launch_gate_effect` before it should be set to `implemented: true`.
+`launch_gate_effect`.
 
 The profile focuses on whether ordinary users, retries, jobs, deploys, imports,
 migrations, or partial failures can create wrong durable state, wrong external
@@ -21,4 +20,5 @@ Stable lanes:
 - `runtime-cutover-controls`
 - `assurance-evidence`
 
-Default strategy: `production-gate`.
+Default calibration request: `auto`.
+Default resolved strategy: `production-gate`.

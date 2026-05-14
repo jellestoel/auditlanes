@@ -12,6 +12,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN_ROOT / "scripts" / "reduce_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 CANDIDATE_DUPES_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-candidate-dupes"
+PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
 
 
 def read_jsonl(path: Path):
@@ -52,6 +53,23 @@ class ReduceRunTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertRegex(records[0]["finding_id"], r"^F-session-auth-[0-9a-f]{12}$")
         self.assertRegex(records[0]["root_cause_id"], r"^RC-session-auth-[0-9a-f]{12}$")
+
+    def test_production_integrity_reducer_assigns_generic_ids(self):
+        run_copy, summary = self.run_reducer(PRODUCTION_INTEGRITY_RUN, "--profile", "production-integrity")
+        self.assertEqual(summary["records"], 1)
+        self.assertEqual(summary["risk_signals"], 1)
+        records = read_jsonl(run_copy / "state" / "finding-inventory.jsonl")
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertRegex(record["finding_id"], r"^F-workflow-atomicity-[0-9a-f]{12}$")
+        self.assertRegex(record["root_cause_id"], r"^RC-workflow-atomicity-[0-9a-f]{12}$")
+        self.assertEqual(record["control_objective"], "Invoice generation must be idempotent per participant and service period.")
+        self.assertEqual(record["missing_control"], "missing transactionally enforced idempotency key")
+        self.assertEqual(record["launch_gate_effect"], "go-with-controls")
+        risk_signals = read_jsonl(run_copy / "state" / "risk-signals.jsonl")
+        self.assertEqual(risk_signals[0]["recommended_owner"], "workflow-atomicity")
+        proof = read_jsonl(run_copy / "state" / "proof-ledger.jsonl")
+        self.assertRegex(proof[0]["subject_id"], r"^F-workflow-atomicity-[0-9a-f]{12}$")
 
     def test_reducer_is_idempotent_for_same_inputs(self):
         run_copy, _ = self.run_reducer(VALID_RUN)

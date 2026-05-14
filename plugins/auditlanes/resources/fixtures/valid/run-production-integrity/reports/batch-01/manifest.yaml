@@ -1,0 +1,44 @@
+schema_version: 1
+run_id: run-production-integrity
+batch_id: batch-01
+generated_at: "2026-05-14T00:00:00Z"
+producer: orchestrator
+manifest_status: completed
+expected_families:
+  - state-model-integrity
+  - workflow-atomicity
+  - derived-output-reconciliation
+  - lifecycle-recovery
+  - runtime-cutover-controls
+  - assurance-evidence
+families:
+  - family: state-model-integrity
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/state-model-integrity/report.md"
+    json: "${RUN_DIR}/reports/batch-01/state-model-integrity/report.json"
+  - family: workflow-atomicity
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/workflow-atomicity/report.md"
+    json: "${RUN_DIR}/reports/batch-01/workflow-atomicity/report.json"
+  - family: derived-output-reconciliation
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/derived-output-reconciliation/report.md"
+    json: "${RUN_DIR}/reports/batch-01/derived-output-reconciliation/report.json"
+  - family: lifecycle-recovery
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/lifecycle-recovery/report.md"
+    json: "${RUN_DIR}/reports/batch-01/lifecycle-recovery/report.json"
+  - family: runtime-cutover-controls
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/runtime-cutover-controls/report.md"
+    json: "${RUN_DIR}/reports/batch-01/runtime-cutover-controls/report.json"
+  - family: assurance-evidence
+    status: ran
+    mode: readiness-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/assurance-evidence/report.md"
+    json: "${RUN_DIR}/reports/batch-01/assurance-evidence/report.json"

@@ -24,8 +24,8 @@ profiles:
     lanes_file: "resources/profiles/architecture/lanes.yaml"
   - id: production-integrity
     status: experimental
-    implemented: false
-    description: "Launch integrity profile metadata for durable state correctness, workflow atomicity, generated-output reconciliation, lifecycle recovery, cutover controls, and assurance evidence."
+    implemented: true
+    description: "Experimental launch integrity profile for durable state correctness, workflow atomicity, generated-output reconciliation, lifecycle recovery, cutover controls, and assurance evidence."
     profile_root: "resources/profiles/production-integrity"
     profile_file: "resources/profiles/production-integrity/profile.yaml"
     lanes_file: "resources/profiles/production-integrity/lanes.yaml"
@@ -50,9 +50,10 @@ profiles:
     description: "Privacy and data governance audit profile."
 
 rules:
-  - "AuditLanes v0.4.14 bundles only the security profile as a stable runnable profile."
-  - "Experimental profile metadata may exist to exercise core/profile loading, but it is not a stable audit mode."
+  - "AuditLanes bundles the security profile as stable runnable and production-integrity as experimental runnable."
+  - "Experimental profile metadata may exist to exercise core/profile loading, but only profiles with implemented:true are runnable audit modes."
   - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."
   - "Executable validators derive strategy and overlay IDs from the selected profile instead of hardcoding them in report schemas."
+  - "Executable validators load the selected profile's report_sidecar_schema instead of forcing every profile through the security sidecar contract."
   - "Executable validators derive cross-lane trigger notification lanes from the selected profile instead of hardcoding them in reducer code."
   - "strategy:auto is resolved during calibration and must produce state/relevance-plan.yaml with the concrete strategy, overlays, coverage mode, suggested checks, and agent-discretion flags."

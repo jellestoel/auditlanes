@@ -27,8 +27,14 @@ family_modes:
   - canonical-sweep
   - canonical-gap-fill
   - clonehunt
+  - readiness-sweep
+  - invariant-gap-fill
+  - control-clonehunt
+  - scenario-probe
   - runtime-safe
   - post-fix-resweep
+  - launch-gate-synthesis
+  - failure-scenario-synthesis
   - exploit-synthesis
   - parked
 

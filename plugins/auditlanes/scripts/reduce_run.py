@@ -48,6 +48,7 @@ REPAIRABLE_STATE_SCHEMAS = {
     "incidental-leads.jsonl": "incidental-lead.schema.json",
     "proof-ledger.jsonl": "proof-ledger.schema.json",
     "regression-plan.jsonl": "regression-plan.schema.json",
+    "risk-signals.jsonl": "risk-signal.schema.json",
     "run-local-checks.jsonl": "run-local-check.schema.json",
     "security-smells.jsonl": "security-smell.schema.json",
 }
@@ -90,12 +91,22 @@ def stable_hash(parts: list[Any], length: int = 12) -> str:
 
 def root_cause_id(finding: dict[str, Any]) -> str:
     key = finding["dedupe_key"]
-    short = stable_hash([
-        key["owner_family"],
-        key["security_invariant"],
-        key["missing_guard"],
-        key["impact_boundary"],
-    ])
+    if "control_objective" in key:
+        short = stable_hash([
+            key["owner_family"],
+            key["control_objective"],
+            key.get("failure_mode"),
+            key["missing_control"],
+            key.get("affected_authoritative_state_or_commitment"),
+            key["impact_boundary"],
+        ])
+    else:
+        short = stable_hash([
+            key["owner_family"],
+            key["security_invariant"],
+            key["missing_guard"],
+            key["impact_boundary"],
+        ])
     return f"RC-{key['owner_family']}-{short}"
 
 
@@ -103,7 +114,7 @@ def finding_id(finding: dict[str, Any], rc_id: str) -> str:
     key = finding["dedupe_key"]
     short = stable_hash([
         rc_id,
-        key["entrypoint"],
+        key.get("entrypoint") or finding.get("entrypoint") or finding.get("entrypoints", []),
         finding.get("files", []),
         key["impact_boundary"],
     ])
@@ -116,7 +127,7 @@ def candidate_id(candidate: dict[str, Any]) -> str:
         key["proposed_owner_family"],
         key["summary"],
         key["files"],
-        key.get("suspected_missing_guard"),
+        key.get("suspected_missing_guard") or key.get("suspected_missing_control"),
         key.get("impact_boundary"),
     ])
     return f"C-{key['proposed_owner_family']}-{short}"
@@ -284,6 +295,9 @@ def confirmed_record(sidecar: dict[str, Any], finding: dict[str, Any], report_pa
     f_id = finding_id(finding, rc_id)
     batch_id = sidecar["batch_id"]
     family = sidecar["family"]
+    entrypoint = finding.get("entrypoint")
+    if entrypoint is None and isinstance(finding.get("entrypoints"), list):
+        entrypoint = ", ".join(str(item) for item in finding.get("entrypoints", []))
     return {
         "schema_version": STATE_SCHEMA_VERSION,
         "finding_id": f_id,
@@ -301,9 +315,15 @@ def confirmed_record(sidecar: dict[str, Any], finding: dict[str, Any], report_pa
         "first_seen_batch": batch_id,
         "last_touched_batch": batch_id,
         "summary": finding["summary"],
-        "entrypoint": finding["entrypoint"],
-        "security_invariant": finding["security_invariant"],
-        "attacker_precondition": finding["attacker_precondition"],
+        "entrypoint": entrypoint,
+        "entrypoints": finding.get("entrypoints", []),
+        "workflow_id": finding.get("workflow_id"),
+        "invariant_id": finding.get("invariant_id"),
+        "security_invariant": finding.get("security_invariant"),
+        "control_objective": finding.get("control_objective"),
+        "attacker_precondition": finding.get("attacker_precondition"),
+        "trigger_condition": finding.get("trigger_condition"),
+        "failure_mode": finding.get("failure_mode"),
         "introduced_after_batch_01": finding["introduced_after_batch_01"],
         "duplicate_of": None,
         "clone_of": finding.get("clone_of"),
@@ -314,8 +334,16 @@ def confirmed_record(sidecar: dict[str, Any], finding: dict[str, Any], report_pa
         "lead_source_refs": finding.get("lead_source_refs", []),
         "widespread_pattern": False,
         "estimated_clone_count": None,
-        "missing_guard": finding["missing_guard"],
+        "missing_guard": finding.get("missing_guard"),
+        "missing_control": finding.get("missing_control"),
+        "affected_authoritative_state": finding.get("affected_authoritative_state"),
+        "affected_side_effects": finding.get("affected_side_effects", []),
         "impact_boundary": finding["impact_boundary"],
+        "detectability": finding.get("detectability"),
+        "recoverability": finding.get("recoverability"),
+        "launch_gate_effect": finding.get("launch_gate_effect"),
+        "existing_controls_checked": finding.get("existing_controls_checked", []),
+        "recommended_regression": finding.get("recommended_regression"),
         "severity_rationale": finding["severity_rationale"],
         "candidate_blocker": None,
         "runtime_status": None,
@@ -344,8 +372,14 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
         "last_touched_batch": batch_id,
         "summary": candidate["summary"],
         "entrypoint": candidate.get("entrypoint"),
+        "entrypoints": candidate.get("entrypoints", []),
+        "workflow_id": candidate.get("workflow_id"),
+        "invariant_id": candidate.get("invariant_id"),
         "security_invariant": None,
+        "control_objective": candidate.get("control_objective"),
         "attacker_precondition": None,
+        "trigger_condition": candidate.get("trigger_condition"),
+        "failure_mode": candidate.get("failure_mode"),
         "introduced_after_batch_01": batch_id != "batch-01",
         "duplicate_of": None,
         "clone_of": None,
@@ -357,7 +391,11 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
         "widespread_pattern": False,
         "estimated_clone_count": None,
         "missing_guard": candidate.get("suspected_missing_guard") or "",
+        "missing_control": candidate.get("suspected_missing_control") or "",
         "impact_boundary": candidate.get("impact_boundary") or "",
+        "detectability": candidate.get("detectability"),
+        "recoverability": candidate.get("recoverability"),
+        "launch_gate_effect": candidate.get("launch_gate_effect"),
         "severity_rationale": None,
         "candidate_blocker": candidate["blocker_to_confirmation"],
         "runtime_status": None,
@@ -402,6 +440,25 @@ def security_smell_record(sidecar: dict[str, Any], smell: dict[str, Any], report
         "description": smell["description"],
         "recommended_owner": smell["recommended_owner"],
         "status": smell["status"],
+    }
+
+
+def risk_signal_record(sidecar: dict[str, Any], signal: dict[str, Any], report_path: Path) -> dict[str, Any]:
+    batch_id = sidecar["batch_id"]
+    family = sidecar["family"]
+    return {
+        "schema_version": STATE_SCHEMA_VERSION,
+        "signal_id": signal["signal_id"],
+        "category": signal["category"],
+        "source_family": family,
+        "source_reports": [source_report(batch_id, family, report_path, signal["signal_id"])],
+        "first_seen_batch": batch_id,
+        "last_touched_batch": batch_id,
+        "path": signal["path"],
+        "line_start": signal.get("line_start"),
+        "description": signal["description"],
+        "recommended_owner": signal["recommended_owner"],
+        "status": signal["status"],
     }
 
 
@@ -537,6 +594,7 @@ def source_id_for_item(kind: str, item: dict[str, Any]) -> str:
         "candidate_id",
         "lead_id",
         "smell_id",
+        "signal_id",
         "check_id",
         "surface_id",
         "matrix_id",
@@ -568,6 +626,12 @@ def signal_from_item(kind: str, sidecar: dict[str, Any] | None, item: dict[str, 
     text_parts = scalar_strings({
         "kind": kind,
         "summary": item.get("summary") if kind in {"incidental-lead", "security-smell"} else None,
+        "control_objective": item.get("control_objective"),
+        "trigger_condition": item.get("trigger_condition"),
+        "failure_mode": item.get("failure_mode"),
+        "missing_control": item.get("missing_control"),
+        "affected_authoritative_state": item.get("affected_authoritative_state"),
+        "affected_side_effects": item.get("affected_side_effects"),
         "reason": item.get("reason"),
         "description": item.get("description"),
         "scope_impact": item.get("scope_impact"),
@@ -585,7 +649,7 @@ def signal_from_item(kind: str, sidecar: dict[str, Any] | None, item: dict[str, 
     return {
         "source_id": source_id_for_item(kind, item),
         "source_kind": kind,
-        "family": sidecar.get("family") if sidecar else item.get("owner_family"),
+        "family": sidecar.get("family") if sidecar else item.get("owner_family") or item.get("recommended_owner") or item.get("proposed_owner_family"),
         "text": " ".join(text_parts).lower(),
         "paths": paths,
         "evidence_types": evidence_types,
@@ -600,6 +664,7 @@ def sidecar_signals(sidecar: dict[str, Any]) -> list[dict[str, Any]]:
         ("candidate_findings", "candidate-finding"),
         ("incidental_leads", "incidental-lead"),
         ("security_smells", "security-smell"),
+        ("risk_signals", "risk-signal"),
         ("run_local_checks", "run-local-check"),
     ):
         for item in sidecar.get(collection, []):
@@ -615,6 +680,7 @@ def state_surface_signals(state_dir: Path) -> list[dict[str, Any]]:
         ("attack-surface-graph.jsonl", "attack-surface-graph"),
         ("authorization-matrix.jsonl", "authorization-matrix"),
         ("security-invariants.jsonl", "security-invariant"),
+        ("risk-signals.jsonl", "risk-signal"),
     ):
         for row in read_jsonl(state_dir / filename):
             signals.append(signal_from_item(kind, None, row))
@@ -649,10 +715,18 @@ def trigger_matches_signal(trigger: dict[str, Any], signal: dict[str, Any]) -> b
     return bool(evidence_type or patterns or path_patterns)
 
 
-def directive_mode_for_source(source_kind: str) -> str:
+def profile_mode(selected_profile: dict[str, Any], preferred: str, fallback: str) -> str:
+    for strategy in selected_profile.get("strategies", {}).values():
+        modes = strategy.get("allowed_modes", set())
+        if preferred in modes:
+            return preferred
+    return fallback
+
+
+def directive_mode_for_source(source_kind: str, selected_profile: dict[str, Any]) -> str:
     if source_kind in {"confirmed-finding", "candidate-finding"}:
-        return "clonehunt"
-    return "canonical-gap-fill"
+        return profile_mode(selected_profile, "control-clonehunt", "clonehunt")
+    return profile_mode(selected_profile, "invariant-gap-fill", "canonical-gap-fill")
 
 
 def add_directive(
@@ -700,7 +774,7 @@ def build_family_directives(
         add_directive(
             directives,
             family,
-            "canonical-gap-fill",
+            profile_mode(selected_profile, "invariant-gap-fill", "canonical-gap-fill"),
             f"Triaging incidental lead {lead.get('lead_id')}: {lead.get('summary')}",
             lead.get("files", []),
             lead.get("lead_id", "unknown-lead"),
@@ -714,7 +788,7 @@ def build_family_directives(
         add_directive(
             directives,
             family,
-            "canonical-gap-fill",
+            profile_mode(selected_profile, "invariant-gap-fill", "canonical-gap-fill"),
             f"Run-local check {local_check.get('check_id')}: {local_check.get('scope_impact')}",
             targets,
             local_check.get("check_id", "unknown-local-check"),
@@ -732,7 +806,7 @@ def build_family_directives(
                 add_directive(
                     directives,
                     family,
-                    directive_mode_for_source(signal["source_kind"]),
+                    directive_mode_for_source(signal["source_kind"], selected_profile),
                     f"Cross-lane trigger {trigger['id']} matched {signal['source_kind']} {source_id}.",
                     signal.get("priority_targets", []),
                     source_id,
@@ -1126,6 +1200,7 @@ def reduce_run(
     existing_chains = read_jsonl(state_dir / "chain-inventory.jsonl")
     existing_incidental_leads = read_jsonl(state_dir / "incidental-leads.jsonl")
     existing_security_smells = read_jsonl(state_dir / "security-smells.jsonl")
+    existing_risk_signals = read_jsonl(state_dir / "risk-signals.jsonl")
     existing_proof_updates = read_jsonl(state_dir / "proof-ledger.jsonl")
     existing_regression_recommendations = read_jsonl(state_dir / "regression-plan.jsonl")
     existing_run_local_checks = read_jsonl(state_dir / "run-local-checks.jsonl")
@@ -1136,6 +1211,7 @@ def reduce_run(
     chain_records: list[dict[str, Any]] = []
     incidental_leads: list[dict[str, Any]] = []
     security_smells: list[dict[str, Any]] = []
+    risk_signals: list[dict[str, Any]] = []
     proof_updates: list[dict[str, Any]] = []
     regression_recommendations: list[dict[str, Any]] = []
     runtime_updates: list[dict[str, Any]] = []
@@ -1181,6 +1257,8 @@ def reduce_run(
                     ))
             for smell in sidecar.get("security_smells", []):
                 security_smells.append(security_smell_record(sidecar, smell, report_path.relative_to(run_dir)))
+            for signal in sidecar.get("risk_signals", []):
+                risk_signals.append(risk_signal_record(sidecar, signal, report_path.relative_to(run_dir)))
             for proof_update in sidecar.get("proof_updates", []):
                 proof_updates.append(proof_update_record(sidecar, proof_update, report_path.relative_to(run_dir)))
             for recommendation in sidecar.get("regression_recommendations", []):
@@ -1246,11 +1324,13 @@ def reduce_run(
     merged = apply_runtime_updates(merged, runtime_updates, events, input_hashes)
     merged_incidental_leads = merge_aux_records_by_key(existing_incidental_leads + incidental_leads, "lead_id")
     merged_security_smells = merge_aux_records_by_key(existing_security_smells + security_smells, "smell_id")
+    merged_risk_signals = merge_aux_records_by_key(existing_risk_signals + risk_signals, "signal_id")
     merged_proof_updates = merge_proof_records(existing_proof_updates + proof_updates)
     merged_regression_recommendations = merge_aux_records_by_key(existing_regression_recommendations + regression_recommendations, "regression_id")
     merged_run_local_checks = merge_aux_records_by_key(existing_run_local_checks + run_local_checks, "check_id")
     merged_incidental_leads = prune_rows_to_schema(merged_incidental_leads, "incidental-lead.schema.json")
     merged_security_smells = prune_rows_to_schema(merged_security_smells, "security-smell.schema.json")
+    merged_risk_signals = prune_rows_to_schema(merged_risk_signals, "risk-signal.schema.json")
     merged_proof_updates = prune_rows_to_schema(merged_proof_updates, "proof-ledger.schema.json")
     merged_regression_recommendations = prune_rows_to_schema(merged_regression_recommendations, "regression-plan.schema.json")
     merged_run_local_checks = prune_rows_to_schema(merged_run_local_checks, "run-local-check.schema.json")
@@ -1278,6 +1358,7 @@ def reduce_run(
     atomic_write_jsonl(state_dir / "chain-inventory.jsonl", merge_records_by_key(existing_chains + chain_records, "chain_id"))
     atomic_write_jsonl(state_dir / "incidental-leads.jsonl", merged_incidental_leads)
     atomic_write_jsonl(state_dir / "security-smells.jsonl", merged_security_smells)
+    atomic_write_jsonl(state_dir / "risk-signals.jsonl", merged_risk_signals)
     atomic_write_jsonl(state_dir / "proof-ledger.jsonl", merged_proof_updates)
     atomic_write_jsonl(state_dir / "regression-plan.jsonl", merged_regression_recommendations)
     atomic_write_jsonl(state_dir / "run-local-checks.jsonl", merged_run_local_checks)
@@ -1293,6 +1374,7 @@ def reduce_run(
         "chains": len(chain_records),
         "incidental_leads": len(incidental_leads),
         "security_smells": len(security_smells),
+        "risk_signals": len(risk_signals),
         "proof_updates": len(proof_updates),
         "regression_recommendations": len(regression_recommendations),
         "runtime_updates": len(runtime_updates),

@@ -9,18 +9,19 @@ Run the AuditLanes multi-lane audit protocol for the target repository.
 
 Use this skill only when the operator explicitly asks for AuditLanes or for a
 structured audit. The stable runnable profile is `security`.
-`production-integrity` and `architecture` are experimental metadata profiles;
-they may be inspected or compatibility-checked, but should not be run as
-production audit modes until their `profile.yaml` files set
-`implemented: true`.
+`production-integrity` is an experimental runnable profile for launch integrity.
+`architecture` is experimental metadata only and should not be run as a
+production audit mode until its `profile.yaml` sets `implemented: true`.
 
 If the operator invokes a scan without an explicit profile, present a profile
 choice first. Recommend `security` when no recent security run exists.
-Recommend `production-integrity` only as a metadata preview for launch integrity
-until the sidecar schema and reducer are generalized. For the stable security
+Recommend `production-integrity` after security when the operator wants a
+launch/no-go review for durable state, generated commitments, lifecycle
+recovery, cutover controls, and assurance evidence. For the stable security
 path, default to requested `profile: security`, `strategy: auto`, and
-`overlays: [auto]`. Calibration must resolve that into a concrete strategy,
-overlay set, coverage mode, suggested checks, and agent-discretion flags in
+`overlays: [auto]`; for production-integrity, default to
+`strategy: production-gate`. Calibration must resolve profile strategy, overlay
+set, coverage mode, suggested checks, and agent-discretion flags in
 `state/relevance-plan.yaml`. Suggested checks frame the review; they do not
 bound reviewer judgment.
 
@@ -78,8 +79,13 @@ unavailable in this host and continue with `subagent` mode when supported.
   commands, or runtime checks without explicit approval.
 - Every non-parked family emits both `report.md` and `report.json`; the JSON
   sidecar is the source of truth.
-- Every sidecar must include `strategy`, `overlays`, `incidental_leads`,
-  `security_smells`, `proof_updates`, and `regression_recommendations`.
+- Every security sidecar must include `strategy`, `overlays`,
+  `incidental_leads`, `security_smells`, `proof_updates`, and
+  `regression_recommendations`.
+- Every production-integrity sidecar must include `strategy`, `overlays`,
+  `incidental_leads`, `risk_signals`, `proof_updates`,
+  `regression_recommendations`, and the profile-specific workflow/invariant/
+  side-effect/lifecycle/evidence update arrays.
 - No-argument or under-specified scan requests should run `scan_advisor.py`
   first and present its recommendation before starting a long audit.
 - Agents may add run-local checks for unmodeled risks when they cite the trigger
@@ -92,11 +98,11 @@ unavailable in this host and continue with `subagent` mode when supported.
 Validate a run:
 
 ```bash
-python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile security
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile <selected-profile>
 ```
 
 Reduce a run:
 
 ```bash
-python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile security
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile <selected-profile>
 ```

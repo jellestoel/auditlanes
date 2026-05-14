@@ -13,27 +13,24 @@ Use this skill only when explicitly invoked by the operator.
 The default stable runnable profile is `security`. Profile metadata is bundled at
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/catalog.yaml`.
 
-v0.4.14 supports the `security` profile as the only stable runnable profile.
-Profile lane catalogs are bundled under
-`${CLAUDE_PLUGIN_ROOT}/resources/profiles/<profile>/`. If the operator asks for
-`architecture` or `production-integrity`, explain that the requested profile is
-experimental metadata only and can be shown or compatibility-checked, but should
-not be run as a production audit profile yet.
+This release supports `security` as the stable runnable profile and
+`production-integrity` as an experimental runnable profile. Profile lane
+catalogs are bundled under
+`${CLAUDE_PLUGIN_ROOT}/resources/profiles/<profile>/`. `architecture` remains
+experimental metadata only and should not be run as a production audit profile.
 
 When the operator invokes `/scan` without an explicit profile, present a
 profile choice before strategy choices:
 
 - `security` - stable runnable profile for authn/authz/data exposure/trust
   boundaries. Recommend this when no recent security run exists.
-- `production-integrity` - experimental metadata for durable state correctness,
+- `production-integrity` - experimental runnable profile for durable state correctness,
   workflow atomicity, generated-output reconciliation, lifecycle recovery,
-  cutover controls, and assurance evidence. Recommend this only as a metadata
-  preview until the sidecar schema and reducer are generalized.
+  cutover controls, and assurance evidence. Recommend this after security when
+  the operator is deciding whether an app is ready to launch.
 - `architecture` - experimental metadata only.
 
-After the profile is selected, present strategy choices from that profile. For
-now, only `security` may start a real scan without an explicit experimental
-compatibility request.
+After the profile is selected, present strategy choices from that profile.
 
 ## Invocation Arguments
 
@@ -62,7 +59,7 @@ Defaults:
 - output root: `${TARGET_ROOT}/auditlanes/out`
 
 If the operator asks to validate a run, run or point to
-`${CLAUDE_PLUGIN_ROOT}/scripts/validate_run.py <run-dir> --profile security`.
+`${CLAUDE_PLUGIN_ROOT}/scripts/validate_run.py <run-dir> --profile <selected-profile>`.
 Do not load schema files into context unless debugging a validation failure.
 
 If the operator invokes the scan without explicit strategy parameters, run or
@@ -73,11 +70,11 @@ closed checklist; agents may add run-local checks for unmodeled risks with
 evidence and scope notes.
 
 If the operator asks to reduce a run or produce reducer state, run or point to
-`${CLAUDE_PLUGIN_ROOT}/scripts/reduce_run.py <run-dir> --profile security`. It
-assigns stable IDs, dedupes candidates, writes reducer state atomically, and
+`${CLAUDE_PLUGIN_ROOT}/scripts/reduce_run.py <run-dir> --profile <selected-profile>`.
+It assigns stable IDs, dedupes candidates, writes reducer state atomically, and
 records reducer events.
 
-Security-profile protocol files are bundled under
+Profile protocol files are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/`:
 
 1. `${CLAUDE_PLUGIN_ROOT}/resources/core/profile-loading.md`
@@ -130,7 +127,7 @@ existing runs, creating `RUN_DIR`, or writing run metadata, activate a native
 Claude Code agent team. Do not simulate this in the lead session. A lead-session
 todo list, sequential lane labels, or subagent tasks do not satisfy this gate.
 
-The lead should create one teammate per batch-01 family lane:
+The lead should create one teammate per batch-01 family lane. For `security`:
 
 - `session-auth`
 - `object-auth`
@@ -138,6 +135,15 @@ The lead should create one teammate per batch-01 family lane:
 - `data-surfaces`
 - `integration-trust`
 - `platform-posture`
+
+For `production-integrity`:
+
+- `state-model-integrity`
+- `workflow-atomicity`
+- `derived-output-reconciliation`
+- `lifecycle-recovery`
+- `runtime-cutover-controls`
+- `assurance-evidence`
 
 Use the team shared task list and direct teammate messaging. Each teammate owns
 one family report and may message other teammates when findings, chains, or

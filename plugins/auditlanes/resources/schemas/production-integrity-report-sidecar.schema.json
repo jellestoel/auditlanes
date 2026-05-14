@@ -1,0 +1,565 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/production-integrity-report-sidecar.schema.json",
+  "title": "AuditLanes production-integrity report sidecar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "sidecar_id",
+    "generated_at",
+    "run_id",
+    "batch_id",
+    "family",
+    "mode",
+    "profile",
+    "strategy",
+    "overlays",
+    "baseline_commit",
+    "reviewed_artifacts",
+    "reviewed_files_routes_helpers",
+    "coverage_units_touched",
+    "confirmed_findings",
+    "candidate_findings",
+    "rejected_claims",
+    "clone_maps",
+    "runtime_updates",
+    "chain_candidates",
+    "coverage_gaps",
+    "profile_feedback",
+    "incidental_leads",
+    "risk_signals",
+    "proof_updates",
+    "regression_recommendations",
+    "workflow_updates",
+    "invariant_updates",
+    "side_effect_updates",
+    "lifecycle_recovery_updates",
+    "assurance_evidence_updates",
+    "next_batch_recommendations"
+  ],
+  "properties": {
+    "schema_version": { "const": 4 },
+    "sidecar_id": { "type": "string", "minLength": 1 },
+    "generated_at": { "type": "string", "minLength": 1, "format": "date-time" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "batch_id": { "type": "string", "pattern": "^batch-[0-9][0-9]$" },
+    "family": { "$ref": "#/$defs/family" },
+    "mode": { "$ref": "#/$defs/mode" },
+    "profile": { "const": "production-integrity" },
+    "strategy": { "$ref": "#/$defs/strategyId" },
+    "overlays": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/overlayId" }
+    },
+    "profile_version": { "type": ["string", "null"] },
+    "baseline_commit": { "type": ["string", "null"] },
+    "reviewed_artifacts": { "$ref": "#/$defs/stringList" },
+    "reviewed_files_routes_helpers": { "$ref": "#/$defs/stringList" },
+    "shared_context_inputs": { "$ref": "#/$defs/stringList" },
+    "coverage_units_touched": { "$ref": "#/$defs/stringList" },
+    "coverage_units_not_touched": { "$ref": "#/$defs/stringList" },
+    "patterns_searched": { "$ref": "#/$defs/stringList" },
+    "intentionally_excluded": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentionallyExcluded" }
+    },
+    "confirmed_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/confirmedFinding" }
+    },
+    "candidate_findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/candidateFinding" }
+    },
+    "rejected_claims": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/rejectedClaim" }
+    },
+    "clone_maps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/cloneMap" }
+    },
+    "runtime_updates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runtimeUpdate" }
+    },
+    "chain_candidates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/chainCandidate" }
+    },
+    "coverage_gaps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/coverageGap" }
+    },
+    "profile_feedback": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/profileFeedback" }
+    },
+    "incidental_leads": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/incidentalLead" }
+    },
+    "risk_signals": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/riskSignal" }
+    },
+    "proof_updates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/proofUpdate" }
+    },
+    "regression_recommendations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/regressionRecommendation" }
+    },
+    "run_local_checks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/runLocalCheck" }
+    },
+    "workflow_updates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "invariant_updates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "side_effect_updates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "lifecycle_recovery_updates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "assurance_evidence_updates": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "next_batch_recommendations": { "$ref": "#/$defs/stringList" }
+  },
+  "$defs": {
+    "family": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "ownerFamily": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "strategyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "overlayId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "mode": {
+      "enum": [
+        "readiness-sweep",
+        "invariant-gap-fill",
+        "control-clonehunt",
+        "scenario-probe",
+        "runtime-safe",
+        "post-fix-resweep",
+        "launch-gate-synthesis",
+        "failure-scenario-synthesis",
+        "parked"
+      ]
+    },
+    "severity": {
+      "enum": ["critical", "high", "medium", "low", "info"]
+    },
+    "confidence": {
+      "enum": ["certain", "probable", "speculative"]
+    },
+    "confirmedConfidence": {
+      "enum": ["certain", "probable"]
+    },
+    "confirmedStatus": {
+      "enum": ["confirmed-static", "runtime-confirmed", "reswept-open", "reswept-closed"]
+    },
+    "runtimeStatus": {
+      "enum": [
+        "confirmed-at-runtime",
+        "not-reproduced",
+        "blocked-by-ingress-or-environment",
+        "unsafe-to-validate-without-separate-approval"
+      ]
+    },
+    "launchGateEffect": {
+      "enum": ["none", "go-with-controls", "module-gated", "no-go", "external-security-gate"]
+    },
+    "detectability": {
+      "enum": [
+        "automatically-detected",
+        "dashboard-or-log-visible",
+        "manual-reconciliation-required",
+        "customer-or-finance-reported",
+        "silent",
+        "unknown"
+      ]
+    },
+    "recoverability": {
+      "enum": [
+        "self-healing",
+        "operator-visible-retryable",
+        "manual-repair-required",
+        "restore-required",
+        "unrecoverable",
+        "unknown"
+      ]
+    },
+    "proofLevel": {
+      "enum": [
+        "P0-lead",
+        "P1-candidate",
+        "P2-static-confirmed",
+        "P3-reachability-confirmed",
+        "P4-runtime-confirmed",
+        "P5-regression-backed"
+      ]
+    },
+    "evidenceType": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "line_start", "evidence_type", "rationale"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "line_start": { "type": ["integer", "null"], "minimum": 1 },
+        "line_end": { "type": ["integer", "null"], "minimum": 1 },
+        "symbol": { "type": ["string", "null"] },
+        "evidence_type": { "$ref": "#/$defs/evidenceType" },
+        "snippet_hash": { "type": ["string", "null"] },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "intentionallyExcluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string" },
+        "reason": { "type": "string" },
+        "scope_source": { "type": ["string", "null"] }
+      }
+    },
+    "findingDedupeKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner_family",
+        "control_objective",
+        "failure_mode",
+        "missing_control",
+        "affected_authoritative_state_or_commitment",
+        "impact_boundary"
+      ],
+      "properties": {
+        "owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "control_objective": { "type": "string", "minLength": 1 },
+        "failure_mode": { "type": "string", "minLength": 1 },
+        "missing_control": { "type": "string", "minLength": 1 },
+        "affected_authoritative_state_or_commitment": { "type": "string", "minLength": 1 },
+        "impact_boundary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "confirmedFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provisional_finding_id",
+        "dedupe_key",
+        "owner_family",
+        "workflow_id",
+        "invariant_id",
+        "control_objective",
+        "trigger_condition",
+        "failure_mode",
+        "missing_control",
+        "affected_authoritative_state",
+        "affected_side_effects",
+        "impact_boundary",
+        "detectability",
+        "recoverability",
+        "launch_gate_effect",
+        "status",
+        "severity",
+        "confidence",
+        "summary",
+        "files",
+        "entrypoints",
+        "evidence_refs",
+        "existing_controls_checked",
+        "severity_rationale",
+        "why_confirmed",
+        "introduced_after_batch_01"
+      ],
+      "properties": {
+        "provisional_finding_id": { "type": "string", "minLength": 1 },
+        "dedupe_key": { "$ref": "#/$defs/findingDedupeKey" },
+        "finding_id": { "type": ["string", "null"] },
+        "root_cause_id": { "type": ["string", "null"] },
+        "owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "workflow_id": { "type": ["string", "null"] },
+        "invariant_id": { "type": ["string", "null"] },
+        "control_objective": { "type": "string", "minLength": 1 },
+        "trigger_condition": { "type": "string", "minLength": 1 },
+        "failure_mode": { "type": "string", "minLength": 1 },
+        "missing_control": { "type": "string", "minLength": 1 },
+        "affected_authoritative_state": { "type": "string", "minLength": 1 },
+        "affected_side_effects": { "type": "array", "items": { "type": "string" } },
+        "impact_boundary": { "type": "string", "minLength": 1 },
+        "detectability": { "$ref": "#/$defs/detectability" },
+        "recoverability": { "$ref": "#/$defs/recoverability" },
+        "launch_gate_effect": { "$ref": "#/$defs/launchGateEffect" },
+        "status": { "$ref": "#/$defs/confirmedStatus" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "$ref": "#/$defs/confirmedConfidence" },
+        "summary": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": ["string", "null"] },
+        "entrypoints": { "$ref": "#/$defs/stringList" },
+        "files": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "report_refs": { "$ref": "#/$defs/stringList" },
+        "lead_source_refs": { "$ref": "#/$defs/stringList" },
+        "existing_controls_checked": { "$ref": "#/$defs/stringList" },
+        "recommended_regression": { "type": ["string", "null"] },
+        "severity_rationale": { "type": "string", "minLength": 1 },
+        "clone_of": { "type": ["string", "null"] },
+        "related_findings": { "$ref": "#/$defs/stringList" },
+        "why_confirmed": { "type": "string", "minLength": 1 },
+        "introduced_after_batch_01": { "type": "boolean" }
+      }
+    },
+    "candidateDedupeKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposed_owner_family", "summary", "files", "suspected_missing_control", "impact_boundary"],
+      "properties": {
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "summary": { "type": "string", "minLength": 1 },
+        "files": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "suspected_missing_control": { "type": ["string", "null"] },
+        "impact_boundary": { "type": ["string", "null"] }
+      }
+    },
+    "candidateFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "candidate_dedupe_key",
+        "proposed_owner_family",
+        "severity",
+        "confidence",
+        "summary",
+        "blocker_to_confirmation",
+        "files",
+        "evidence_refs"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "minLength": 1 },
+        "candidate_dedupe_key": { "$ref": "#/$defs/candidateDedupeKey" },
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "workflow_id": { "type": ["string", "null"] },
+        "invariant_id": { "type": ["string", "null"] },
+        "control_objective": { "type": ["string", "null"] },
+        "trigger_condition": { "type": ["string", "null"] },
+        "failure_mode": { "type": ["string", "null"] },
+        "suspected_missing_control": { "type": ["string", "null"] },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "summary": { "type": "string", "minLength": 1 },
+        "entrypoint": { "type": ["string", "null"] },
+        "entrypoints": { "$ref": "#/$defs/stringList" },
+        "impact_boundary": { "type": ["string", "null"] },
+        "detectability": { "$ref": "#/$defs/detectability" },
+        "recoverability": { "$ref": "#/$defs/recoverability" },
+        "launch_gate_effect": { "$ref": "#/$defs/launchGateEffect" },
+        "blocker_to_confirmation": { "type": "string", "minLength": 1 },
+        "files": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "report_refs": { "$ref": "#/$defs/stringList" },
+        "lead_source_refs": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "rejectedClaim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "reason"],
+      "properties": {
+        "claim_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "subsumed_by": { "type": ["string", "null"] }
+      }
+    },
+    "runtimeUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "runtime_status", "request_posture", "result"],
+      "properties": {
+        "finding_id": { "type": "string" },
+        "runtime_status": { "$ref": "#/$defs/runtimeStatus" },
+        "request_posture": { "type": "string" },
+        "result": { "type": "string" },
+        "evidence_refs": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } }
+      }
+    },
+    "cloneMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonical_exemplar", "repeated_pattern", "widespread_pattern", "estimated_clone_count", "clone_locations"],
+      "properties": {
+        "canonical_exemplar": { "type": "string" },
+        "repeated_pattern": { "type": "string" },
+        "widespread_pattern": { "type": "boolean" },
+        "estimated_clone_count": { "type": ["integer", "null"] },
+        "clone_locations": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" } },
+        "severity_shift": { "type": ["string", "null"] }
+      }
+    },
+    "chainCandidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["chain_candidate_id", "component_findings", "why_chain_matters"],
+      "properties": {
+        "chain_candidate_id": { "type": "string" },
+        "component_findings": { "$ref": "#/$defs/stringList" },
+        "why_chain_matters": { "type": "string" },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "coverageGap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["coverage_unit_id", "reason"],
+      "properties": {
+        "coverage_unit_id": { "type": "string" },
+        "reason": { "type": "string" },
+        "suggested_next_mode": { "type": ["string", "null"] }
+      }
+    },
+    "profileFeedback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile_gap_id", "family", "observed_issue", "suggested_change", "evidence_refs", "urgency"],
+      "properties": {
+        "profile_gap_id": { "type": "string" },
+        "family": { "$ref": "#/$defs/ownerFamily" },
+        "affected_families": { "$ref": "#/$defs/stringList" },
+        "observed_issue": { "type": "string" },
+        "suggested_change": { "type": "string" },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "urgency": { "enum": ["high", "medium", "low"] }
+      }
+    },
+    "incidentalLead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lead_id",
+        "noticed_by_family",
+        "proposed_owner_family",
+        "summary",
+        "confidence",
+        "severity_hint",
+        "blocker_to_confirmation",
+        "files",
+        "evidence_refs"
+      ],
+      "properties": {
+        "lead_id": { "type": "string", "minLength": 1 },
+        "noticed_by_family": { "$ref": "#/$defs/family" },
+        "proposed_owner_family": { "$ref": "#/$defs/ownerFamily" },
+        "summary": { "type": "string", "minLength": 1 },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "severity_hint": { "$ref": "#/$defs/severity" },
+        "why_noticed": { "type": "string" },
+        "blocker_to_confirmation": { "type": "string", "minLength": 1 },
+        "files": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidenceRef" } }
+      }
+    },
+    "riskSignal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "category", "path", "description", "recommended_owner", "status"],
+      "properties": {
+        "signal_id": { "type": "string", "minLength": 1 },
+        "category": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "line_start": { "type": ["integer", "null"], "minimum": 1 },
+        "description": { "type": "string", "minLength": 1 },
+        "recommended_owner": { "$ref": "#/$defs/ownerFamily" },
+        "status": { "enum": ["needs-triage", "promoted", "rejected"] }
+      }
+    },
+    "proofUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject_id", "proof_level", "evidence_summary", "evidence_refs"],
+      "properties": {
+        "subject_id": { "type": "string", "minLength": 1 },
+        "proof_level": { "$ref": "#/$defs/proofLevel" },
+        "evidence_summary": { "type": "string", "minLength": 1 },
+        "runtime_validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "approved": { "type": "boolean" },
+            "reason": { "type": "string" }
+          }
+        },
+        "regression_status": { "type": ["string", "null"] },
+        "evidence_refs": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidenceRef" } }
+      }
+    },
+    "regressionRecommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finding_id", "recommended_regression", "test_name", "guard_asserted", "automation_status"],
+      "properties": {
+        "finding_id": { "type": "string", "minLength": 1 },
+        "recommended_regression": {
+          "enum": [
+            "unit test",
+            "integration test",
+            "scenario test",
+            "e2e or smoke test",
+            "runtime check",
+            "manual compensating control",
+            "documented not-feasible reason"
+          ]
+        },
+        "test_name": { "type": "string", "minLength": 1 },
+        "guard_asserted": { "type": "string", "minLength": 1 },
+        "automation_status": { "enum": ["proposed", "implemented", "not-feasible"] },
+        "owner_hint": { "type": ["string", "null"] }
+      }
+    },
+    "runLocalCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "reason", "trigger_evidence_refs", "scope_impact"],
+      "properties": {
+        "check_id": { "type": "string", "pattern": "^local\\.[a-z0-9][a-z0-9.-]*$" },
+        "reason": { "type": "string", "minLength": 1 },
+        "trigger_evidence_refs": { "type": "array", "items": { "$ref": "#/$defs/evidenceRef" }, "minItems": 1 },
+        "extends_checks": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "recommended_owner_family": { "$ref": "#/$defs/family" },
+        "scope_impact": { "type": "string", "minLength": 1 },
+        "regression_impact": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

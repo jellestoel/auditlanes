@@ -38,26 +38,28 @@ structured, reviewable, and repeatable.
 
 ## Current State
 
-AuditLanes v0.4.14 is a protocol-first beta. The `security` profile is the only
-stable runnable profile.
+AuditLanes v0.4.15 is a protocol-first beta. The `security` profile is stable
+runnable. The `production-integrity` profile is experimental runnable.
 
 What works today:
 
 - Claude Code and Codex marketplace plugin manifests
 - `/auditlanes:scan` for Claude Code and `@auditlanes` for Codex
 - static `scan_advisor.py` relevance preview
-- six security lanes, strategies, overlays, and cross-lane triggers
-- executable validation for report sidecars, manifests, and core state files
+- security and production-integrity lane catalogs, strategies, overlays, and
+  cross-lane triggers
+- executable validation for profile-specific report sidecars, manifests, and
+  core state files
 - deterministic reducer state for findings, candidates, rejected claims,
-  incidental leads, proof updates, security smells, run-local checks, and
-  regression recommendations
+  incidental leads, proof updates, security smells, production risk signals,
+  run-local checks, and regression recommendations
 - stable finding IDs and basic dedupe across lane outputs
 - generated run output under `auditlanes/out/`
 
 Still intentionally beta:
 
 - no packaged `auditlanes` CLI yet
-- non-security profiles are metadata only
+- production-integrity is runnable but experimental; architecture is metadata only
 - final report generation is still agent-led
 - reducer coverage ledgers and some full protocol semantics are still evolving
 
@@ -148,8 +150,8 @@ Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
 audit or invoke the plugin explicitly with `@auditlanes`.
 
 For a deliberately pinned install, use `/plugin marketplace add
-jellestoel/auditlanes@v0.4.14` in Claude Code or `codex plugin marketplace add
-jellestoel/auditlanes --ref v0.4.14` in Codex.
+jellestoel/auditlanes@v0.4.15` in Claude Code or `codex plugin marketplace add
+jellestoel/auditlanes --ref v0.4.15` in Codex.
 
 ## What It Optimizes For
 
@@ -171,9 +173,8 @@ jellestoel/auditlanes --ref v0.4.14` in Codex.
 - `platform-posture`
 
 These lanes are loaded from the bundled `security` profile catalog. The
-`architecture` profile currently exists only as experimental metadata; it is not
-a production audit mode until profile-specific report contracts and reducer
-semantics exist.
+`production-integrity` profile is also runnable but experimental; `architecture`
+currently exists only as experimental metadata.
 
 ## Project Layout
 
@@ -196,6 +197,7 @@ plugins/auditlanes/
     core/profile-loading.md         # core/profile split and lane resolution rules
     profiles/catalog.yaml           # bundled and planned audit profiles
     profiles/security/              # stable security lanes, strategies, and overlays
+    profiles/production-integrity/  # experimental launch integrity profile
     profiles/architecture/          # experimental metadata-only lane catalog
     schemas/                        # executable JSON Schema files for sidecars, manifests, and state rows
     fixtures/                       # compact valid/invalid validation fixtures
@@ -252,25 +254,26 @@ python3 "$AUDITLANES_PLUGIN_ROOT/scripts/reduce_run.py" auditlanes/out/runs/<run
 python3 "$AUDITLANES_PLUGIN_ROOT/scripts/scan_advisor.py" .
 ```
 
-The validator and reducer accept `--profile security`. The advisor emits a
-security relevance preview with agent discretion enabled so suggested checks
-frame the review without bounding it. Sidecars also declare a selected strategy
-and overlays. Audit runs normally request `strategy: auto`, then calibration
-writes `state/relevance-plan.yaml` with the resolved strategy and overlay set.
-Experimental profiles are rejected by default.
-`--allow-experimental` is only for profile-loading/catalog compatibility checks;
-it does not make metadata-only profiles runnable sidecar audit modes.
+The validator and reducer accept `--profile security` and
+`--profile production-integrity`. The advisor emits a security relevance
+preview with agent discretion enabled so suggested checks frame the review
+without bounding it. Sidecars also declare a selected strategy and overlays.
+Audit runs normally request `strategy: auto`, then calibration writes
+`state/relevance-plan.yaml` with the resolved strategy and overlay set.
+Metadata-only profiles are rejected by default. `--allow-experimental` is only
+for profile-loading/catalog compatibility checks; it does not make
+metadata-only profiles runnable sidecar audit modes.
 
-The v0.4.14 reducer imports confirmed findings, candidate findings, rejected
+The v0.4.15 reducer imports confirmed findings, candidate findings, rejected
 claims, profile feedback, chain candidates, incidental leads, security smells,
-proof updates, `run_local_checks`, and regression recommendations. Run-local
-checks let agents preserve repo-specific security questions outside the bundled
-packs. It preserves existing state when reducing a selected batch. It emits
-basic `family-directives.yaml` guidance from incidental leads, run-local checks,
-and cross-lane triggers. It rewrites provisional finding/candidate references
-to reducer stable IDs where possible and keeps the strongest proof level per
-subject. It does not yet update coverage ledgers, clone maps, final reports, or
-calibrated scope.
+production risk signals, proof updates, `run_local_checks`, and regression
+recommendations. Run-local checks let agents preserve repo-specific questions
+outside the bundled packs. It preserves existing state when reducing a selected
+batch. It emits basic `family-directives.yaml` guidance from incidental leads,
+run-local checks, and cross-lane triggers. It rewrites provisional
+finding/candidate references to reducer stable IDs where possible and keeps the
+strongest proof level per subject. It does not yet update coverage ledgers,
+clone maps, final reports, or calibrated scope.
 
 ## Contract Coverage
 
@@ -494,10 +497,11 @@ AuditLanes Core
 
 ## Profiles
 
-AuditLanes v0.4.14 separates core workflow mechanics from profile lane catalogs:
+AuditLanes v0.4.15 separates core workflow mechanics from profile lane catalogs:
 
 - core: orchestration, output layout, validation scripts, reducer mechanics
-- stable profile: `security`
+- stable runnable profile: `security`
+- experimental runnable profile: `production-integrity`
 - experimental metadata profile: `architecture`
 
 The validator derives allowed lane IDs from
@@ -511,9 +515,10 @@ federation, admin backoffices, realtime messaging, monorepos, microservices,
 AI-agent apps, mobile backends, APIs, SaaS tenancy, data-heavy apps, platforms,
 libraries, web apps, checkout, payments, integrations, and Python.
 
-The architecture profile is metadata-only. Its lane catalog can be loaded for
-compatibility checks, but its specialist mode is not part of the executable
-security sidecar schema yet.
+The production-integrity profile uses a profile-specific v4 report sidecar
+schema with generic control fields. The architecture profile is metadata-only:
+its lane catalog can be loaded for compatibility checks, but it is not a
+runnable audit mode.
 
 ## Intended Outcome
 

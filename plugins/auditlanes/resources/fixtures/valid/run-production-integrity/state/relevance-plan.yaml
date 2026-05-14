@@ -1,0 +1,39 @@
+schema_version: 1
+profile: production-integrity
+requested_strategy: production-gate
+resolved_strategy: production-gate
+resolved_overlays:
+  - money-documents-workflows
+coverage_mode: risk-ranked
+resolution_reason: "Fixture production-integrity run."
+runtime_validation: false
+output_style: structured
+repo_observations:
+  languages:
+    - typescript
+  approximate_loc: 1200
+  detected_frameworks:
+    - nextjs
+  detected_surfaces:
+    - database
+    - export
+  inferred_archetypes:
+    - invoicing
+selected_checks:
+  - id: integrity.invoice-idempotency
+    status: required
+    reason: "Invoice generation commits durable state and generated outputs."
+    evidence:
+      - src/invoices.ts
+    agent_discretion: true
+deprioritized_checks: []
+universal_checks_enabled: true
+agent_discretion_enabled: true
+uncertainty: []
+coverage_gaps: []
+advisor:
+  target_root: /tmp/example
+  git_detected: true
+  prior_auditlanes_runs_detected: false
+  config_files:
+    - package.json
