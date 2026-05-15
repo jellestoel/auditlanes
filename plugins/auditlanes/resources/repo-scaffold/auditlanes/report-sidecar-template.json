@@ -1,0 +1,79 @@
+{
+  "schema_version": 3,
+  "sidecar_id": "sidecar-batch-01-session-auth-template",
+  "generated_at": "1970-01-01T00:00:00Z",
+  "run_id": "RUN_ID",
+  "batch_id": "batch-01",
+  "family": "session-auth",
+  "mode": "canonical-sweep",
+  "profile": "security",
+  "profile_version": "0.4.17",
+  "strategy": "invariant-audit",
+  "overlays": [
+    "authn-session"
+  ],
+  "baseline_commit": null,
+  "reviewed_artifacts": [],
+  "reviewed_files_routes_helpers": [],
+  "shared_context_inputs": [],
+  "coverage_units_touched": [],
+  "coverage_units_not_touched": [],
+  "patterns_searched": [],
+  "intentionally_excluded": [],
+  "confirmed_findings": [
+    {
+      "provisional_finding_id": "PF-session-auth-template-001",
+      "dedupe_key": {
+        "owner_family": "session-auth",
+        "security_invariant": "State-changing session-authenticated requests require CSRF protection.",
+        "missing_guard": "CSRF enforcement",
+        "entrypoint": "app.views.example",
+        "impact_boundary": "cross-site state mutation"
+      },
+      "owner_family": "session-auth",
+      "status": "confirmed-static",
+      "severity": "high",
+      "confidence": "probable",
+      "summary": "Replace this with one concrete finding sentence.",
+      "entrypoint": "app.views.example",
+      "security_invariant": "State-changing session-authenticated requests require CSRF protection.",
+      "missing_guard": "CSRF enforcement",
+      "attacker_precondition": "Victim has an authenticated browser session.",
+      "impact_boundary": "cross-site state mutation",
+      "files": [
+        "app/views.py"
+      ],
+      "evidence_refs": [
+        {
+          "path": "app/views.py",
+          "line_start": 1,
+          "line_end": null,
+          "symbol": "example",
+          "evidence_type": "entrypoint",
+          "snippet_hash": null,
+          "rationale": "Replace this with why this line proves the claim."
+        }
+      ],
+      "report_refs": [],
+      "lead_source_refs": [],
+      "severity_rationale": "Replace this with impact and likelihood reasoning.",
+      "clone_of": null,
+      "related_findings": [],
+      "why_confirmed": "Replace this with the static proof that distinguishes this from a lead.",
+      "introduced_after_batch_01": false
+    }
+  ],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "incidental_leads": [],
+  "security_smells": [],
+  "proof_updates": [],
+  "regression_recommendations": [],
+  "run_local_checks": [],
+  "next_batch_recommendations": []
+}

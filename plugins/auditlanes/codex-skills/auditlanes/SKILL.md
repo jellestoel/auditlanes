@@ -86,6 +86,11 @@ unavailable in this host and continue with `subagent` mode when supported.
 - If a subagent or host hook blocks writing required report artifacts, have the
   lane return the markdown and JSON inline; the lead persists them under the
   canonical paths.
+- Include the exact minimal sidecar shape from
+  `${AUDITLANES_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/report-sidecar-template.json`
+  in lane briefs. Validate each returned lane sidecar immediately with
+  `validate_run.py <run-dir> --sidecar reports/<batch-id>/<family>/report.json`;
+  fix schema drift before accepting the lane as complete.
 - Include relevant state JSONL schema fields from
   `${AUDITLANES_PLUGIN_ROOT}/resources/schemas/` in lane briefs before asking a
   lane to append state. Prefer lane-owned drafts or inline returns over
@@ -108,6 +113,8 @@ unavailable in this host and continue with `subagent` mode when supported.
   recovery path and treat its warnings as follow-up work, not validation.
   Lenient reduction writes `reducer/summary.json`, `reducer/lenient-warnings.json`,
   and a pre-repair snapshot at `reducer/raw-state-before-lenient/`.
+  Use `validate_run.py <run-dir> --state-only` to check reducer-canonical state
+  for a leniently recovered run without revalidating the original loose sidecars.
 - Ask active lanes for short progress pings every few minutes: current focus,
   candidate count, blocker if any, and rough ETA.
 
@@ -117,6 +124,18 @@ Validate a run:
 
 ```bash
 python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile <selected-profile>
+```
+
+Validate one lane sidecar:
+
+```bash
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --sidecar reports/<batch-id>/<family>/report.json --grouped
+```
+
+Validate reducer-canonical state after lenient recovery:
+
+```bash
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --state-only --grouped
 ```
 
 Reduce a run:
@@ -129,4 +148,10 @@ Lenient recovery reduce:
 
 ```bash
 python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --lenient
+```
+
+Lenient recovery with normalized sidecar rewrite:
+
+```bash
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --lenient --write-normalized-sidecars
 ```

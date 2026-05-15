@@ -524,15 +524,21 @@ def manifest_paths(run_dir: Path, batch_id: str | None = None) -> list[Path]:
     return sorted(paths)
 
 
-def sidecar_paths(run_dir: Path, batch_id: str | None = None) -> list[Path]:
+def sidecar_paths(run_dir: Path, batch_id: str | None = None, family: str | None = None) -> list[Path]:
+    if batch_id and family:
+        path = run_dir / "reports" / batch_id / family / "report.json"
+        return [path] if path.exists() else []
     if batch_id:
-        return sorted((run_dir / "reports" / batch_id).glob("*/report.json"))
+        pattern = f"{family}/report.json" if family else "*/report.json"
+        return sorted((run_dir / "reports" / batch_id).glob(pattern))
+    if family:
+        return sorted(run_dir.glob(f"reports/batch-*/{family}/report.json"))
     return sorted(run_dir.glob("reports/batch-*/*/report.json"))
 
 
-def collect_input_hashes(run_dir: Path, batch_id: str | None = None) -> list[dict[str, str]]:
+def collect_input_hashes(run_dir: Path, batch_id: str | None = None, family: str | None = None) -> list[dict[str, str]]:
     paths = manifest_paths(run_dir, batch_id)
-    paths.extend(sidecar_paths(run_dir, batch_id))
+    paths.extend(sidecar_paths(run_dir, batch_id, family))
     return [
         {
             "path": path.relative_to(run_dir).as_posix(),
@@ -1614,6 +1620,149 @@ def validate_relevance_plan_consistency(
     return issues
 
 
+def sidecar_schema_for_profile(
+    schemas_dir: Path,
+    selected_profile: dict[str, Any],
+    profile: str,
+) -> tuple[Path, dict[str, Any]] | tuple[None, None]:
+    schema_name = selected_profile.get("report_sidecar_schema", "report-sidecar.schema.json")
+    if not isinstance(schema_name, str) or not schema_name:
+        return None, None
+    sidecar_schema_path = schemas_dir / schema_name
+    if not sidecar_schema_path.exists():
+        return sidecar_schema_path, None
+    return sidecar_schema_path, load_json(sidecar_schema_path)
+
+
+def validate_sidecar_file(
+    run_dir: Path,
+    sidecar_path: Path,
+    schemas_dir: Path,
+    profile: str = DEFAULT_PROFILE,
+    profiles_dir: Path = DEFAULT_PROFILES_DIR,
+    allow_experimental: bool = False,
+) -> list[ValidationIssue]:
+    try:
+        selected_profile = load_profile(profile, profiles_dir)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(profiles_dir / profile, "$", f"could not load profile: {exc}")]
+
+    schema_path, sidecar_schema = sidecar_schema_for_profile(schemas_dir, selected_profile, profile)
+    if schema_path is None:
+        return [ValidationIssue(selected_profile["profile_path"], "$.report_sidecar_schema", "must be a non-empty schema filename")]
+    if sidecar_schema is None:
+        return [ValidationIssue(schema_path, "$", f"report sidecar schema for profile {profile!r} is missing")]
+
+    path = sidecar_path if sidecar_path.is_absolute() else run_dir / sidecar_path
+    path = path.resolve()
+    issues = require_plain_file_under(run_dir, path, "sidecar")
+    if issues:
+        return issues
+
+    try:
+        sidecar = load_json(path)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(path, "$", f"could not parse sidecar: {exc}")]
+
+    for message in validate_schema(sidecar, sidecar_schema):
+        issues.append(ValidationIssue(path, message.split(":", 1)[0], message.split(":", 1)[1].strip() if ":" in message else message))
+    if isinstance(sidecar, dict):
+        expected_version = package_version()
+        run_metadata, metadata_issues = load_optional_run_metadata(run_dir)
+        issues.extend(metadata_issues)
+        issues.extend(validate_sidecar_path(run_dir, path, sidecar))
+        issues.extend(validate_sidecar_profile(path, sidecar, selected_profile, run_metadata, expected_version, allow_experimental))
+    return issues
+
+
+def validate_jsonl_parseable_file(path: Path) -> list[ValidationIssue]:
+    issues: list[ValidationIssue] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    json.loads(text)
+                except json.JSONDecodeError as exc:
+                    issues.append(ValidationIssue(path, f"$[{line_number}]", f"could not parse JSONL row: {exc}"))
+    except Exception as exc:  # noqa: BLE001
+        issues.append(ValidationIssue(path, "$", f"could not read JSONL file: {exc}"))
+    return issues
+
+
+def validate_state_only(
+    run_dir: Path,
+    schemas_dir: Path,
+    profile: str = DEFAULT_PROFILE,
+    profiles_dir: Path = DEFAULT_PROFILES_DIR,
+    allow_experimental: bool = False,
+    include_relevance_plan: bool = False,
+) -> list[ValidationIssue]:
+    del allow_experimental
+    try:
+        selected_profile = load_profile(profile, profiles_dir)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(profiles_dir / profile, "$", f"could not load profile: {exc}")]
+
+    state_dir = run_dir / "state"
+    if not state_dir.exists():
+        return [ValidationIssue(state_dir, "$", "state-only validation requires reducer-owned state output")]
+    if state_dir.is_symlink():
+        return [ValidationIssue(state_dir, "$", "symlinked state directory is not allowed")]
+    if not state_dir.is_dir():
+        return [ValidationIssue(state_dir, "$", "state path exists but is not a directory")]
+
+    issues: list[ValidationIssue] = []
+    required = ("finding-inventory.jsonl", "run-events.jsonl")
+    for filename in required:
+        if not (state_dir / filename).exists():
+            issues.append(ValidationIssue(state_dir / filename, "$", "state-only validation requires this reducer-owned artifact"))
+
+    for artifact_path in sorted(state_dir.iterdir()):
+        if artifact_path.is_dir():
+            continue
+        plain_file_issues = require_plain_file_under(run_dir, artifact_path, "state artifact")
+        if plain_file_issues:
+            issues.extend(plain_file_issues)
+            continue
+        artifact_name = artifact_path.name
+        if artifact_name in {"relevance-plan.yaml", "relevance-plan.yml"} and not include_relevance_plan:
+            continue
+        if artifact_name in STATE_ARTIFACT_SCHEMAS:
+            issues.extend(validate_state_artifact(
+                run_dir,
+                schemas_dir,
+                f"state/{artifact_name}",
+                ["state-only"],
+                selected_profile,
+            ))
+        elif artifact_path.suffix == ".jsonl":
+            issues.extend(validate_jsonl_parseable_file(artifact_path))
+        elif artifact_path.suffix in {".json", ".yaml", ".yml"}:
+            try:
+                load_json_or_yaml(artifact_path)
+            except Exception as exc:  # noqa: BLE001
+                issues.append(ValidationIssue(artifact_path, "$", f"could not parse state artifact: {exc}"))
+
+    summary_path = run_dir / "reducer" / "summary.json"
+    if summary_path.exists():
+        plain_file_issues = require_plain_file_under(run_dir, summary_path, "reducer summary")
+        if plain_file_issues:
+            issues.extend(plain_file_issues)
+        else:
+            try:
+                summary = load_json(summary_path)
+            except Exception as exc:  # noqa: BLE001
+                issues.append(ValidationIssue(summary_path, "$", f"could not parse reducer summary: {exc}"))
+            else:
+                if not isinstance(summary, dict):
+                    issues.append(ValidationIssue(summary_path, "$", "reducer summary must be an object"))
+
+    return issues
+
+
 def validate_run(
     run_dir: Path,
     schemas_dir: Path,
@@ -1621,6 +1770,7 @@ def validate_run(
     profiles_dir: Path = DEFAULT_PROFILES_DIR,
     allow_experimental: bool = False,
     batch_id: str | None = None,
+    family: str | None = None,
 ) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
 
@@ -1629,13 +1779,11 @@ def validate_run(
     except Exception as exc:  # noqa: BLE001
         return [ValidationIssue(profiles_dir / profile, "$", f"could not load profile: {exc}")]
 
-    schema_name = selected_profile.get("report_sidecar_schema", "report-sidecar.schema.json")
-    if not isinstance(schema_name, str) or not schema_name:
+    sidecar_schema_path, sidecar_schema = sidecar_schema_for_profile(schemas_dir, selected_profile, profile)
+    if sidecar_schema_path is None:
         return [ValidationIssue(selected_profile["profile_path"], "$.report_sidecar_schema", "must be a non-empty schema filename")]
-    sidecar_schema_path = schemas_dir / schema_name
-    if not sidecar_schema_path.exists():
+    if sidecar_schema is None:
         return [ValidationIssue(sidecar_schema_path, "$", f"report sidecar schema for profile {profile!r} is missing")]
-    sidecar_schema = load_json(sidecar_schema_path)
     manifest_schema = load_json(schemas_dir / "batch-manifest.schema.json")
 
     if not selected_profile["implemented"] and not allow_experimental:
@@ -1645,7 +1793,7 @@ def validate_run(
     issues.extend(metadata_issues)
 
     manifests = manifest_paths(run_dir, batch_id)
-    sidecars = sidecar_paths(run_dir, batch_id)
+    sidecars = sidecar_paths(run_dir, batch_id, family)
     referenced_sidecars: dict[Path, int] = {}
     parsed_sidecars: list[tuple[Path, dict[str, Any]]] = []
 
@@ -1710,6 +1858,57 @@ def validate_run(
     return issues
 
 
+def issue_group_key(run_dir: Path, issue: ValidationIssue) -> tuple[str, str]:
+    try:
+        rel = issue.path.resolve().relative_to(run_dir.resolve()).as_posix()
+    except (OSError, RuntimeError, ValueError):
+        rel = issue.path.as_posix()
+
+    parts = rel.split("/")
+    if len(parts) >= 4 and parts[0] == "reports" and parts[1].startswith("batch-"):
+        artifact = f"{parts[1]}/{parts[2]}"
+    elif parts and parts[0] in {"state", "reducer"}:
+        artifact = "/".join(parts[:2]) if len(parts) > 1 else parts[0]
+    else:
+        artifact = rel
+
+    location = re.sub(r"\[\d+\]", "", issue.location)
+    if location.startswith("$."):
+        location = location[2:]
+    elif location == "$":
+        location = "root"
+    if location.startswith("["):
+        location = f"row{location}"
+    field_parts = [part for part in re.split(r"[.\[\]]", location) if part]
+    if len(field_parts) >= 2:
+        field = ".".join(field_parts[:2])
+    else:
+        field = field_parts[0] if field_parts else location
+    missing_match = re.search(r"missing required property '([^']+)'", issue.message)
+    if missing_match and field != "root":
+        field = f"{field}.{missing_match.group(1)}"
+    return artifact, field
+
+
+def print_issues(issues: list[ValidationIssue], run_dir: Path, grouped: bool = False, max_per_group: int = 3) -> None:
+    if not grouped:
+        for issue in issues:
+            print(issue.format(), file=sys.stderr)
+        return
+
+    groups: dict[tuple[str, str], list[ValidationIssue]] = {}
+    for issue in issues:
+        groups.setdefault(issue_group_key(run_dir, issue), []).append(issue)
+
+    for (artifact, field), grouped_issues in sorted(groups.items(), key=lambda item: (-len(item[1]), item[0][0], item[0][1])):
+        print(f"[{len(grouped_issues)}] {artifact} :: {field}", file=sys.stderr)
+        for issue in grouped_issues[:max_per_group]:
+            print(f"  - {issue.format()}", file=sys.stderr)
+        omitted = len(grouped_issues) - max_per_group
+        if omitted > 0:
+            print(f"  - ... {omitted} more", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate AuditLanes run artifacts.")
     parser.add_argument("run_dir", type=Path, help="Path to auditlanes/out/runs/<run-id>.")
@@ -1718,24 +1917,56 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profiles-dir", type=Path, default=DEFAULT_PROFILES_DIR)
     parser.add_argument("--allow-experimental", action="store_true", help="Allow metadata-only profiles for profile-loading/catalog compatibility checks.")
     parser.add_argument("--batch-id", help="Validate only one batch, for example batch-01.")
+    parser.add_argument("--family", help="Validate sidecars for one family/lane within the selected batch scope.")
+    parser.add_argument("--sidecar", type=Path, help="Validate one report.json sidecar under the run directory without requiring a batch manifest.")
+    parser.add_argument("--state-only", action="store_true", help="Validate reducer-owned state artifacts without revalidating original lane sidecars or manifests.")
+    parser.add_argument("--include-relevance-plan", action="store_true", help="With --state-only, also validate state/relevance-plan.yaml as an input planning artifact.")
+    parser.add_argument("--grouped", action="store_true", help="Group validation errors by artifact and field.")
+    parser.add_argument("--max-issues-per-group", type=int, default=3)
     parser.add_argument("--print-input-hashes", action="store_true")
     args = parser.parse_args(argv)
 
     run_dir = args.run_dir.resolve()
     if args.print_input_hashes:
-        print(json.dumps(collect_input_hashes(run_dir, args.batch_id), indent=2, sort_keys=True))
+        print(json.dumps(collect_input_hashes(run_dir, args.batch_id, args.family), indent=2, sort_keys=True))
 
-    issues = validate_run(
-        run_dir,
-        args.schemas_dir.resolve(),
-        profile=args.profile,
-        profiles_dir=args.profiles_dir.resolve(),
-        allow_experimental=args.allow_experimental,
-        batch_id=args.batch_id,
-    )
+    if args.sidecar and args.state_only:
+        print("--sidecar and --state-only are mutually exclusive", file=sys.stderr)
+        return 2
+    if args.include_relevance_plan and not args.state_only:
+        print("--include-relevance-plan requires --state-only", file=sys.stderr)
+        return 2
+
+    if args.sidecar:
+        issues = validate_sidecar_file(
+            run_dir,
+            args.sidecar,
+            args.schemas_dir.resolve(),
+            profile=args.profile,
+            profiles_dir=args.profiles_dir.resolve(),
+            allow_experimental=args.allow_experimental,
+        )
+    elif args.state_only:
+        issues = validate_state_only(
+            run_dir,
+            args.schemas_dir.resolve(),
+            profile=args.profile,
+            profiles_dir=args.profiles_dir.resolve(),
+            allow_experimental=args.allow_experimental,
+            include_relevance_plan=args.include_relevance_plan,
+        )
+    else:
+        issues = validate_run(
+            run_dir,
+            args.schemas_dir.resolve(),
+            profile=args.profile,
+            profiles_dir=args.profiles_dir.resolve(),
+            allow_experimental=args.allow_experimental,
+            batch_id=args.batch_id,
+            family=args.family,
+        )
     if issues:
-        for issue in issues:
-            print(issue.format(), file=sys.stderr)
+        print_issues(issues, run_dir, args.grouped, max(1, args.max_issues_per_group))
         return 1
 
     print(f"AuditLanes validation passed: {run_dir}")

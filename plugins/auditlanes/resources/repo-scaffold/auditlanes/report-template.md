@@ -75,6 +75,10 @@ For each finding:
 `finding_id` and `root_cause_id` may be null in family sidecars. The reducer
 owns final stable IDs.
 
+Use `report-sidecar-template.json` as the fill-in JSON sidecar shape. Validate
+the sidecar with `validate_run.py <run-dir> --sidecar reports/<batch-id>/<family>/report.json`
+before marking the lane complete.
+
 `dedupe_key` must be a verbatim mirror of these parent finding fields:
 
 - `owner_family`

@@ -10,6 +10,7 @@ from pathlib import Path
 
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN_ROOT / "scripts" / "reduce_run.py"
+VALIDATE_SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 CANDIDATE_DUPES_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-candidate-dupes"
 PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
@@ -805,6 +806,47 @@ class ReduceRunTests(unittest.TestCase):
         self.assertEqual(owners, {"platform-posture", "session-auth"})
         events = read_jsonl(run_dir / "state" / "run-events.jsonl")
         self.assertTrue(any(event["event_type"] == "lenient-reducer-warning" for event in events))
+
+    def test_lenient_reduce_can_rewrite_normalized_sidecars(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-good"
+        shutil.copytree(VALID_RUN, run_copy)
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        finding = sidecar["confirmed_findings"][0]
+        finding["id"] = finding.pop("provisional_finding_id")
+        finding["severity"] = "High"
+        finding["impact"] = finding.pop("impact_boundary")
+        finding["missing_control"] = finding.pop("missing_guard")
+        finding["evidence_refs"] = ["app/views.py:12"]
+        finding["blocker"] = "schema drift"
+        sidecar["findings"] = sidecar.pop("confirmed_findings")
+        sidecar["extra_top_level"] = "prune me"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy), "--lenient", "--write-normalized-sidecars"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        normalized = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        self.assertNotIn("extra_top_level", normalized)
+        self.assertIn("confirmed_findings", normalized)
+        self.assertEqual(normalized["confirmed_findings"][0]["severity"], "high")
+        self.assertIsInstance(normalized["confirmed_findings"][0]["evidence_refs"][0], dict)
+        snapshot = run_copy / "reducer" / "raw-sidecars-before-normalize" / "reports" / "batch-01" / "session-auth" / "report.json"
+        self.assertTrue(snapshot.exists())
+
+        validation = subprocess.run(
+            [sys.executable, str(VALIDATE_SCRIPT), str(run_copy), "--sidecar", "reports/batch-01/session-auth/report.json"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(validation.returncode, 0, validation.stderr)
 
 
 if __name__ == "__main__":

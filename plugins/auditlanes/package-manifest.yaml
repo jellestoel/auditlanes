@@ -32,6 +32,7 @@ product_shape:
     - "minimal deterministic reduce-run script"
     - "agent-authored YAML parsing and reducer-owned state repair hardening"
     - "lenient reducer recovery for missing manifests, legacy report layout, candidate YAML files, and common lane-output aliases"
+    - "single-sidecar validation, grouped validation output, state-only validation, normalized sidecar rewrite, and report-sidecar template"
     - "git-aware scan advisor file discovery"
     - "small-app exploit-synthesis batch compatibility"
     - "static-only scan advisor script"
@@ -141,7 +142,7 @@ validator_status:
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.17 ships a direct profile-aware validator script."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.17 ships a direct profile-aware validator script with single-sidecar, grouped-output, and state-only modes."
 
 advisor_status:
   current_release: "minimal-script"
@@ -166,6 +167,7 @@ reducer_status:
     - "reducer event log"
     - "same-ID status transition guard"
     - "lenient recovery mode with persisted summary, reducer warning events, and pre-repair state snapshots"
+    - "optional normalized sidecar rewrite after lenient coercion"
   note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.17 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
 
 profile_status:
@@ -193,6 +195,7 @@ managed_files:
   - "reducer.yaml"
   - "state-model.yaml"
   - "report-sidecar-schema.yaml"
+  - "report-sidecar-template.json"
   - "batch-manifest-schema.yaml"
   - "report-template.md"
   - "final-report-template.md"
@@ -393,6 +396,7 @@ plugin_files:
   - "resources/repo-scaffold/auditlanes/reducer.yaml"
   - "resources/repo-scaffold/auditlanes/state-model.yaml"
   - "resources/repo-scaffold/auditlanes/report-sidecar-schema.yaml"
+  - "resources/repo-scaffold/auditlanes/report-sidecar-template.json"
   - "resources/repo-scaffold/auditlanes/batch-manifest-schema.yaml"
   - "resources/repo-scaffold/auditlanes/report-template.md"
   - "resources/repo-scaffold/auditlanes/final-report-template.md"

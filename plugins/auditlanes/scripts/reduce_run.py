@@ -880,6 +880,79 @@ def snapshot_state_before_lenient_repair(run_dir: Path, warnings: list[str]) -> 
         )
 
 
+def resolve_local_schema_ref(schema: dict[str, Any], root_schema: dict[str, Any]) -> dict[str, Any]:
+    ref = schema.get("$ref")
+    if not isinstance(ref, str) or not ref.startswith("#/$defs/"):
+        return schema
+    name = ref.removeprefix("#/$defs/")
+    resolved = root_schema.get("$defs", {}).get(name)
+    return resolved if isinstance(resolved, dict) else schema
+
+
+def prune_value_to_schema(value: Any, schema: dict[str, Any], root_schema: dict[str, Any]) -> Any:
+    schema = resolve_local_schema_ref(schema, root_schema)
+    if isinstance(value, dict):
+        properties = schema.get("properties")
+        if not isinstance(properties, dict):
+            return value
+        source_keys = properties if schema.get("additionalProperties") is False else value
+        pruned: dict[str, Any] = {}
+        for key in source_keys:
+            if key not in value:
+                continue
+            child_schema = properties.get(key)
+            pruned[key] = prune_value_to_schema(value[key], child_schema, root_schema) if isinstance(child_schema, dict) else value[key]
+        return pruned
+    if isinstance(value, list):
+        item_schema = schema.get("items")
+        if isinstance(item_schema, dict):
+            return [prune_value_to_schema(item, item_schema, root_schema) for item in value]
+    return value
+
+
+def sidecar_schema_for_profile(selected_profile: dict[str, Any]) -> dict[str, Any]:
+    schema_name = selected_profile.get("report_sidecar_schema", "report-sidecar.schema.json")
+    if not isinstance(schema_name, str) or not schema_name:
+        schema_name = "report-sidecar.schema.json"
+    return validate_run.load_json(validate_run.DEFAULT_SCHEMAS_DIR / schema_name)
+
+
+def normalized_sidecar_for_write(sidecar: dict[str, Any], selected_profile: dict[str, Any]) -> dict[str, Any]:
+    schema = sidecar_schema_for_profile(selected_profile)
+    return prune_value_to_schema(sidecar, schema, schema)
+
+
+def snapshot_sidecar_before_normalize(run_dir: Path, report_path: Path, warnings: list[str]) -> None:
+    if not validate_run.is_plain_file_under(run_dir, report_path):
+        raise SystemExit(f"refusing to snapshot sidecar outside run dir: {report_path}")
+    reducer_dir = ensure_reducer_dir(run_dir)
+    snapshot_root = reducer_dir / "raw-sidecars-before-normalize"
+    if snapshot_root.is_symlink():
+        raise SystemExit("refusing to write through symlinked sidecar snapshot directory")
+    rel = report_path.resolve().relative_to(run_dir.resolve())
+    destination = snapshot_root / rel
+    if destination.exists():
+        return
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
+    tmp = Path(tmp_name)
+    try:
+        with report_path.open("rb") as source, os.fdopen(fd, "wb") as handle:
+            handle.write(source.read())
+        os.replace(tmp, destination)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+    warn_lenient(warnings, f"{report_path}: preserved original sidecar in reducer/raw-sidecars-before-normalize")
+
+
 def unique_sorted(items: list[Any]) -> list[Any]:
     seen: dict[str, Any] = {}
     for item in items:
@@ -2024,6 +2097,7 @@ def reduce_run(
     profiles_dir: Path = validate_run.DEFAULT_PROFILES_DIR,
     allow_experimental: bool = False,
     lenient: bool = False,
+    write_normalized_sidecars: bool = False,
 ) -> dict[str, int]:
     run_dir = run_dir.resolve()
     lenient_warnings: list[str] = []
@@ -2115,6 +2189,11 @@ def reduce_run(
             raise SystemExit(f"sidecar must be an object: {report_path}")
         if lenient:
             sidecar = coerce_sidecar_for_reduce(sidecar, report_path, manifest, item, run_dir, profile, selected_profile, lenient_warnings)
+            if lenient and write_normalized_sidecars and sidecar_override is None:
+                normalized = normalized_sidecar_for_write(sidecar, selected_profile)
+                snapshot_sidecar_before_normalize(run_dir, report_path, lenient_warnings)
+                atomic_write_json(report_path, normalized)
+                sidecar = normalized
         relative_report_path = report_path.relative_to(run_dir)
         trigger_signals.extend(sidecar_signals(sidecar))
         for finding in sidecar.get("confirmed_findings", []):
@@ -2427,7 +2506,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profiles-dir", type=Path, default=validate_run.DEFAULT_PROFILES_DIR)
     parser.add_argument("--allow-experimental", action="store_true", help="Allow metadata-only profiles for profile-loading/catalog compatibility checks.")
     parser.add_argument("--lenient", action="store_true", help="Reduce best-effort when lane outputs or state files deviate from schema; records warnings in run-events.jsonl.")
+    parser.add_argument("--write-normalized-sidecars", action="store_true", help="With --lenient, overwrite existing report.json files with reducer-normalized schema-shaped JSON after snapshotting originals under reducer/.")
     args = parser.parse_args(argv)
+    if args.write_normalized_sidecars and not args.lenient:
+        parser.error("--write-normalized-sidecars requires --lenient")
 
     summary = reduce_run(
         args.run_dir,
@@ -2436,6 +2518,7 @@ def main(argv: list[str] | None = None) -> int:
         profiles_dir=args.profiles_dir.resolve(),
         allow_experimental=args.allow_experimental,
         lenient=args.lenient,
+        write_normalized_sidecars=args.write_normalized_sidecars,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

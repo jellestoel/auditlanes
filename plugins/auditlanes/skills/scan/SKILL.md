@@ -212,7 +212,10 @@ lane worker must return the report content inline and the lead must persist it
 under the canonical path.
 
 Before spawning lane workers, the lead must include the report contract and the
-state append contract in the lane brief. The executable schemas are bundled in
+state append contract in the lane brief. Give each lane the minimal JSON shape
+from `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/report-sidecar-template.json`
+and run `validate_run.py <run-dir> --sidecar reports/<batch-id>/<family>/report.json`
+as soon as the lane returns. The executable schemas are bundled in
 `${CLAUDE_PLUGIN_ROOT}/resources/schemas/`; do not ask lane workers to append to
 `state/*.jsonl` without giving the relevant schema fields. For concurrent runs,
 prefer lane-owned drafts or inline returns over direct shared JSONL appends; the

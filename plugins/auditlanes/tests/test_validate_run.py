@@ -147,6 +147,53 @@ class ValidateRunCliTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("evidence_refs", result.stderr)
 
+    def test_state_only_ignores_invalid_sidecars_and_relevance_plan_by_default(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["confirmed_findings"][0]["severity"] = "High"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        (run_copy / "state" / "relevance-plan.yaml").write_text("profile: wrong-profile\n", encoding="utf-8")
+
+        strict = self.run_validator(run_copy)
+        self.assertNotEqual(strict.returncode, 0)
+
+        state_only = self.run_validator(run_copy, "--state-only")
+        self.assertEqual(state_only.returncode, 0, state_only.stderr)
+
+        with_plan = self.run_validator(run_copy, "--state-only", "--include-relevance-plan")
+        self.assertNotEqual(with_plan.returncode, 0)
+        self.assertIn("relevance-plan.yaml", with_plan.stderr)
+
+    def test_sidecar_option_validates_one_report_without_manifest_noise(self):
+        run_copy = self.copied_run()
+        manifest = run_copy / "reports" / "batch-01" / "manifest.yaml"
+        manifest.unlink()
+        sidecar_rel = Path("reports/batch-01/session-auth/report.json")
+        sidecar_path = run_copy / sidecar_rel
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        del sidecar["confirmed_findings"][0]["evidence_refs"]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy, "--sidecar", sidecar_rel.as_posix())
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("evidence_refs", result.stderr)
+        self.assertNotIn("no batch manifests found", result.stderr)
+
+    def test_grouped_validation_output_summarizes_by_artifact_and_field(self):
+        run_copy = self.copied_run()
+        sidecar_path = run_copy / "reports" / "batch-01" / "session-auth" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        del sidecar["confirmed_findings"][0]["evidence_refs"]
+        sidecar["confirmed_findings"][0]["severity"] = "High"
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = self.run_validator(run_copy, "--grouped")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[", result.stderr)
+        self.assertIn("batch-01/session-auth :: confirmed_findings.evidence_refs", result.stderr)
+        self.assertIn("batch-01/session-auth :: confirmed_findings.severity", result.stderr)
+
     def test_profile_lane_validation_rejects_wrong_profile(self):
         result = self.run_validator(VALID_RUN, "--profile", "architecture", "--allow-experimental")
         self.assertNotEqual(result.returncode, 0)
