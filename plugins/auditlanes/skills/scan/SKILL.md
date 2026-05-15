@@ -79,8 +79,10 @@ with `--lenient`. Lenient reduction is a recovery path: it synthesizes missing
 batch manifests from discovered `report.json` files, imports legacy
 `reports/<family>/report.json` and `candidates/<family>/*.yaml` outputs
 best-effort, coerces common aliases, and records warnings in
-`state/run-events.jsonl`. Do not treat a leniently reduced run as fully valid
-until `validate_run.py` passes.
+`state/run-events.jsonl` plus `reducer/lenient-warnings.json`. It also writes
+`reducer/summary.json` and snapshots pre-repair top-level state files under
+`reducer/raw-state-before-lenient/` before canonical rewrites. Do not treat a
+leniently reduced run as fully valid until `validate_run.py` passes.
 
 Profile protocol files are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/`:

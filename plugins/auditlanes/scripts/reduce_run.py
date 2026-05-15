@@ -787,6 +787,25 @@ def atomic_write_text(path: Path, text: str) -> None:
         raise
 
 
+def atomic_write_json(path: Path, value: Any) -> None:
+    fd, tmp = secure_state_temp(path)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, sort_keys=True, indent=2)
+            handle.write("\n")
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+        raise
+
+
 def ensure_state_dir(run_dir: Path) -> Path:
     state_dir = run_dir / "state"
     if state_dir.is_symlink():
@@ -801,6 +820,64 @@ def ensure_state_dir(run_dir: Path) -> Path:
     except (OSError, RuntimeError) as exc:
         raise SystemExit(f"could not resolve state directory: {exc}") from exc
     return state_dir
+
+
+def ensure_reducer_dir(run_dir: Path) -> Path:
+    reducer_dir = run_dir / "reducer"
+    if reducer_dir.is_symlink():
+        raise SystemExit("refusing to write through symlinked reducer directory")
+    if reducer_dir.exists() and not reducer_dir.is_dir():
+        raise SystemExit("reducer path exists but is not a directory")
+    reducer_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        reducer_dir.resolve().relative_to(run_dir.resolve())
+    except ValueError as exc:
+        raise SystemExit("reducer directory escapes run dir") from exc
+    except (OSError, RuntimeError) as exc:
+        raise SystemExit(f"could not resolve reducer directory: {exc}") from exc
+    return reducer_dir
+
+
+def snapshot_state_before_lenient_repair(run_dir: Path, warnings: list[str]) -> None:
+    state_dir = run_dir / "state"
+    if not state_dir.exists() or state_dir.is_symlink() or not state_dir.is_dir():
+        return
+    reducer_dir = ensure_reducer_dir(run_dir)
+    snapshot_dir = reducer_dir / "raw-state-before-lenient"
+    if snapshot_dir.is_symlink():
+        raise SystemExit("refusing to write through symlinked lenient state snapshot directory")
+    if snapshot_dir.exists():
+        return
+    snapshot_dir.mkdir()
+    copied = 0
+    for path in sorted(state_dir.iterdir()):
+        if path.is_symlink() or not path.is_file():
+            continue
+        if path.suffix not in {".jsonl", ".yaml", ".yml", ".md"}:
+            continue
+        destination = snapshot_dir / path.name
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=snapshot_dir)
+        tmp = Path(tmp_name)
+        try:
+            with path.open("rb") as source, os.fdopen(fd, "wb") as handle:
+                handle.write(source.read())
+            os.replace(tmp, destination)
+            copied += 1
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                tmp.unlink()
+            except FileNotFoundError:
+                pass
+            raise
+    if copied:
+        warn_lenient(
+            warnings,
+            f"preserved {copied} pre-repair state file(s) in reducer/raw-state-before-lenient",
+        )
 
 
 def unique_sorted(items: list[Any]) -> list[Any]:
@@ -1949,9 +2026,11 @@ def reduce_run(
     lenient: bool = False,
 ) -> dict[str, int]:
     run_dir = run_dir.resolve()
+    lenient_warnings: list[str] = []
+    if lenient:
+        snapshot_state_before_lenient_repair(run_dir, lenient_warnings)
     repair_reducer_owned_state(run_dir)
     selected_profile = validate_run.load_profile(profile, profiles_dir)
-    lenient_warnings: list[str] = []
     issues = validate_run.validate_run(
         run_dir,
         validate_run.DEFAULT_SCHEMAS_DIR,
@@ -2239,7 +2318,7 @@ def reduce_run(
     atomic_write_text(state_dir / "family-directives.yaml", family_directives_yaml(family_directives, processed_batches))
     atomic_write_text(state_dir / "shared-context-summary.md", shared_context_summary(merged))
 
-    return {
+    summary = {
         "records": len(merged),
         "events": len(merge_records_by_key(events, "event_id")),
         "rejected": len(rejected),
@@ -2255,6 +2334,14 @@ def reduce_run(
         "family_directives": len(family_directives),
         "lenient_warnings": len(lenient_warnings),
     }
+    reducer_dir = ensure_reducer_dir(run_dir)
+    atomic_write_json(reducer_dir / "summary.json", summary)
+    if lenient_warnings:
+        atomic_write_json(
+            reducer_dir / "lenient-warnings.json",
+            {"count": len(lenient_warnings), "warnings": lenient_warnings},
+        )
+    return summary
 
 
 def merge_records_by_key(records: list[dict[str, Any]], key: str) -> list[dict[str, Any]]:

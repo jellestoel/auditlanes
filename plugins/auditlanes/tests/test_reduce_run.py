@@ -773,6 +773,15 @@ class ReduceRunTests(unittest.TestCase):
             "severity_rationale": "Universal CSRF bypass.",
             "why_confirmed": "The code path is unconditional.",
         }), encoding="utf-8")
+        state_dir = run_dir / "state"
+        state_dir.mkdir()
+        (state_dir / "security-smells.jsonl").write_text(json.dumps({
+            "schema_version": 1,
+            "smell_id": "SMELL-RAW",
+            "source_family": "platform-posture",
+            "summary": "Raw lane-authored state before lenient repair.",
+            "extra_lane_field": "preserve me in reducer snapshot",
+        }) + "\n", encoding="utf-8")
 
         result = subprocess.run(
             [sys.executable, str(SCRIPT), str(run_dir), "--lenient"],
@@ -784,6 +793,12 @@ class ReduceRunTests(unittest.TestCase):
         summary = json.loads(result.stdout)
         self.assertEqual(summary["records"], 2)
         self.assertGreater(summary["lenient_warnings"], 0)
+        persisted_summary = json.loads((run_dir / "reducer" / "summary.json").read_text(encoding="utf-8"))
+        self.assertEqual(persisted_summary, summary)
+        snapshot = run_dir / "reducer" / "raw-state-before-lenient" / "security-smells.jsonl"
+        self.assertIn("extra_lane_field", snapshot.read_text(encoding="utf-8"))
+        warnings = json.loads((run_dir / "reducer" / "lenient-warnings.json").read_text(encoding="utf-8"))
+        self.assertEqual(warnings["count"], summary["lenient_warnings"])
 
         records = read_jsonl(run_dir / "state" / "finding-inventory.jsonl")
         owners = {record["owner_family"] for record in records}

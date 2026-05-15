@@ -102,6 +102,8 @@ sidecar_validation:
     - "Import candidates/<family>/*.yaml as lane-authored candidate or confirmed-finding inputs when no sidecar exists."
     - "Coerce common aliases such as id to candidate_id, lane to family, title to summary, noticed_by_family/source_family, and missing_control to missing_guard where safe."
     - "Record lenient reducer warnings in state/run-events.jsonl."
+    - "Persist reducer/summary.json and reducer/lenient-warnings.json so recovery output does not depend on terminal scrollback."
+    - "Before repairing or rewriting top-level state files, preserve a raw snapshot in reducer/raw-state-before-lenient/."
     - "Require a later strict validate_run.py pass before the run is considered complete."
   invalid_sidecar_behavior:
     - "Do not import confirmed findings from invalid sidecars."
@@ -268,6 +270,7 @@ required_outputs:
   - "${RUN_DIR}/state/profile-adjustments.yaml"
   - "${RUN_DIR}/state/shared-context-summary.md"
   - "${RUN_DIR}/state/run-events.jsonl"
+  - "${RUN_DIR}/reducer/summary.json"
 
 finalization_rules:
   pre_fix_report:

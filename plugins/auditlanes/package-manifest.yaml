@@ -165,8 +165,8 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-    - "lenient recovery mode with reducer warning events"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.17 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs."
+    - "lenient recovery mode with persisted summary, reducer warning events, and pre-repair state snapshots"
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.17 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
 
 profile_status:
   implemented:

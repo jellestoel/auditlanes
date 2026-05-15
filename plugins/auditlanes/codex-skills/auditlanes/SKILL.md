@@ -106,6 +106,8 @@ unavailable in this host and continue with `subagent` mode when supported.
   treating a run as complete. If strict reduction fails because agent-authored
   artifacts drifted from the schema, use `reduce_run.py --lenient` as a
   recovery path and treat its warnings as follow-up work, not validation.
+  Lenient reduction writes `reducer/summary.json`, `reducer/lenient-warnings.json`,
+  and a pre-repair snapshot at `reducer/raw-state-before-lenient/`.
 - Ask active lanes for short progress pings every few minutes: current focus,
   candidate count, blocker if any, and rough ETA.
 
