@@ -115,6 +115,11 @@ unavailable in this host and continue with `subagent` mode when supported.
   and a pre-repair snapshot at `reducer/raw-state-before-lenient/`.
   Use `validate_run.py <run-dir> --state-only` to check reducer-canonical state
   for a leniently recovered run without revalidating the original loose sidecars.
+- Do not report an AuditLanes security scan as complete after batch-01 or after
+  lenient recovery alone. A complete pre-fix security run must pass
+  `validate_run.py <run-dir> --profile security --complete`, which requires
+  batches 01-04, reducer passes for each batch, exploit synthesis, and final
+  pre-fix artifacts.
 - Ask active lanes for short progress pings every few minutes: current focus,
   candidate count, blocker if any, and rough ETA.
 
@@ -136,6 +141,12 @@ Validate reducer-canonical state after lenient recovery:
 
 ```bash
 python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --state-only --grouped
+```
+
+Validate completion before operator handoff:
+
+```bash
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/validate_run.py auditlanes/out/runs/<run-id> --profile security --complete --grouped
 ```
 
 Reduce a run:

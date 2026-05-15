@@ -83,6 +83,10 @@ best-effort, coerces common aliases, and records warnings in
 `reducer/summary.json` and snapshots pre-repair top-level state files under
 `reducer/raw-state-before-lenient/` before canonical rewrites. Do not treat a
 leniently reduced run as fully valid until `validate_run.py` passes.
+Do not call a security scan complete until
+`${CLAUDE_PLUGIN_ROOT}/scripts/validate_run.py <run-dir> --profile security --complete`
+passes; batch-01 findings or lenient recovery are interim state, not the final
+operator handoff.
 
 Profile protocol files are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/`:

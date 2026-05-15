@@ -47,10 +47,140 @@ class ValidateRunCliTests(unittest.TestCase):
         shutil.copytree(PRODUCTION_INTEGRITY_RUN, run_copy)
         return run_copy
 
+    def make_complete_security_run(self) -> Path:
+        run_copy = self.copied_run()
+        lanes = [
+            "session-auth",
+            "object-auth",
+            "role-matrix",
+            "data-surfaces",
+            "integration-trust",
+            "platform-posture",
+        ]
+        for batch_id, mode in (("batch-02", "canonical-gap-fill"), ("batch-03", "clonehunt")):
+            batch_dir = run_copy / "reports" / batch_id
+            batch_dir.mkdir()
+            manifest_lines = [
+                "schema_version: 1",
+                f"run_id: {run_copy.name}",
+                f"batch_id: {batch_id}",
+                'generated_at: "2026-05-11T00:00:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+            ]
+            manifest_lines.extend(f"  - {family}" for family in lanes)
+            manifest_lines.append("families:")
+            for family in lanes:
+                family_dir = batch_dir / family
+                family_dir.mkdir()
+                source_json = run_copy / "reports" / "batch-01" / family / "report.json"
+                source_md = run_copy / "reports" / "batch-01" / family / "report.md"
+                sidecar = json.loads(source_json.read_text(encoding="utf-8"))
+                sidecar["sidecar_id"] = f"{sidecar['sidecar_id']}-{batch_id}"
+                sidecar["batch_id"] = batch_id
+                sidecar["mode"] = mode
+                (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+                (family_dir / "report.md").write_text(source_md.read_text(encoding="utf-8"), encoding="utf-8")
+                manifest_lines.extend([
+                    f"  - family: {family}",
+                    "    status: ran",
+                    f"    mode: {mode}",
+                    f'    markdown: "${{RUN_DIR}}/reports/{batch_id}/{family}/report.md"',
+                    f'    json: "${{RUN_DIR}}/reports/{batch_id}/{family}/report.json"',
+                ])
+            (batch_dir / "manifest.yaml").write_text("\n".join(manifest_lines) + "\n", encoding="utf-8")
+
+        batch_04 = run_copy / "reports" / "batch-04"
+        family_dir = batch_04 / "exploit-synthesis"
+        family_dir.mkdir(parents=True)
+        sidecar = json.loads((run_copy / "reports" / "batch-01" / "object-auth" / "report.json").read_text(encoding="utf-8"))
+        sidecar.update({
+            "sidecar_id": "sidecar-exploit-synthesis-complete",
+            "batch_id": "batch-04",
+            "family": "exploit-synthesis",
+            "mode": "exploit-synthesis",
+            "reviewed_artifacts": [],
+            "reviewed_files_routes_helpers": [],
+            "coverage_units_touched": [],
+            "next_batch_recommendations": [],
+        })
+        (family_dir / "report.json").write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+        (family_dir / "report.md").write_text("# Exploit Synthesis\n\nNo additional chains in fixture.\n", encoding="utf-8")
+        (batch_04 / "manifest.yaml").write_text(
+            "\n".join([
+                "schema_version: 1",
+                f"run_id: {run_copy.name}",
+                "batch_id: batch-04",
+                'generated_at: "2026-05-11T00:00:00Z"',
+                "producer: orchestrator",
+                "manifest_status: completed",
+                "expected_families:",
+                "  - exploit-synthesis",
+                "families:",
+                "  - family: exploit-synthesis",
+                "    status: ran",
+                "    mode: exploit-synthesis",
+                '    markdown: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.md"',
+                '    json: "${RUN_DIR}/reports/batch-04/exploit-synthesis/report.json"',
+                "",
+            ]),
+            encoding="utf-8",
+        )
+
+        (run_copy / "final").mkdir()
+        (run_copy / "final" / "pre-fix-findings.md").write_text("# Pre-Fix Findings\n\nFixture findings.\n", encoding="utf-8")
+        (run_copy / "final" / "pre-fix-summary.md").write_text("# Pre-Fix Summary\n\nFixture summary.\n", encoding="utf-8")
+        events = [
+            {
+                "schema_version": 1,
+                "event_id": f"EV-reducer-run-{batch_id}-fixture",
+                "event_type": "reducer-run",
+                "batch_id": batch_id,
+                "family": None,
+                "severity": "info",
+                "message": f"Reduced {batch_id}.",
+                "input_hashes": [],
+                "occurred_at": "deterministic",
+            }
+            for batch_id in ("batch-01", "batch-02", "batch-03", "batch-04")
+        ]
+        (run_copy / "state" / "run-events.jsonl").write_text(
+            "".join(json.dumps(event, sort_keys=True) + "\n" for event in events),
+            encoding="utf-8",
+        )
+        return run_copy
+
     def test_valid_fixture_passes(self):
         result = self.run_validator(VALID_RUN)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("validation passed", result.stdout)
+
+    def test_complete_requires_full_security_protocol(self):
+        result = self.run_validator(VALID_RUN, "--complete")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("requires batch-02 manifest", result.stderr)
+        self.assertIn("pre-fix-findings.md", result.stderr)
+
+    def test_complete_passes_for_full_security_protocol_fixture(self):
+        run_copy = self.make_complete_security_run()
+        result = self.run_validator(run_copy, "--complete")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_complete_rejects_missing_reducer_pass(self):
+        run_copy = self.make_complete_security_run()
+        events_path = run_copy / "state" / "run-events.jsonl"
+        events = [
+            json.loads(line)
+            for line in events_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        events = [event for event in events if event["batch_id"] != "batch-03"]
+        events_path.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+
+        result = self.run_validator(run_copy, "--complete")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("reducer-run event for batch-03", result.stderr)
 
     def test_production_optional_batch_02_accepts_ran_families(self):
         run_copy = self.copied_production_run()

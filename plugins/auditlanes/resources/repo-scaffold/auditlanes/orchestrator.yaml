@@ -208,6 +208,8 @@ global_requirements:
   - "Concurrent lane workers should not directly append to the same shared state JSONL file unless the host provides an atomic append helper; use lane-owned drafts or inline returns for reducer import."
   - "Active lanes should send short progress pings every few minutes with focus, candidate count, blockers, and ETA."
   - "Do not self-assign or reassign a task already marked completed in the shared task list."
+  - "Do not report a security scan as complete after batch-01, after a single reducer pass, or after lenient recovery alone."
+  - "A complete pre-fix security scan requires batch-01 canonical sweep, batch-02 adaptive follow-up, batch-03 adaptive clone/gap follow-up, batch-04 exploit synthesis, reducer passes for batches 01-04, final/pre-fix-findings.md, final/pre-fix-summary.md, and a passing validate_run.py --complete check."
 
 modes:
   canonical-sweep:
@@ -467,6 +469,19 @@ phases:
       - "${RUN_DIR}/final/pre-fix-findings.md"
       - "${RUN_DIR}/final/pre-fix-summary.md"
       - "${RUN_DIR}/state/shared-context-summary.md"
+
+  - id: pre-fix-completion-gate
+    type: serial
+    driver: "validate_run.py --complete"
+    goal: "Prove the pre-fix security audit completed all required batches, reducer passes, exploit synthesis, and final handoff artifacts before reporting completion."
+    requires:
+      - "${RUN_DIR}/reports/batch-01/manifest.yaml"
+      - "${RUN_DIR}/reports/batch-02/manifest.yaml"
+      - "${RUN_DIR}/reports/batch-03/manifest.yaml"
+      - "${RUN_DIR}/reports/batch-04/manifest.yaml"
+      - "${RUN_DIR}/state/run-events.jsonl"
+      - "${RUN_DIR}/final/pre-fix-findings.md"
+      - "${RUN_DIR}/final/pre-fix-summary.md"
 
   - id: batch-05-post-fix
     type: concurrent-family-batch

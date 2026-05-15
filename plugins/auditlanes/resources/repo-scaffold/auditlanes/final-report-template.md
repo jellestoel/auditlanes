@@ -6,6 +6,11 @@ Use this template for `${RUN_DIR}/final/pre-fix-findings.md`,
 The reducer-owned inventories are the source of truth. Do not introduce final
 report findings that are absent from `${RUN_DIR}/state/finding-inventory.jsonl`.
 
+Generate these artifacts only after reducer-04, then run
+`validate_run.py ${RUN_DIR} --profile security --complete`. If the completion
+gate fails, treat the report as a draft and continue the missing batch,
+reducer, or finalization work.
+
 ## Methodology
 
 Describe the AuditLanes profile, calibration sources, lane batches, reducer

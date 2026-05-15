@@ -278,6 +278,9 @@ finalization_rules:
     outputs:
       - "${RUN_DIR}/final/pre-fix-findings.md"
       - "${RUN_DIR}/final/pre-fix-summary.md"
+    completion_gate:
+      - "Run validate_run.py ${RUN_DIR} --profile security --complete before reporting the pre-fix audit as complete."
+      - "If the gate fails, the run is still in-progress even when finding-inventory.jsonl contains useful findings."
   post_fix_addendum:
     when: "after reducer-05"
     outputs:

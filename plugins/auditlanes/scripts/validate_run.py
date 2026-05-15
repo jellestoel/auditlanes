@@ -60,6 +60,32 @@ STATE_EVIDENCE_ARTIFACTS = {
     "risk-signals.jsonl",
     "security-invariants.jsonl",
 }
+SECURITY_COMPLETE_BATCHES = {
+    "batch-01": {
+        "families": "lanes",
+        "ran_modes": {"canonical-sweep"},
+        "allow_parked": False,
+    },
+    "batch-02": {
+        "families": "lanes",
+        "ran_modes": {"canonical-gap-fill", "clonehunt", "runtime-safe"},
+        "allow_parked": True,
+    },
+    "batch-03": {
+        "families": "lanes",
+        "ran_modes": {"canonical-gap-fill", "clonehunt", "runtime-safe"},
+        "allow_parked": True,
+    },
+    "batch-04": {
+        "families": "specialists",
+        "ran_modes": {"exploit-synthesis"},
+        "allow_parked": False,
+    },
+}
+SECURITY_PRE_FIX_FINAL_ARTIFACTS = (
+    "final/pre-fix-findings.md",
+    "final/pre-fix-summary.md",
+)
 
 
 class ValidationIssue:
@@ -1763,6 +1789,153 @@ def validate_state_only(
     return issues
 
 
+def complete_batch_manifest_path(run_dir: Path, batch_id: str) -> Path:
+    for name in MANIFEST_FILENAMES:
+        path = run_dir / "reports" / batch_id / name
+        if path.exists():
+            return path
+    return run_dir / "reports" / batch_id / "manifest.yaml"
+
+
+def reducer_run_batches(run_dir: Path) -> set[str]:
+    batches: set[str] = set()
+    path = run_dir / "state" / "run-events.jsonl"
+    for _, row in parsed_jsonl_rows(path):
+        if not isinstance(row, dict) or row.get("event_type") != "reducer-run":
+            continue
+        batch_id = row.get("batch_id")
+        if isinstance(batch_id, str) and batch_id:
+            batches.add(batch_id)
+    return batches
+
+
+def validate_completed_batch(
+    run_dir: Path,
+    selected_profile: dict[str, Any],
+    batch_id: str,
+    requirement: dict[str, Any],
+) -> list[ValidationIssue]:
+    manifest_path = complete_batch_manifest_path(run_dir, batch_id)
+    if not manifest_path.exists():
+        return [ValidationIssue(manifest_path, "$", f"complete security run requires {batch_id} manifest")]
+
+    issues = require_plain_file_under(run_dir, manifest_path, "manifest")
+    if issues:
+        return issues
+    try:
+        manifest = load_json_or_yaml(manifest_path)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(manifest_path, "$", f"could not parse manifest: {exc}")]
+    if not isinstance(manifest, dict):
+        return [ValidationIssue(manifest_path, "$", "manifest must be an object")]
+
+    if manifest.get("manifest_status") != "completed":
+        issues.append(ValidationIssue(manifest_path, "$.manifest_status", "complete security run requires completed manifests for required batches"))
+
+    expected_source = requirement.get("families")
+    if expected_source == "lanes":
+        expected_families = set(selected_profile["lane_order"])
+    elif expected_source == "specialists":
+        expected_families = set(selected_profile["specialists"])
+    else:
+        expected_families = set()
+
+    actual_items = manifest.get("families", [])
+    if not isinstance(actual_items, list):
+        actual_items = []
+    actual_families = {
+        item.get("family")
+        for item in actual_items
+        if isinstance(item, dict) and isinstance(item.get("family"), str)
+    }
+    if actual_families != expected_families:
+        issues.append(ValidationIssue(
+            manifest_path,
+            "$.families",
+            f"complete security run requires {batch_id} families {sorted(expected_families)!r}",
+        ))
+
+    ran_modes = requirement.get("ran_modes", set())
+    allow_parked = bool(requirement.get("allow_parked"))
+    for index, item in enumerate(actual_items):
+        if not isinstance(item, dict):
+            continue
+        family = item.get("family")
+        if family not in expected_families:
+            continue
+        status = item.get("status")
+        mode = item.get("mode")
+        if status == "ran":
+            if mode not in ran_modes:
+                issues.append(ValidationIssue(
+                    manifest_path,
+                    f"$.families[{index}].mode",
+                    f"complete security run requires {batch_id} ran families to use one of {sorted(ran_modes)!r}",
+                ))
+        elif status == "parked" and allow_parked:
+            if mode != "parked" or not item.get("carried_forward_from"):
+                issues.append(ValidationIssue(
+                    manifest_path,
+                    f"$.families[{index}]",
+                    f"complete security run requires parked {batch_id} families to use mode=parked and carried_forward_from",
+                ))
+        else:
+            issues.append(ValidationIssue(
+                manifest_path,
+                f"$.families[{index}].status",
+                f"complete security run does not allow status {status!r} in {batch_id}",
+            ))
+    return issues
+
+
+def validate_final_markdown_artifact(run_dir: Path, relative_path: str) -> list[ValidationIssue]:
+    path = run_dir / relative_path
+    if not path.exists():
+        return [ValidationIssue(path, "$", "complete security run requires final pre-fix report artifact")]
+    issues = require_plain_file_under(run_dir, path, "final report")
+    if issues:
+        return issues
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(path, "$", f"could not read final report artifact: {exc}")]
+    if not text.strip():
+        return [ValidationIssue(path, "$", "final report artifact must not be empty")]
+    return []
+
+
+def validate_completion(
+    run_dir: Path,
+    profile: str = DEFAULT_PROFILE,
+    profiles_dir: Path = DEFAULT_PROFILES_DIR,
+) -> list[ValidationIssue]:
+    try:
+        selected_profile = load_profile(profile, profiles_dir)
+    except Exception as exc:  # noqa: BLE001
+        return [ValidationIssue(profiles_dir / profile, "$", f"could not load profile: {exc}")]
+
+    if selected_profile["id"] != "security":
+        return [ValidationIssue(selected_profile["profile_path"], "$.id", "completion gate is currently defined for the security profile")]
+
+    issues: list[ValidationIssue] = []
+    for batch_id, requirement in SECURITY_COMPLETE_BATCHES.items():
+        issues.extend(validate_completed_batch(run_dir, selected_profile, batch_id, requirement))
+
+    reducer_batches = reducer_run_batches(run_dir)
+    for batch_id in SECURITY_COMPLETE_BATCHES:
+        if batch_id not in reducer_batches:
+            issues.append(ValidationIssue(
+                run_dir / "state" / "run-events.jsonl",
+                "$",
+                f"complete security run requires a reducer-run event for {batch_id}",
+            ))
+
+    for relative_path in SECURITY_PRE_FIX_FINAL_ARTIFACTS:
+        issues.extend(validate_final_markdown_artifact(run_dir, relative_path))
+
+    return issues
+
+
 def validate_run(
     run_dir: Path,
     schemas_dir: Path,
@@ -1920,6 +2093,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--family", help="Validate sidecars for one family/lane within the selected batch scope.")
     parser.add_argument("--sidecar", type=Path, help="Validate one report.json sidecar under the run directory without requiring a batch manifest.")
     parser.add_argument("--state-only", action="store_true", help="Validate reducer-owned state artifacts without revalidating original lane sidecars or manifests.")
+    parser.add_argument("--complete", action="store_true", help="Require the full security AuditLanes protocol through batch-04, reducer passes, and pre-fix final artifacts.")
     parser.add_argument("--include-relevance-plan", action="store_true", help="With --state-only, also validate state/relevance-plan.yaml as an input planning artifact.")
     parser.add_argument("--grouped", action="store_true", help="Group validation errors by artifact and field.")
     parser.add_argument("--max-issues-per-group", type=int, default=3)
@@ -1932,6 +2106,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.sidecar and args.state_only:
         print("--sidecar and --state-only are mutually exclusive", file=sys.stderr)
+        return 2
+    if args.complete and (args.sidecar or args.state_only or args.batch_id or args.family):
+        print("--complete validates a whole run and cannot be combined with --sidecar, --state-only, --batch-id, or --family", file=sys.stderr)
         return 2
     if args.include_relevance_plan and not args.state_only:
         print("--include-relevance-plan requires --state-only", file=sys.stderr)
@@ -1965,6 +2142,12 @@ def main(argv: list[str] | None = None) -> int:
             batch_id=args.batch_id,
             family=args.family,
         )
+        if args.complete:
+            issues.extend(validate_completion(
+                run_dir,
+                profile=args.profile,
+                profiles_dir=args.profiles_dir.resolve(),
+            ))
     if issues:
         print_issues(issues, run_dir, args.grouped, max(1, args.max_issues_per_group))
         return 1

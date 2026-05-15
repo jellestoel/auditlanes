@@ -1,4 +1,4 @@
-version: 0.4.17
+version: 0.4.18
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -33,6 +33,7 @@ product_shape:
     - "agent-authored YAML parsing and reducer-owned state repair hardening"
     - "lenient reducer recovery for missing manifests, legacy report layout, candidate YAML files, and common lane-output aliases"
     - "single-sidecar validation, grouped validation output, state-only validation, normalized sidecar rewrite, and report-sidecar template"
+    - "pre-fix security completion gate requiring batches 01-04, reducer passes, exploit synthesis, and final artifacts"
     - "git-aware scan advisor file discovery"
     - "small-app exploit-synthesis batch compatibility"
     - "static-only scan advisor script"
@@ -142,7 +143,7 @@ validator_status:
     - "resources/schemas/run-local-check.schema.json"
     - "resources/schemas/relevance-plan.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.17 ships a direct profile-aware validator script with single-sidecar, grouped-output, and state-only modes."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.18 ships a direct profile-aware validator script with single-sidecar, grouped-output, state-only, and security completion-gate modes."
 
 advisor_status:
   current_release: "minimal-script"
@@ -168,7 +169,7 @@ reducer_status:
     - "same-ID status transition guard"
     - "lenient recovery mode with persisted summary, reducer warning events, and pre-repair state snapshots"
     - "optional normalized sidecar rewrite after lenient coercion"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.17 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.18 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
 
 profile_status:
   implemented:

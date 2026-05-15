@@ -51,7 +51,7 @@ Default flow:
 4. Run the first family batch.
 5. Run the reducer after every batch.
 
-For v0.4.17, `security` is the stable runnable profile and
+For v0.4.18, `security` is the stable runnable profile and
 `production-integrity` is an experimental runnable profile. The default
 requested strategy is `auto` and the default overlay is `auto`. Calibration
 must write `state/relevance-plan.yaml` with the resolved strategy, overlays,
