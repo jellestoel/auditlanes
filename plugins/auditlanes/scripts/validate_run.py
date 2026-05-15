@@ -110,7 +110,8 @@ def parse_simple_yaml(text: str) -> Any:
 
     lines: list[tuple[int, str]] = []
     for raw in text.splitlines():
-        if not raw.strip() or raw.lstrip().startswith("#"):
+        stripped = raw.strip()
+        if not stripped or stripped in {"---", "..."} or raw.lstrip().startswith("#"):
             continue
         indent = len(raw) - len(raw.lstrip(" "))
         lines.append((indent, raw.strip()))

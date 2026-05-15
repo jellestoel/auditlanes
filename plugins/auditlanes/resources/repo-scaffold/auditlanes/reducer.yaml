@@ -40,6 +40,7 @@ rules:
   - "Incidental leads are preserved even when the reporting family cannot confirm them."
   - "A lane is an ownership mechanism, not a visibility boundary."
   - "Cross-lane trigger matches create follow-up directives; the reducer still owns final finding ownership."
+  - "Strict validation is the default. If strict validation would reduce the run to zero because of agent-authored schema drift, use lenient recovery mode and record every repair as a warning."
   - "Do not import confirmed findings from invalid sidecars."
   - "Import narrative-only claims as candidates at most."
   - "When markdown and JSON disagree, trust JSON for state and record the mismatch in run-events.jsonl."
@@ -94,6 +95,14 @@ batch_manifest_contract:
         carried_forward_from: batch-01
 
 sidecar_validation:
+  lenient_recovery_behavior:
+    - "Accepted only as a recovery path, never as proof the run is valid."
+    - "Synthesize a batch manifest from discovered report.json files when reports/<batch-id>/manifest.yaml is missing."
+    - "Accept legacy reports/<family>/report.json as batch-01 input and warn."
+    - "Import candidates/<family>/*.yaml as lane-authored candidate or confirmed-finding inputs when no sidecar exists."
+    - "Coerce common aliases such as id to candidate_id, lane to family, title to summary, noticed_by_family/source_family, and missing_control to missing_guard where safe."
+    - "Record lenient reducer warnings in state/run-events.jsonl."
+    - "Require a later strict validate_run.py pass before the run is considered complete."
   invalid_sidecar_behavior:
     - "Do not import confirmed findings from invalid sidecars."
     - "Import narrative-only claims as candidates at most."

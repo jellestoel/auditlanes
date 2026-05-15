@@ -24,8 +24,13 @@ The family run must emit:
 - `${RUN_DIR}/reports/${BATCH_ID}/${FAMILY}/report.md` using this template
 - `${RUN_DIR}/reports/${BATCH_ID}/${FAMILY}/report.json` using `${PROTOCOL_ROOT}/report-sidecar-schema.yaml`
 
-`report.md` is a required family audit artifact, not an ad-hoc summary file.
-Rules that prohibit optional summary files must not block this required output.
+`report.json` is the reducer input and source of truth. `report.md` is the
+required narrative companion, not an ad-hoc summary file. Rules that prohibit
+optional summary files must not block either required output. If the host blocks
+artifact writes, return both artifacts inline so the lead can persist them.
+
+Do not write to `reports/${FAMILY}/report.*`; that is a legacy layout accepted
+only by lenient recovery tooling.
 
 ## Scope
 

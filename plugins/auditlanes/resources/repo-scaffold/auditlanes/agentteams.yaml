@@ -5,7 +5,10 @@ shared_report_contract:
   template: "${PROTOCOL_ROOT}/report-template.md"
   requirements:
     - "Each non-parked run must emit report.md and report.json."
+    - "Use reports/${BATCH_ID}/${FAMILY}/report.md and reports/${BATCH_ID}/${FAMILY}/report.json."
     - "report.md is a required family audit artifact, not an optional summary file."
+    - "report.json is the reducer input and source of truth; report.md is the narrative companion."
+    - "If host policy blocks artifact writes, return markdown and JSON inline so the lead can persist them."
     - "Each finding must declare owner_family, provisional_finding_id, dedupe_key, status, severity, confidence, and evidence_refs."
     - "confirmed finding dedupe_key values must mirror the parent finding owner_family, security_invariant, missing_guard, entrypoint, and impact_boundary fields exactly."
     - "candidate_dedupe_key values must mirror the parent candidate proposed_owner_family, summary, files, suspected_missing_guard, and impact_boundary fields exactly."

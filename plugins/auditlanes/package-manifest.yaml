@@ -31,6 +31,7 @@ product_shape:
     - "minimal validate-run script"
     - "minimal deterministic reduce-run script"
     - "agent-authored YAML parsing and reducer-owned state repair hardening"
+    - "lenient reducer recovery for missing manifests, legacy report layout, candidate YAML files, and common lane-output aliases"
     - "git-aware scan advisor file discovery"
     - "small-app exploit-synthesis batch compatibility"
     - "static-only scan advisor script"
@@ -164,7 +165,8 @@ reducer_status:
     - "incidental lead, security smell, proof ledger, run-local check, and regression plan imports"
     - "reducer event log"
     - "same-ID status transition guard"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.16 reduces valid sidecars into deterministic state files and emits basic follow-up directives."
+    - "lenient recovery mode with reducer warning events"
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.16 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs."
 
 profile_status:
   implemented:
@@ -450,7 +452,7 @@ known_limitations:
   - "strategy:auto and small-app-invariant-audit are protocol contracts; a packaged CLI/orchestrator that performs automatic relevance scoring is still planned."
   - "scan_advisor.py performs minimal static relevance scoring; an interactive numbered-choice wizard is still planned."
   - "YAML contract files remain agent/reducer guidance; executable JSON Schema currently covers profile-specific report sidecars and batch manifests; validate_run.py adds profile-specific semantic checks."
-  - "The reducer implementation imports confirmed findings, candidates, rejected claims, profile feedback, chain candidates, incidental leads, security smells, production risk signals, proof updates, run-local checks, and regression recommendations. It emits basic next-batch directives from incidental leads, run-local checks, and cross-lane triggers, but does not yet process coverage, runtime updates, clone maps, final reports, or scope mutation."
+  - "The reducer implementation imports confirmed findings, candidates, rejected claims, profile feedback, chain candidates, incidental leads, security smells, production risk signals, proof updates, run-local checks, and regression recommendations. It emits basic next-batch directives from incidental leads, run-local checks, and cross-lane triggers, and has a lenient recovery mode for schema-drifted agent outputs. It does not yet process coverage, final reports, or scope mutation."
   - "A packaged auditlanes CLI command is not included in this repository snapshot."
   - "production-integrity is runnable but still experimental; its profile contract should be treated as less stable than security."
 

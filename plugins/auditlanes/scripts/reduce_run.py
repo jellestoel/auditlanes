@@ -35,6 +35,48 @@ PROOF_LEVEL_RANK = {
     "P5-regression-backed": 5,
 }
 PROVISIONAL_ID_PREFIXES = ("PF-", "CAND-")
+LENIENT_DEFAULT_GENERATED_AT = "1970-01-01T00:00:00Z"
+LENIENT_WARNING_LIMIT = 200
+TOP_LEVEL_ARRAY_FIELDS = (
+    "reviewed_artifacts",
+    "reviewed_files_routes_helpers",
+    "shared_context_inputs",
+    "coverage_units_touched",
+    "coverage_units_not_touched",
+    "patterns_searched",
+    "intentionally_excluded",
+    "confirmed_findings",
+    "candidate_findings",
+    "rejected_claims",
+    "clone_maps",
+    "runtime_updates",
+    "chain_candidates",
+    "coverage_gaps",
+    "profile_feedback",
+    "incidental_leads",
+    "security_smells",
+    "risk_signals",
+    "proof_updates",
+    "regression_recommendations",
+    "run_local_checks",
+    "next_batch_recommendations",
+)
+TOP_LEVEL_COLLECTION_ALIASES = {
+    "findings": "confirmed_findings",
+    "confirmed": "confirmed_findings",
+    "candidates": "candidate_findings",
+    "leads": "incidental_leads",
+    "incidental": "incidental_leads",
+    "smells": "security_smells",
+    "risks": "risk_signals",
+    "proof": "proof_updates",
+    "regressions": "regression_recommendations",
+    "local_checks": "run_local_checks",
+}
+CONFIRMED_STATUSES = {"confirmed-static", "runtime-confirmed", "reswept-open", "reswept-closed"}
+SEVERITIES = {"critical", "high", "medium", "low", "info"}
+CONFIDENCES = {"certain", "probable", "speculative"}
+PROOF_LEVELS = set(PROOF_LEVEL_RANK.keys())
 STATUS_TRANSITIONS = {
     "lead": {"candidate", "confirmed-static", "rejected"},
     "candidate": {"confirmed-static", "blocked", "rejected", "duplicate"},
@@ -87,6 +129,497 @@ def normalize_value(value: Any) -> Any:
 def stable_hash(parts: list[Any], length: int = 12) -> str:
     material = json.dumps([normalize_value(part) for part in parts], separators=(",", ":"), sort_keys=True)
     return sha256(material.encode("utf-8")).hexdigest()[:length]
+
+
+def warn_lenient(warnings: list[str], message: str) -> None:
+    if len(warnings) < LENIENT_WARNING_LIMIT:
+        warnings.append(message)
+    elif len(warnings) == LENIENT_WARNING_LIMIT:
+        warnings.append("additional lenient reducer warnings suppressed")
+
+
+def as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
+
+
+def string_list(value: Any) -> list[str]:
+    values: list[str] = []
+    for item in as_list(value):
+        if isinstance(item, str):
+            text = normalize_text(item)
+        elif item is None:
+            continue
+        else:
+            text = normalize_text(item)
+        if text:
+            values.append(text)
+    return unique_sorted(values)
+
+
+def coerce_string(value: Any, default: str) -> str:
+    text = normalize_text(value)
+    return text if text else default
+
+
+def coerce_nullable_string(value: Any) -> str | None:
+    text = normalize_text(value)
+    return text if text else None
+
+
+def coerce_int(value: Any, default: int) -> int:
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return default
+    return default
+
+
+def coerce_enum(value: Any, allowed: set[str], default: str) -> str:
+    raw = normalize_text(value)
+    if raw in allowed:
+        return raw
+    normalized = raw.lower().replace("_", "-")
+    if normalized in allowed:
+        return normalized
+    for item in allowed:
+        if item.lower().replace("_", "-") == normalized:
+            return item
+    return default
+
+
+def path_line_from_string(value: str) -> tuple[str, int | None]:
+    text = value.strip()
+    match = re.match(r"^(?P<path>.+?):(?P<line>[0-9]+)(?::[0-9]+)?$", text)
+    if not match:
+        return validate_run.repo_path_without_line_suffix(text), None
+    return match.group("path"), int(match.group("line"))
+
+
+def evidence_ref_from_string(value: str, rationale: str) -> dict[str, Any] | None:
+    path, line_start = path_line_from_string(value)
+    if not path:
+        return None
+    return {
+        "path": path,
+        "line_start": line_start,
+        "line_end": None,
+        "symbol": None,
+        "evidence_type": "other",
+        "snippet_hash": None,
+        "rationale": rationale,
+    }
+
+
+def coerce_evidence_refs(item: dict[str, Any], fallback_files: list[str], rationale: str) -> list[dict[str, Any]]:
+    raw_refs = item.get("evidence_refs")
+    if raw_refs is None:
+        raw_refs = item.get("evidence") or item.get("refs") or item.get("trigger_evidence_refs")
+    refs: list[dict[str, Any]] = []
+    for ref in as_list(raw_refs):
+        if isinstance(ref, str):
+            if fallback_files and not re.search(r"(^|/)[^/\s]+\.[A-Za-z0-9]{1,12}(:[0-9]+)?$", ref.strip()):
+                refs.append({
+                    "path": fallback_files[0],
+                    "line_start": None,
+                    "line_end": None,
+                    "symbol": None,
+                    "evidence_type": "other",
+                    "snippet_hash": None,
+                    "rationale": ref.strip() or rationale,
+                })
+            else:
+                coerced = evidence_ref_from_string(ref, rationale)
+                if coerced:
+                    refs.append(coerced)
+            continue
+        if not isinstance(ref, dict):
+            continue
+        path = coerce_string(ref.get("path") or ref.get("file") or (fallback_files[0] if fallback_files else ""), "")
+        if not path:
+            continue
+        line_start = ref.get("line_start", ref.get("line"))
+        if line_start is not None:
+            line_start = coerce_int(line_start, 0) or None
+        line_end = ref.get("line_end")
+        if line_end is not None:
+            line_end = coerce_int(line_end, 0) or None
+        refs.append({
+            "path": validate_run.repo_path_without_line_suffix(path),
+            "line_start": line_start,
+            "line_end": line_end,
+            "symbol": coerce_nullable_string(ref.get("symbol")),
+            "evidence_type": coerce_enum(ref.get("evidence_type"), {
+                "entrypoint",
+                "missing-authn-check",
+                "missing-authz-check",
+                "insufficient-role-check",
+                "missing-ownership-check",
+                "unsafe-data-sink",
+                "integration-trust-boundary",
+                "platform-config",
+                "dependency-or-supply-chain",
+                "runtime-observation",
+                "route-definition",
+                "framework-convention",
+                "repository-structure",
+                "dependency-manifest",
+                "ci-workflow",
+                "secret-pattern-redacted",
+                "config-default",
+                "middleware-registration",
+                "policy-registration",
+                "other",
+            }, "other"),
+            "snippet_hash": coerce_nullable_string(ref.get("snippet_hash")),
+            "rationale": coerce_string(ref.get("rationale") or ref.get("reason"), rationale),
+        })
+    if not refs and fallback_files:
+        refs.append({
+            "path": fallback_files[0],
+            "line_start": None,
+            "line_end": None,
+            "symbol": None,
+            "evidence_type": "other",
+            "snippet_hash": None,
+            "rationale": rationale,
+        })
+    return refs
+
+
+def files_from_item(item: dict[str, Any], sidecar: dict[str, Any] | None = None) -> list[str]:
+    files = string_list(item.get("files"))
+    for field in ("file", "path"):
+        value = item.get(field)
+        if isinstance(value, str) and value:
+            files.append(validate_run.repo_path_without_line_suffix(value))
+    refs = item.get("evidence_refs") or item.get("evidence") or item.get("refs") or []
+    for ref in as_list(refs):
+        if isinstance(ref, str):
+            path, _ = path_line_from_string(ref)
+            if path:
+                files.append(path)
+        elif isinstance(ref, dict) and isinstance(ref.get("path"), str):
+            files.append(validate_run.repo_path_without_line_suffix(ref["path"]))
+    if not files and sidecar is not None:
+        files = string_list(sidecar.get("reviewed_artifacts") or sidecar.get("reviewed_files_routes_helpers"))
+    return unique_sorted(files)
+
+
+def infer_batch_family_from_report_path(run_dir: Path, report_path: Path) -> tuple[str | None, str | None]:
+    try:
+        parts = report_path.resolve().relative_to(run_dir.resolve()).parts
+    except ValueError:
+        return None, None
+    if len(parts) == 4 and parts[0] == "reports":
+        return parts[1], parts[2]
+    if len(parts) == 3 and parts[0] == "reports":
+        return "batch-01", parts[1]
+    if len(parts) >= 3 and parts[0] == "candidates":
+        return "batch-01", parts[1]
+    return None, None
+
+
+def relevance_plan_defaults(run_dir: Path) -> tuple[str | None, list[str]]:
+    plan_path = run_dir / "state" / "relevance-plan.yaml"
+    if not plan_path.exists() or plan_path.is_symlink():
+        return None, []
+    try:
+        plan = validate_run.load_json_or_yaml(plan_path)
+    except Exception:  # noqa: BLE001
+        return None, []
+    if not isinstance(plan, dict):
+        return None, []
+    strategy = plan.get("resolved_strategy") if isinstance(plan.get("resolved_strategy"), str) else None
+    overlays = string_list(plan.get("resolved_overlays"))
+    return strategy, overlays
+
+
+def default_mode_for_batch(batch_id: str | None, family: str | None, selected_profile: dict[str, Any]) -> str:
+    if family in selected_profile.get("specialist_modes", {}):
+        return selected_profile["specialist_modes"][family]
+    if batch_id == "batch-01":
+        return "canonical-sweep"
+    return "canonical-gap-fill"
+
+
+def coerce_top_level_sidecar(
+    sidecar: dict[str, Any],
+    report_path: Path,
+    manifest: dict[str, Any] | None,
+    item: dict[str, Any] | None,
+    run_dir: Path,
+    profile: str,
+    selected_profile: dict[str, Any],
+    warnings: list[str],
+) -> dict[str, Any]:
+    coerced = dict(sidecar)
+    path_batch, path_family = infer_batch_family_from_report_path(run_dir, report_path)
+    plan_strategy, plan_overlays = relevance_plan_defaults(run_dir)
+    batch_id = coerce_string(coerced.get("batch_id") or (manifest or {}).get("batch_id") or path_batch, "batch-01")
+    family = coerce_string(coerced.get("family") or (item or {}).get("family") or path_family, selected_profile["lane_order"][0])
+    mode = coerce_string(coerced.get("mode") or (item or {}).get("mode"), default_mode_for_batch(batch_id, family, selected_profile))
+
+    if coerced.get("schema_version") != 3:
+        warn_lenient(warnings, f"{report_path}: inferred sidecar schema_version=3")
+    coerced["schema_version"] = 3
+    coerced["run_id"] = coerce_string(coerced.get("run_id") or (manifest or {}).get("run_id"), run_dir.name)
+    coerced["batch_id"] = batch_id
+    coerced["family"] = family
+    coerced["mode"] = mode
+    coerced["profile"] = coerce_string(coerced.get("profile"), profile)
+    coerced["strategy"] = coerce_string(coerced.get("strategy") or plan_strategy, "invariant-audit" if profile == "security" else "production-gate")
+    overlays = string_list(coerced.get("overlays")) or plan_overlays or ["auto"]
+    coerced["overlays"] = overlays
+    coerced["sidecar_id"] = coerce_string(coerced.get("sidecar_id") or coerced.get("id"), f"sidecar-{batch_id}-{family}-{stable_hash([report_path.as_posix()])}")
+    generated_at = coerced.get("generated_at") or (manifest or {}).get("generated_at")
+    coerced["generated_at"] = generated_at if validate_run.is_datetime(generated_at) else LENIENT_DEFAULT_GENERATED_AT
+    coerced["baseline_commit"] = coerced.get("baseline_commit") if isinstance(coerced.get("baseline_commit"), str) or coerced.get("baseline_commit") is None else None
+
+    for alias, canonical in TOP_LEVEL_COLLECTION_ALIASES.items():
+        if canonical not in coerced and alias in coerced:
+            coerced[canonical] = coerced[alias]
+            warn_lenient(warnings, f"{report_path}: treated top-level {alias!r} as {canonical!r}")
+    for field in TOP_LEVEL_ARRAY_FIELDS:
+        coerced[field] = as_list(coerced.get(field))
+    return coerced
+
+
+def coerce_confirmed_finding(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object confirmed finding")
+        return None
+    finding = dict(item)
+    dedupe_key = finding.get("dedupe_key") if isinstance(finding.get("dedupe_key"), dict) else {}
+    owner = coerce_string(finding.get("owner_family") or finding.get("proposed_owner_family") or finding.get("family") or dedupe_key.get("owner_family"), sidecar["family"])
+    summary = coerce_string(finding.get("summary") or finding.get("title") or finding.get("description"), "Unspecified security finding.")
+    files = files_from_item(finding, sidecar)
+    entrypoints = string_list(finding.get("entrypoints"))
+    entrypoint = coerce_string(finding.get("entrypoint") or (", ".join(entrypoints) if entrypoints else None) or finding.get("surface_id") or (files[0] if files else None), summary[:120])
+    security_invariant = coerce_string(finding.get("security_invariant") or finding.get("invariant") or finding.get("control_objective"), summary)
+    missing_guard = coerce_string(finding.get("missing_guard") or finding.get("missing_control") or finding.get("guard"), "unspecified missing guard")
+    impact_boundary = coerce_string(finding.get("impact_boundary") or finding.get("impact") or finding.get("boundary"), summary)
+    finding["provisional_finding_id"] = coerce_string(
+        finding.get("provisional_finding_id") or finding.get("local_id") or finding.get("id") or finding.get("finding_id"),
+        f"PF-{owner}-{stable_hash([sidecar['sidecar_id'], summary, files])}",
+    )
+    finding["owner_family"] = owner
+    finding["status"] = coerce_enum(finding.get("status"), CONFIRMED_STATUSES, "confirmed-static")
+    finding["severity"] = coerce_enum(finding.get("severity"), SEVERITIES, "medium")
+    finding["confidence"] = coerce_enum(finding.get("confidence"), {"certain", "probable"}, "probable")
+    finding["summary"] = summary
+    finding["entrypoint"] = entrypoint
+    finding["security_invariant"] = security_invariant
+    finding["missing_guard"] = missing_guard
+    finding["attacker_precondition"] = coerce_string(finding.get("attacker_precondition") or finding.get("precondition"), "Not specified by lane output.")
+    finding["impact_boundary"] = impact_boundary
+    finding["files"] = files
+    finding["evidence_refs"] = coerce_evidence_refs(finding, files, "Lenient reducer imported agent-authored finding evidence.")
+    finding["report_refs"] = string_list(finding.get("report_refs"))
+    finding["lead_source_refs"] = string_list(finding.get("lead_source_refs"))
+    finding["severity_rationale"] = coerce_string(finding.get("severity_rationale") or finding.get("impact"), "Not specified by lane output.")
+    finding["clone_of"] = coerce_nullable_string(finding.get("clone_of"))
+    finding["related_findings"] = string_list(finding.get("related_findings"))
+    finding["why_confirmed"] = coerce_string(finding.get("why_confirmed") or finding.get("rationale"), "Lenient reducer preserved a lane-confirmed claim.")
+    finding["introduced_after_batch_01"] = bool(finding.get("introduced_after_batch_01")) if sidecar.get("batch_id") != "batch-01" else False
+    finding["dedupe_key"] = {
+        "owner_family": owner,
+        "security_invariant": security_invariant,
+        "missing_guard": missing_guard,
+        "entrypoint": entrypoint,
+        "impact_boundary": impact_boundary,
+    }
+    return finding
+
+
+def coerce_candidate_finding(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object candidate finding")
+        return None
+    candidate = dict(item)
+    owner = coerce_string(candidate.get("proposed_owner_family") or candidate.get("owner_family") or candidate.get("family"), sidecar["family"])
+    summary = coerce_string(candidate.get("summary") or candidate.get("title") or candidate.get("description"), "Unspecified candidate finding.")
+    files = files_from_item(candidate, sidecar)
+    missing_guard = coerce_nullable_string(candidate.get("suspected_missing_guard") or candidate.get("missing_guard") or candidate.get("suspected_missing_control"))
+    impact_boundary = coerce_nullable_string(candidate.get("impact_boundary") or candidate.get("impact") or summary)
+    candidate["candidate_id"] = coerce_string(candidate.get("candidate_id") or candidate.get("id"), f"CAND-{owner}-{stable_hash([sidecar['sidecar_id'], summary, files])}")
+    candidate["proposed_owner_family"] = owner
+    candidate["severity"] = coerce_enum(candidate.get("severity"), SEVERITIES, "medium")
+    candidate["confidence"] = coerce_enum(candidate.get("confidence"), CONFIDENCES, "speculative")
+    candidate["summary"] = summary
+    candidate["entrypoint"] = coerce_nullable_string(candidate.get("entrypoint"))
+    candidate["impact_boundary"] = impact_boundary
+    candidate["suspected_missing_guard"] = missing_guard
+    candidate["blocker_to_confirmation"] = coerce_string(candidate.get("blocker_to_confirmation") or candidate.get("blocker"), "Needs owner-lane confirmation.")
+    candidate["files"] = files
+    candidate["evidence_refs"] = coerce_evidence_refs(candidate, files, "Lenient reducer imported candidate evidence.")
+    candidate["report_refs"] = string_list(candidate.get("report_refs"))
+    candidate["lead_source_refs"] = string_list(candidate.get("lead_source_refs"))
+    candidate["candidate_dedupe_key"] = {
+        "proposed_owner_family": owner,
+        "summary": summary,
+        "files": files,
+        "suspected_missing_guard": missing_guard,
+        "impact_boundary": impact_boundary,
+    }
+    return candidate
+
+
+def coerce_incidental_lead(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object incidental lead")
+        return None
+    lead = dict(item)
+    files = files_from_item(lead, sidecar)
+    summary = coerce_string(lead.get("summary") or lead.get("title") or lead.get("description"), "Unspecified incidental lead.")
+    noticed_by = coerce_string(lead.get("noticed_by_family") or lead.get("source_family") or lead.get("family"), sidecar["family"])
+    proposed_owner = coerce_string(lead.get("proposed_owner_family") or lead.get("owner_family") or lead.get("recommended_owner"), noticed_by)
+    lead["lead_id"] = coerce_string(lead.get("lead_id") or lead.get("id"), f"LEAD-{noticed_by}-{stable_hash([sidecar['sidecar_id'], summary, files])}")
+    lead["noticed_by_family"] = noticed_by
+    lead["proposed_owner_family"] = proposed_owner
+    lead["summary"] = summary
+    lead["confidence"] = coerce_enum(lead.get("confidence"), CONFIDENCES, "speculative")
+    lead["severity_hint"] = coerce_enum(lead.get("severity_hint") or lead.get("severity"), SEVERITIES, "medium")
+    lead["why_noticed"] = coerce_nullable_string(lead.get("why_noticed"))
+    lead["blocker_to_confirmation"] = coerce_string(lead.get("blocker_to_confirmation") or lead.get("blocker"), "Needs owner-lane confirmation.")
+    lead["files"] = files
+    lead["evidence_refs"] = coerce_evidence_refs(lead, files, "Lenient reducer imported incidental lead evidence.")
+    return lead
+
+
+def coerce_security_smell(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object security smell")
+        return None
+    smell = dict(item)
+    files = files_from_item(smell, sidecar)
+    description = coerce_string(smell.get("description") or smell.get("summary"), "Unspecified security smell.")
+    smell["smell_id"] = coerce_string(smell.get("smell_id") or smell.get("id"), f"SMELL-{stable_hash([sidecar['sidecar_id'], description, files])}")
+    smell["category"] = coerce_string(smell.get("category") or smell.get("type"), "uncategorized")
+    smell["path"] = coerce_string(smell.get("path") or (files[0] if files else None), "unknown")
+    smell["line_start"] = coerce_int(smell.get("line_start") or smell.get("line"), 0) or None
+    smell["description"] = description
+    smell["recommended_owner"] = coerce_string(smell.get("recommended_owner") or smell.get("owner_family") or smell.get("source_family"), sidecar["family"])
+    smell["status"] = coerce_enum(smell.get("status"), {"needs-triage", "promoted", "rejected"}, "needs-triage")
+    return smell
+
+
+def coerce_risk_signal(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    signal = coerce_security_smell(item, sidecar, report_path, warnings)
+    if signal is None:
+        return None
+    signal["signal_id"] = coerce_string(signal.pop("smell_id", None), f"RISK-{stable_hash([sidecar['sidecar_id'], signal.get('description')])}")
+    return signal
+
+
+def coerce_proof_update(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object proof update")
+        return None
+    update = dict(item)
+    update["subject_id"] = coerce_string(update.get("subject_id") or update.get("finding_id") or update.get("lead_id") or update.get("candidate_id"), f"unknown-{stable_hash([sidecar['sidecar_id'], update])}")
+    update["proof_level"] = coerce_enum(update.get("proof_level"), PROOF_LEVELS, "P1-candidate")
+    update["evidence_summary"] = coerce_string(update.get("evidence_summary") or update.get("summary"), "Lenient reducer imported proof update.")
+    update["evidence_refs"] = coerce_evidence_refs(update, files_from_item(update, sidecar), "Lenient reducer imported proof evidence.")
+    return update
+
+
+def coerce_regression_recommendation(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object regression recommendation")
+        return None
+    rec = dict(item)
+    rec["finding_id"] = coerce_string(rec.get("finding_id") or rec.get("subject_id"), f"PF-{sidecar['family']}-{stable_hash([sidecar['sidecar_id'], rec])}")
+    rec["recommended_regression"] = coerce_enum(rec.get("recommended_regression"), {
+        "unit test",
+        "integration test",
+        "policy test",
+        "configuration assertion",
+        "custom static rule",
+        "dependency/policy gate",
+        "manual compensating control",
+        "documented not-feasible reason",
+    }, "integration test")
+    rec["test_name"] = coerce_string(rec.get("test_name"), f"test_{stable_hash([rec['finding_id']])}")
+    rec["guard_asserted"] = coerce_string(rec.get("guard_asserted"), "Preserve the missing security guard.")
+    rec["automation_status"] = coerce_enum(rec.get("automation_status"), {"proposed", "implemented", "not-feasible"}, "proposed")
+    return rec
+
+
+def coerce_run_local_check(item: Any, sidecar: dict[str, Any], report_path: Path, warnings: list[str]) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        warn_lenient(warnings, f"{report_path}: skipped non-object run-local check")
+        return None
+    check = dict(item)
+    raw_id = coerce_string(check.get("check_id") or check.get("id"), f"local.{stable_hash([sidecar['sidecar_id'], check])}")
+    if not raw_id.startswith("local."):
+        raw_id = f"local.{re.sub(r'[^a-z0-9.-]+', '-', raw_id.lower()).strip('-') or stable_hash([raw_id])}"
+    check["check_id"] = raw_id
+    check["reason"] = coerce_string(check.get("reason") or check.get("summary"), "Lenient reducer imported a run-local check.")
+    check["trigger_evidence_refs"] = coerce_evidence_refs(check, files_from_item(check, sidecar), "Lenient reducer imported run-local check evidence.")
+    check["extends_checks"] = string_list(check.get("extends_checks"))
+    check["recommended_owner_family"] = coerce_nullable_string(check.get("recommended_owner_family") or check.get("recommended_owner"))
+    check["scope_impact"] = coerce_string(check.get("scope_impact"), "Review scope may need owner-lane follow-up.")
+    check["regression_impact"] = coerce_nullable_string(check.get("regression_impact"))
+    return check
+
+
+def coerce_sidecar_for_reduce(
+    sidecar: dict[str, Any],
+    report_path: Path,
+    manifest: dict[str, Any] | None,
+    item: dict[str, Any] | None,
+    run_dir: Path,
+    profile: str,
+    selected_profile: dict[str, Any],
+    warnings: list[str],
+) -> dict[str, Any]:
+    coerced = coerce_top_level_sidecar(sidecar, report_path, manifest, item, run_dir, profile, selected_profile, warnings)
+    coerced["confirmed_findings"] = [
+        value for value in (coerce_confirmed_finding(raw, coerced, report_path, warnings) for raw in coerced.get("confirmed_findings", []))
+        if value is not None
+    ]
+    coerced["candidate_findings"] = [
+        value for value in (coerce_candidate_finding(raw, coerced, report_path, warnings) for raw in coerced.get("candidate_findings", []))
+        if value is not None
+    ]
+    coerced["incidental_leads"] = [
+        value for value in (coerce_incidental_lead(raw, coerced, report_path, warnings) for raw in coerced.get("incidental_leads", []))
+        if value is not None
+    ]
+    coerced["security_smells"] = [
+        value for value in (coerce_security_smell(raw, coerced, report_path, warnings) for raw in coerced.get("security_smells", []))
+        if value is not None
+    ]
+    coerced["risk_signals"] = [
+        value for value in (coerce_risk_signal(raw, coerced, report_path, warnings) for raw in coerced.get("risk_signals", []))
+        if value is not None
+    ]
+    coerced["proof_updates"] = [
+        value for value in (coerce_proof_update(raw, coerced, report_path, warnings) for raw in coerced.get("proof_updates", []))
+        if value is not None
+    ]
+    coerced["regression_recommendations"] = [
+        value for value in (coerce_regression_recommendation(raw, coerced, report_path, warnings) for raw in coerced.get("regression_recommendations", []))
+        if value is not None
+    ]
+    coerced["run_local_checks"] = [
+        value for value in (coerce_run_local_check(raw, coerced, report_path, warnings) for raw in coerced.get("run_local_checks", []))
+        if value is not None
+    ]
+    return coerced
 
 
 def root_cause_id(finding: dict[str, Any]) -> str:
@@ -152,6 +685,14 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
             if line:
                 rows.append(json.loads(line))
     return rows
+
+
+def safe_read_jsonl(path: Path, warnings: list[str]) -> list[dict[str, Any]]:
+    try:
+        return read_jsonl(path)
+    except Exception as exc:  # noqa: BLE001
+        warn_lenient(warnings, f"{path}: could not read existing JSONL state: {exc}")
+        return []
 
 
 def schema_allowed_properties(schema_name: str) -> set[str]:
@@ -275,6 +816,239 @@ def load_manifests(run_dir: Path, batch_id: str | None) -> list[tuple[Path, dict
     for path in paths:
         manifests.append((path, validate_run.load_json_or_yaml(path)))
     return manifests
+
+
+def lenient_sidecar_paths(run_dir: Path, batch_id: str | None) -> list[Path]:
+    paths = set(validate_run.sidecar_paths(run_dir, batch_id))
+    if batch_id in {None, "batch-01"}:
+        paths.update((run_dir / "reports").glob("*/report.json"))
+    return sorted(paths)
+
+
+def lenient_candidate_paths(run_dir: Path) -> list[Path]:
+    candidates_dir = run_dir / "candidates"
+    if not candidates_dir.exists() or candidates_dir.is_symlink():
+        return []
+    return sorted(candidates_dir.glob("*/*.yaml")) + sorted(candidates_dir.glob("*/*.yml")) + sorted(candidates_dir.glob("*/*.json"))
+
+
+def parse_line_range(value: Any) -> tuple[int | None, int | None]:
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value, value
+    if not isinstance(value, str):
+        return None, None
+    text = value.strip()
+    match = re.match(r"^([0-9]+)(?:\s*-\s*([0-9]+))?$", text)
+    if not match:
+        return None, None
+    start = int(match.group(1))
+    end = int(match.group(2)) if match.group(2) else start
+    return start, end
+
+
+def normalize_candidate_yaml_item(data: dict[str, Any], path: Path) -> dict[str, Any]:
+    item = dict(data)
+    location = item.get("location")
+    if isinstance(location, dict):
+        file_value = location.get("file") or location.get("path")
+        if isinstance(file_value, str) and file_value:
+            item.setdefault("files", [file_value])
+            line_start, line_end = parse_line_range(location.get("lines") or location.get("line"))
+            item.setdefault("evidence_refs", [{
+                "path": file_value,
+                "line_start": line_start,
+                "line_end": line_end,
+                "symbol": coerce_nullable_string(location.get("symbol")),
+                "evidence_type": "other",
+                "snippet_hash": None,
+                "rationale": "Lane candidate location.",
+            }])
+    if "summary" not in item and "title" in item:
+        item["summary"] = item["title"]
+    if "family" not in item and "lane" in item:
+        item["family"] = item["lane"]
+    if "proposed_owner_family" not in item:
+        item["proposed_owner_family"] = item.get("owner_family") or item.get("family") or item.get("lane")
+    if "candidate_id" not in item and "id" in item:
+        item["candidate_id"] = item["id"]
+    if "blocker_to_confirmation" not in item:
+        item["blocker_to_confirmation"] = "Imported from lane candidate YAML; owner-lane confirmation may still be needed."
+    if "impact_boundary" not in item and "impact" in item:
+        item["impact_boundary"] = item["impact"]
+    return item
+
+
+def sidecar_from_candidate_file(
+    path: Path,
+    run_dir: Path,
+    profile: str,
+    selected_profile: dict[str, Any],
+    warnings: list[str],
+) -> dict[str, Any] | None:
+    try:
+        data = validate_run.load_json_or_yaml(path)
+    except Exception as exc:  # noqa: BLE001
+        warn_lenient(warnings, f"{path}: could not parse candidate file: {exc}")
+        return None
+    if not isinstance(data, dict):
+        warn_lenient(warnings, f"{path}: skipped non-object candidate file")
+        return None
+
+    batch_id, family_from_path = infer_batch_family_from_report_path(run_dir, path)
+    family = coerce_string(data.get("family") or data.get("lane") or data.get("proposed_owner_family") or family_from_path, selected_profile["lane_order"][0])
+    item = normalize_candidate_yaml_item(data, path)
+    status = normalize_text(item.get("status")).lower().replace("_", "-")
+    collection = "confirmed_findings" if status in CONFIRMED_STATUSES else "candidate_findings"
+    return {
+        "schema_version": 3,
+        "sidecar_id": f"sidecar-{batch_id or 'batch-01'}-{family}-{path.stem}",
+        "generated_at": LENIENT_DEFAULT_GENERATED_AT,
+        "run_id": run_dir.name,
+        "batch_id": batch_id or "batch-01",
+        "family": family,
+        "mode": default_mode_for_batch(batch_id or "batch-01", family, selected_profile),
+        "profile": profile,
+        "strategy": coerce_string(item.get("strategy"), "invariant-audit" if profile == "security" else "production-gate"),
+        "overlays": string_list(item.get("overlays") or item.get("overlays_relevant")) or ["auto"],
+        "baseline_commit": None,
+        "reviewed_artifacts": files_from_item(item),
+        "reviewed_files_routes_helpers": [],
+        "shared_context_inputs": [],
+        "coverage_units_touched": [],
+        "coverage_units_not_touched": [],
+        "patterns_searched": [],
+        "intentionally_excluded": [],
+        "confirmed_findings": [item] if collection == "confirmed_findings" else [],
+        "candidate_findings": [item] if collection == "candidate_findings" else [],
+        "rejected_claims": [],
+        "clone_maps": [],
+        "runtime_updates": [],
+        "chain_candidates": [],
+        "coverage_gaps": [],
+        "profile_feedback": [],
+        "incidental_leads": [],
+        "security_smells": [],
+        "proof_updates": [],
+        "regression_recommendations": [],
+        "run_local_checks": [],
+        "next_batch_recommendations": [],
+    }
+
+
+def lenient_input_hashes(run_dir: Path, batch_id: str | None) -> list[dict[str, str]]:
+    paths = set(validate_run.manifest_paths(run_dir, batch_id))
+    paths.update(lenient_sidecar_paths(run_dir, batch_id))
+    if batch_id in {None, "batch-01"}:
+        paths.update(lenient_candidate_paths(run_dir))
+    hashed: list[dict[str, str]] = []
+    for path in sorted(paths):
+        if validate_run.is_plain_file_under(run_dir, path):
+            hashed.append({"path": path.relative_to(run_dir).as_posix(), "sha256": validate_run.hash_file(path)})
+    return hashed
+
+
+def collect_report_inputs(
+    run_dir: Path,
+    batch_id: str | None,
+    profile: str,
+    selected_profile: dict[str, Any],
+    lenient: bool,
+    warnings: list[str],
+) -> list[tuple[Path, dict[str, Any], dict[str, Any], Path, dict[str, Any] | None]]:
+    inputs: list[tuple[Path, dict[str, Any], dict[str, Any], Path, dict[str, Any] | None]] = []
+    seen_reports: set[Path] = set()
+    try:
+        manifests = load_manifests(run_dir, batch_id)
+    except Exception as exc:  # noqa: BLE001
+        if not lenient:
+            raise
+        warn_lenient(warnings, f"could not load batch manifests; reducing discovered report files instead: {exc}")
+        manifests = []
+    for manifest_path, manifest in manifests:
+        if not isinstance(manifest, dict):
+            warn_lenient(warnings, f"{manifest_path}: skipped non-object manifest")
+            continue
+        for item in manifest.get("families", []):
+            if not isinstance(item, dict):
+                continue
+            if item.get("status") != "ran" or not isinstance(item.get("json"), str):
+                inputs.append((manifest_path, manifest, item, manifest_path, None))
+                continue
+            try:
+                report_path = resolve_report_path(run_dir, manifest_path, item["json"])
+            except Exception as exc:  # noqa: BLE001
+                warn_lenient(warnings, f"{manifest_path}: could not resolve report path {item.get('json')!r}: {exc}")
+                continue
+            seen_reports.add(report_path)
+            inputs.append((manifest_path, manifest, item, report_path, None))
+
+    if not lenient:
+        return inputs
+
+    sidecar_paths = lenient_sidecar_paths(run_dir, batch_id)
+    if sidecar_paths and not manifests:
+        warn_lenient(warnings, "no batch manifests found; synthesized reducer inputs from report.json files")
+    for report_path in sidecar_paths:
+        if report_path in seen_reports:
+            continue
+        try:
+            sidecar = validate_run.load_json(report_path)
+        except Exception as exc:  # noqa: BLE001
+            warn_lenient(warnings, f"{report_path}: could not parse sidecar JSON: {exc}")
+            continue
+        if not isinstance(sidecar, dict):
+            warn_lenient(warnings, f"{report_path}: skipped non-object sidecar")
+            continue
+        path_batch, path_family = infer_batch_family_from_report_path(run_dir, report_path)
+        current_batch = coerce_string(sidecar.get("batch_id") or path_batch, "batch-01")
+        if batch_id is not None and current_batch != batch_id:
+            continue
+        family = coerce_string(sidecar.get("family") or path_family, selected_profile["lane_order"][0])
+        mode = coerce_string(sidecar.get("mode"), default_mode_for_batch(current_batch, family, selected_profile))
+        manifest = {
+            "schema_version": 1,
+            "run_id": run_dir.name,
+            "batch_id": current_batch,
+            "generated_at": coerce_string(sidecar.get("generated_at"), LENIENT_DEFAULT_GENERATED_AT),
+            "producer": "reduce_run.py --lenient",
+            "manifest_status": "completed",
+            "expected_families": [family],
+            "families": [],
+        }
+        item = {
+            "family": family,
+            "status": "ran",
+            "mode": mode,
+            "json": report_path.relative_to(run_dir).as_posix(),
+        }
+        inputs.append((run_dir / "reports" / current_batch / "manifest.yaml", manifest, item, report_path, sidecar))
+
+    if batch_id in {None, "batch-01"}:
+        for candidate_path in lenient_candidate_paths(run_dir):
+            sidecar = sidecar_from_candidate_file(candidate_path, run_dir, profile, selected_profile, warnings)
+            if sidecar is None:
+                continue
+            family = sidecar["family"]
+            current_batch = sidecar["batch_id"]
+            manifest = {
+                "schema_version": 1,
+                "run_id": run_dir.name,
+                "batch_id": current_batch,
+                "generated_at": sidecar["generated_at"],
+                "producer": "reduce_run.py --lenient",
+                "manifest_status": "completed",
+                "expected_families": [family],
+                "families": [],
+            }
+            item = {
+                "family": family,
+                "status": "ran",
+                "mode": sidecar["mode"],
+                "json": candidate_path.relative_to(run_dir).as_posix(),
+            }
+            inputs.append((run_dir / "reports" / current_batch / "manifest.yaml", manifest, item, candidate_path, sidecar))
+
+    return inputs
 
 
 def resolve_report_path(run_dir: Path, manifest_path: Path, value: str) -> Path:
@@ -1172,9 +1946,12 @@ def reduce_run(
     profile: str = validate_run.DEFAULT_PROFILE,
     profiles_dir: Path = validate_run.DEFAULT_PROFILES_DIR,
     allow_experimental: bool = False,
+    lenient: bool = False,
 ) -> dict[str, int]:
     run_dir = run_dir.resolve()
     repair_reducer_owned_state(run_dir)
+    selected_profile = validate_run.load_profile(profile, profiles_dir)
+    lenient_warnings: list[str] = []
     issues = validate_run.validate_run(
         run_dir,
         validate_run.DEFAULT_SCHEMAS_DIR,
@@ -1183,28 +1960,31 @@ def reduce_run(
         allow_experimental=allow_experimental,
         batch_id=batch_id,
     )
-    if issues:
+    if issues and not lenient:
         formatted = "\n".join(issue.format() for issue in issues)
         raise SystemExit(f"validation failed before reduce:\n{formatted}")
-
-    selected_profile = validate_run.load_profile(profile, profiles_dir)
     state_dir = ensure_state_dir(run_dir)
-    existing_inventory = read_jsonl(state_dir / "finding-inventory.jsonl")
+    if issues and lenient:
+        warn_lenient(lenient_warnings, f"strict validation reported {len(issues)} issue(s); reducing best-effort")
+        for issue in issues[:LENIENT_WARNING_LIMIT]:
+            warn_lenient(lenient_warnings, issue.format())
+    read_state_jsonl = (lambda path: safe_read_jsonl(path, lenient_warnings)) if lenient else read_jsonl
+    existing_inventory = read_state_jsonl(state_dir / "finding-inventory.jsonl")
     existing_records = {
         row["finding_id"]: row
         for row in existing_inventory
         if isinstance(row.get("finding_id"), str) and row["finding_id"]
     }
-    existing_rejected = read_jsonl(state_dir / "rejected-claims.jsonl")
-    existing_profile_feedback = read_jsonl(state_dir / "profile-feedback.jsonl")
-    existing_chains = read_jsonl(state_dir / "chain-inventory.jsonl")
-    existing_incidental_leads = read_jsonl(state_dir / "incidental-leads.jsonl")
-    existing_security_smells = read_jsonl(state_dir / "security-smells.jsonl")
-    existing_risk_signals = read_jsonl(state_dir / "risk-signals.jsonl")
-    existing_proof_updates = read_jsonl(state_dir / "proof-ledger.jsonl")
-    existing_regression_recommendations = read_jsonl(state_dir / "regression-plan.jsonl")
-    existing_run_local_checks = read_jsonl(state_dir / "run-local-checks.jsonl")
-    events = read_jsonl(state_dir / "run-events.jsonl")
+    existing_rejected = read_state_jsonl(state_dir / "rejected-claims.jsonl")
+    existing_profile_feedback = read_state_jsonl(state_dir / "profile-feedback.jsonl")
+    existing_chains = read_state_jsonl(state_dir / "chain-inventory.jsonl")
+    existing_incidental_leads = read_state_jsonl(state_dir / "incidental-leads.jsonl")
+    existing_security_smells = read_state_jsonl(state_dir / "security-smells.jsonl")
+    existing_risk_signals = read_state_jsonl(state_dir / "risk-signals.jsonl")
+    existing_proof_updates = read_state_jsonl(state_dir / "proof-ledger.jsonl")
+    existing_regression_recommendations = read_state_jsonl(state_dir / "regression-plan.jsonl")
+    existing_run_local_checks = read_state_jsonl(state_dir / "run-local-checks.jsonl")
+    events = read_state_jsonl(state_dir / "run-events.jsonl")
     records: list[dict[str, Any]] = []
     rejected: list[dict[str, Any]] = []
     profile_feedback: list[dict[str, Any]] = []
@@ -1216,98 +1996,182 @@ def reduce_run(
     regression_recommendations: list[dict[str, Any]] = []
     runtime_updates: list[dict[str, Any]] = []
     run_local_checks: list[dict[str, Any]] = []
-    trigger_signals = state_surface_signals(state_dir)
+    try:
+        trigger_signals = state_surface_signals(state_dir)
+    except Exception as exc:  # noqa: BLE001
+        if not lenient:
+            raise
+        warn_lenient(lenient_warnings, f"{state_dir}: skipped malformed state surface signals: {exc}")
+        trigger_signals = []
 
-    manifests = load_manifests(run_dir, batch_id)
-    input_hashes = validate_run.collect_input_hashes(run_dir, batch_id)
+    input_hashes = lenient_input_hashes(run_dir, batch_id) if lenient else validate_run.collect_input_hashes(run_dir, batch_id)
+    report_inputs = collect_report_inputs(run_dir, batch_id, profile, selected_profile, lenient, lenient_warnings)
     processed_batches: set[str] = set()
 
-    for manifest_path, manifest in manifests:
+    for manifest_path, manifest, item, report_path, sidecar_override in report_inputs:
         current_batch = manifest["batch_id"]
         processed_batches.add(current_batch)
-        for item in manifest.get("families", []):
-            if item.get("status") != "ran" or "json" not in item:
-                if item.get("status") in {"failed", "missing"}:
-                    events.append(make_event(
-                        "lane-output-unavailable",
-                        current_batch,
-                        item.get("family"),
-                        "error",
-                        item.get("failure_reason") or f"Family status was {item.get('status')}",
-                        input_hashes,
-                    ))
-                continue
-            report_path = resolve_report_path(run_dir, manifest_path, item["json"])
-            sidecar = validate_run.load_json(report_path)
-            trigger_signals.extend(sidecar_signals(sidecar))
-            for finding in sidecar.get("confirmed_findings", []):
-                records.append(confirmed_record(sidecar, finding, report_path.relative_to(run_dir)))
-            for candidate in sidecar.get("candidate_findings", []):
-                records.append(candidate_record(sidecar, candidate, report_path.relative_to(run_dir)))
-            for lead in sidecar.get("incidental_leads", []):
-                incidental_leads.append(incidental_lead_record(sidecar, lead, report_path.relative_to(run_dir)))
-                if lead.get("noticed_by_family") != lead.get("proposed_owner_family"):
-                    events.append(make_event(
-                        "out-of-lane-lead-imported",
-                        current_batch,
-                        sidecar.get("family"),
-                        "info",
-                        f"Imported incidental lead {lead.get('lead_id')} from {lead.get('noticed_by_family')} for {lead.get('proposed_owner_family')}.",
-                        input_hashes,
-                    ))
-            for smell in sidecar.get("security_smells", []):
-                security_smells.append(security_smell_record(sidecar, smell, report_path.relative_to(run_dir)))
-            for signal in sidecar.get("risk_signals", []):
-                risk_signals.append(risk_signal_record(sidecar, signal, report_path.relative_to(run_dir)))
-            for proof_update in sidecar.get("proof_updates", []):
-                proof_updates.append(proof_update_record(sidecar, proof_update, report_path.relative_to(run_dir)))
-            for recommendation in sidecar.get("regression_recommendations", []):
-                regression_recommendations.append(regression_recommendation_record(sidecar, recommendation, report_path.relative_to(run_dir)))
-            for runtime_update in sidecar.get("runtime_updates", []):
-                runtime_updates.append(runtime_update_record(sidecar, runtime_update, report_path.relative_to(run_dir)))
-            for local_check in sidecar.get("run_local_checks", []):
-                run_local_checks.append(run_local_check_record(sidecar, local_check, report_path.relative_to(run_dir)))
+        if item.get("status") != "ran" or ("json" not in item and sidecar_override is None):
+            if item.get("status") in {"failed", "missing"}:
                 events.append(make_event(
-                    "run-local-check-imported",
+                    "lane-output-unavailable",
+                    current_batch,
+                    item.get("family"),
+                    "error",
+                    item.get("failure_reason") or f"Family status was {item.get('status')}",
+                    input_hashes,
+                ))
+            continue
+        try:
+            sidecar = sidecar_override if sidecar_override is not None else validate_run.load_json(report_path)
+        except Exception as exc:  # noqa: BLE001
+            if lenient:
+                warn_lenient(lenient_warnings, f"{report_path}: could not load report input: {exc}")
+                continue
+            raise
+        if not isinstance(sidecar, dict):
+            if lenient:
+                warn_lenient(lenient_warnings, f"{report_path}: skipped non-object report input")
+                continue
+            raise SystemExit(f"sidecar must be an object: {report_path}")
+        if lenient:
+            sidecar = coerce_sidecar_for_reduce(sidecar, report_path, manifest, item, run_dir, profile, selected_profile, lenient_warnings)
+        relative_report_path = report_path.relative_to(run_dir)
+        trigger_signals.extend(sidecar_signals(sidecar))
+        for finding in sidecar.get("confirmed_findings", []):
+            try:
+                records.append(confirmed_record(sidecar, finding, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped confirmed finding during import: {exc}")
+                    continue
+                raise
+        for candidate in sidecar.get("candidate_findings", []):
+            try:
+                records.append(candidate_record(sidecar, candidate, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped candidate finding during import: {exc}")
+                    continue
+                raise
+        for lead in sidecar.get("incidental_leads", []):
+            try:
+                incidental_leads.append(incidental_lead_record(sidecar, lead, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped incidental lead during import: {exc}")
+                    continue
+                raise
+            if lead.get("noticed_by_family") != lead.get("proposed_owner_family"):
+                events.append(make_event(
+                    "out-of-lane-lead-imported",
                     current_batch,
                     sidecar.get("family"),
                     "info",
-                    f"Imported run-local check {local_check.get('check_id')}.",
+                    f"Imported incidental lead {lead.get('lead_id')} from {lead.get('noticed_by_family')} for {lead.get('proposed_owner_family')}.",
                     input_hashes,
                 ))
-            for claim in sidecar.get("rejected_claims", []):
-                rejected.append({
-                    "schema_version": STATE_SCHEMA_VERSION,
-                    "claim_id": claim["claim_id"],
-                    "source_family": sidecar["family"],
-                    "batch_id": sidecar["batch_id"],
-                    "reason": claim["reason"],
-                    "subsumed_by": claim.get("subsumed_by"),
-                })
-            for feedback in sidecar.get("profile_feedback", []):
-                profile_feedback.append({
-                    "schema_version": STATE_SCHEMA_VERSION,
-                    "profile_gap_id": feedback["profile_gap_id"],
-                    "family": feedback["family"],
-                    "affected_families": feedback.get("affected_families", []),
-                    "observed_issue": feedback["observed_issue"],
-                    "suggested_change": feedback["suggested_change"],
-                    "evidence_refs": feedback.get("evidence_refs", []),
-                    "urgency": feedback["urgency"],
-                    "reducer_status": "deferred",
-                    "reducer_reason": "v0.4 reducer records profile feedback but does not mutate scope.",
-                })
-            for chain in sidecar.get("chain_candidates", []):
-                chain_records.append({
-                    "schema_version": STATE_SCHEMA_VERSION,
-                    "chain_id": f"CH-{stable_hash([chain['chain_candidate_id'], chain.get('component_findings', [])])}",
-                    "source_chain_candidate_id": chain["chain_candidate_id"],
-                    "component_findings": chain.get("component_findings", []),
-                    "families_involved": sorted({sidecar["family"]}),
-                    "impact": chain["why_chain_matters"],
-                    "confidence": chain.get("confidence", "speculative"),
-                    "status": "candidate",
-                })
+        for smell in sidecar.get("security_smells", []):
+            try:
+                security_smells.append(security_smell_record(sidecar, smell, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped security smell during import: {exc}")
+                    continue
+                raise
+        for signal in sidecar.get("risk_signals", []):
+            try:
+                risk_signals.append(risk_signal_record(sidecar, signal, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped risk signal during import: {exc}")
+                    continue
+                raise
+        for proof_update in sidecar.get("proof_updates", []):
+            try:
+                proof_updates.append(proof_update_record(sidecar, proof_update, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped proof update during import: {exc}")
+                    continue
+                raise
+        for recommendation in sidecar.get("regression_recommendations", []):
+            try:
+                regression_recommendations.append(regression_recommendation_record(sidecar, recommendation, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped regression recommendation during import: {exc}")
+                    continue
+                raise
+        for runtime_update in sidecar.get("runtime_updates", []):
+            try:
+                runtime_updates.append(runtime_update_record(sidecar, runtime_update, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped runtime update during import: {exc}")
+                    continue
+                raise
+        for local_check in sidecar.get("run_local_checks", []):
+            try:
+                run_local_checks.append(run_local_check_record(sidecar, local_check, relative_report_path))
+            except Exception as exc:  # noqa: BLE001
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped run-local check during import: {exc}")
+                    continue
+                raise
+            events.append(make_event(
+                "run-local-check-imported",
+                current_batch,
+                sidecar.get("family"),
+                "info",
+                f"Imported run-local check {local_check.get('check_id')}.",
+                input_hashes,
+            ))
+        for claim in sidecar.get("rejected_claims", []):
+            if not isinstance(claim, dict) or "claim_id" not in claim or "reason" not in claim:
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped malformed rejected claim")
+                    continue
+            rejected.append({
+                "schema_version": STATE_SCHEMA_VERSION,
+                "claim_id": claim["claim_id"],
+                "source_family": sidecar["family"],
+                "batch_id": sidecar["batch_id"],
+                "reason": claim["reason"],
+                "subsumed_by": claim.get("subsumed_by"),
+            })
+        for feedback in sidecar.get("profile_feedback", []):
+            if not isinstance(feedback, dict) or not all(key in feedback for key in ("profile_gap_id", "family", "observed_issue", "suggested_change", "urgency")):
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped malformed profile feedback")
+                    continue
+            profile_feedback.append({
+                "schema_version": STATE_SCHEMA_VERSION,
+                "profile_gap_id": feedback["profile_gap_id"],
+                "family": feedback["family"],
+                "affected_families": feedback.get("affected_families", []),
+                "observed_issue": feedback["observed_issue"],
+                "suggested_change": feedback["suggested_change"],
+                "evidence_refs": feedback.get("evidence_refs", []),
+                "urgency": feedback["urgency"],
+                "reducer_status": "deferred",
+                "reducer_reason": "v0.4 reducer records profile feedback but does not mutate scope.",
+            })
+        for chain in sidecar.get("chain_candidates", []):
+            if not isinstance(chain, dict) or "chain_candidate_id" not in chain or "why_chain_matters" not in chain:
+                if lenient:
+                    warn_lenient(lenient_warnings, f"{report_path}: skipped malformed chain candidate")
+                    continue
+            chain_records.append({
+                "schema_version": STATE_SCHEMA_VERSION,
+                "chain_id": f"CH-{stable_hash([chain['chain_candidate_id'], chain.get('component_findings', [])])}",
+                "source_chain_candidate_id": chain["chain_candidate_id"],
+                "component_findings": chain.get("component_findings", []),
+                "families_involved": sorted({sidecar["family"]}),
+                "impact": chain["why_chain_matters"],
+                "confidence": chain.get("confidence", "speculative"),
+                "status": "candidate",
+            })
 
     id_crosswalk = build_id_crosswalk(existing_inventory, records)
     existing_proof_updates = rewrite_proof_references(existing_proof_updates, id_crosswalk, events, input_hashes)
@@ -1343,6 +2207,15 @@ def reduce_run(
         events,
         input_hashes,
     )
+    for warning in lenient_warnings:
+        events.append(make_event(
+            "lenient-reducer-warning",
+            ",".join(sorted(processed_batches)) if processed_batches else batch_id,
+            None,
+            "warn",
+            warning,
+            input_hashes,
+        ))
     events.append(make_event(
         "reducer-run",
         ",".join(sorted(processed_batches)) if processed_batches else batch_id,
@@ -1380,6 +2253,7 @@ def reduce_run(
         "runtime_updates": len(runtime_updates),
         "run_local_checks": len(run_local_checks),
         "family_directives": len(family_directives),
+        "lenient_warnings": len(lenient_warnings),
     }
 
 
@@ -1465,6 +2339,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--profile", default=validate_run.DEFAULT_PROFILE, help="AuditLanes profile id to validate against before reducing.")
     parser.add_argument("--profiles-dir", type=Path, default=validate_run.DEFAULT_PROFILES_DIR)
     parser.add_argument("--allow-experimental", action="store_true", help="Allow metadata-only profiles for profile-loading/catalog compatibility checks.")
+    parser.add_argument("--lenient", action="store_true", help="Reduce best-effort when lane outputs or state files deviate from schema; records warnings in run-events.jsonl.")
     args = parser.parse_args(argv)
 
     summary = reduce_run(
@@ -1473,6 +2348,7 @@ def main(argv: list[str] | None = None) -> int:
         profile=args.profile,
         profiles_dir=args.profiles_dir.resolve(),
         allow_experimental=args.allow_experimental,
+        lenient=args.lenient,
     )
     print(json.dumps(summary, sort_keys=True))
     return 0

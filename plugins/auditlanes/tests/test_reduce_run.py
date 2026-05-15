@@ -715,6 +715,82 @@ class ReduceRunTests(unittest.TestCase):
         self.assertIn("L-imported-0001", ids)
         self.assertTrue(any(str(record.get("finding_id", "")).startswith("F-session-auth-") for record in records))
 
+    def test_lenient_reducer_imports_manifestless_reports_and_candidate_yaml(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_dir = Path(tmp.name) / "security-20260515T164337Z"
+        (run_dir / "reports" / "platform-posture").mkdir(parents=True)
+        (run_dir / "candidates" / "session-auth").mkdir(parents=True)
+
+        (run_dir / "reports" / "platform-posture" / "report.json").write_text(json.dumps({
+            "family": "platform-posture",
+            "confirmed_findings": [{
+                "id": "PP-001",
+                "owner_family": "platform-posture",
+                "status": "confirmed-static",
+                "severity": "high",
+                "confidence": "certain",
+                "summary": "Wildcard CORS is enabled.",
+                "entrypoint": "core.middleware.cors.CorsMiddleware",
+                "security_invariant": "CORS must use an allowlist.",
+                "missing_guard": "origin allowlist",
+                "attacker_precondition": "Attacker can run a malicious origin.",
+                "impact_boundary": "cross-origin reads",
+                "files": ["src/core/middleware/cors.py"],
+                "evidence_refs": [{
+                    "path": "src/core/middleware/cors.py",
+                    "line_start": 19,
+                    "line_end": 24,
+                    "symbol": "CorsMiddleware.process_response",
+                    "evidence_type": "middleware-registration",
+                    "rationale": "Synthetic legacy-layout evidence.",
+                }],
+                "severity_rationale": "High-impact browser boundary failure.",
+                "why_confirmed": "Static evidence shows wildcard response headers.",
+            }],
+        }), encoding="utf-8")
+
+        (run_dir / "candidates" / "session-auth" / "SA-001.yaml").write_text(json.dumps({
+            "id": "SA-001",
+            "family": "session-auth",
+            "status": "confirmed-static",
+            "severity": "critical",
+            "confidence": "certain",
+            "summary": "Global CSRF enforcement is disabled.",
+            "entrypoint": "all Django views",
+            "security_invariant": "CSRF must be enforced for session-authenticated mutations.",
+            "missing_guard": "CSRF enforcement",
+            "attacker_precondition": "Victim has an active browser session.",
+            "impact_boundary": "cross-site state mutation",
+            "location": {
+                "file": "src/core/middleware/checkout_classes.py",
+                "lines": "84-88",
+                "symbol": "CheckoutMiddleware.process_request",
+            },
+            "evidence": [
+                "The middleware unconditionally sets the framework CSRF opt-out flag."
+            ],
+            "severity_rationale": "Universal CSRF bypass.",
+            "why_confirmed": "The code path is unconditional.",
+        }), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_dir), "--lenient"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["records"], 2)
+        self.assertGreater(summary["lenient_warnings"], 0)
+
+        records = read_jsonl(run_dir / "state" / "finding-inventory.jsonl")
+        owners = {record["owner_family"] for record in records}
+        self.assertEqual(owners, {"platform-posture", "session-auth"})
+        events = read_jsonl(run_dir / "state" / "run-events.jsonl")
+        self.assertTrue(any(event["event_type"] == "lenient-reducer-warning" for event in events))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -46,6 +46,24 @@ common_types:
       - name: confidence
         type: string_or_null
 
+append_policy:
+  - "Lane workers must not invent JSONL field shapes. Use the fields in this state model and the executable schemas in resources/schemas/."
+  - "If multiple lanes are active, avoid direct concurrent appends to shared state/*.jsonl unless the host provides atomic append with retry."
+  - "Preferred concurrent pattern: each lane returns report.json plus any state rows inline or in lane-owned drafts; the reducer imports normalized shared state after the batch."
+  - "Every JSONL row that has a schema_version field uses schema_version: 1 unless a future schema says otherwise."
+
+required_state_schema_files:
+  attack_surface_graph: "resources/schemas/attack-surface.schema.json"
+  attack_surface_inventory: "resources/schemas/attack-surface-inventory.schema.json"
+  authorization_matrix: "resources/schemas/authorization-matrix.schema.json"
+  incidental_leads: "resources/schemas/incidental-lead.schema.json"
+  proof_ledger: "resources/schemas/proof-ledger.schema.json"
+  regression_plan: "resources/schemas/regression-plan.schema.json"
+  run_local_checks: "resources/schemas/run-local-check.schema.json"
+  security_invariants: "resources/schemas/security-invariant.schema.json"
+  security_smells: "resources/schemas/security-smell.schema.json"
+  unowned_surfaces: "resources/schemas/unowned-surface.schema.json"
+
 records:
   relevance_plan:
     format: yaml

@@ -203,6 +203,7 @@ class ValidateRunCliTests(unittest.TestCase):
         validator = load_validator_module()
         parsed = validator.parse_simple_yaml(
             "\n".join([
+                "---",
                 "schema_version: 1",
                 "profile: security",
                 "requested_strategy: auto",

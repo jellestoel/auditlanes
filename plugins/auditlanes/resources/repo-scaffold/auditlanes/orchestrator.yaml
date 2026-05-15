@@ -102,6 +102,12 @@ policy:
   family_report_formats:
     - markdown
     - json
+  report_artifact_roles:
+    report_json: "primary reducer input and source of truth"
+    report_md: "required narrative companion"
+    host_write_block_fallback: "lane returns markdown and JSON inline; lead persists them under reports/${BATCH_ID}/${FAMILY}/"
+  batch_manifest_owner: "lead-orchestrator"
+  lane_progress_ping_interval_minutes: 3
   report_sidecar_schema_file: "${PROTOCOL_ROOT}/report-sidecar-schema.yaml"
   batch_manifest_schema_file: "${PROTOCOL_ROOT}/batch-manifest-schema.yaml"
   runtime_policy_file: "${PROTOCOL_ROOT}/runtime-policy.md"
@@ -195,6 +201,13 @@ global_requirements:
   - "If a clone pattern exceeds the reporting limit, record exemplars plus spread instead of full enumeration."
   - "Every non-parked family run emits both markdown and machine-readable JSON sidecar output."
   - "Reducer consumes JSON sidecars as the primary family output."
+  - "The canonical report layout is reports/<batch-id>/<family>/report.json and reports/<batch-id>/<family>/report.md; reports/<family>/report.* is legacy and only accepted by lenient recovery tooling."
+  - "The lead or orchestrator owns reports/<batch-id>/manifest.yaml. Lane workers do not invent alternate manifest locations."
+  - "If host policy blocks a lane from writing required report artifacts, the lane must return the markdown and JSON inline and the lead must persist them."
+  - "Before lane work starts, lane briefs must include the relevant report sidecar and state JSONL schema fields from the bundled schemas."
+  - "Concurrent lane workers should not directly append to the same shared state JSONL file unless the host provides an atomic append helper; use lane-owned drafts or inline returns for reducer import."
+  - "Active lanes should send short progress pings every few minutes with focus, candidate count, blockers, and ETA."
+  - "Do not self-assign or reassign a task already marked completed in the shared task list."
 
 modes:
   canonical-sweep:
@@ -268,6 +281,11 @@ phases:
       - "${RUN_DIR}/state/family-scope-map.yaml"
       - "${RUN_DIR}/state/excluded-roots.yaml"
     batch_manifest: "${RUN_DIR}/reports/batch-01/manifest.yaml"
+    lead_setup:
+      - "Create ${RUN_DIR}/reports/batch-01/manifest.yaml before launching lane workers."
+      - "Initialize each expected family as status: missing; update to ran, parked, or failed as lane outputs arrive."
+      - "Give every lane the sidecar schema fields, relevant state JSONL schema fields, canonical output paths, and host-write fallback instructions."
+      - "Collect progress pings every few minutes."
     families:
       - family: session-auth
         mode: canonical-sweep

@@ -79,6 +79,18 @@ unavailable in this host and continue with `subagent` mode when supported.
   commands, or runtime checks without explicit approval.
 - Every non-parked family emits both `report.md` and `report.json`; the JSON
   sidecar is the source of truth.
+- Use the canonical report layout:
+  `auditlanes/out/runs/<run-id>/reports/<batch-id>/<family>/report.json` and
+  `auditlanes/out/runs/<run-id>/reports/<batch-id>/<family>/report.md`, with
+  `reports/<batch-id>/manifest.yaml` owned by the lead/reducer flow.
+- If a subagent or host hook blocks writing required report artifacts, have the
+  lane return the markdown and JSON inline; the lead persists them under the
+  canonical paths.
+- Include relevant state JSONL schema fields from
+  `${AUDITLANES_PLUGIN_ROOT}/resources/schemas/` in lane briefs before asking a
+  lane to append state. Prefer lane-owned drafts or inline returns over
+  concurrent writes to shared state files; reducer state is normalized after the
+  batch.
 - Every security sidecar must include `strategy`, `overlays`,
   `incidental_leads`, `security_smells`, `proof_updates`, and
   `regression_recommendations`.
@@ -91,7 +103,11 @@ unavailable in this host and continue with `subagent` mode when supported.
 - Agents may add run-local checks for unmodeled risks when they cite the trigger
   evidence and explain how scope or regression recommendations change.
 - Run `reduce_run.py` after each completed batch and `validate_run.py` before
-  treating a run as complete.
+  treating a run as complete. If strict reduction fails because agent-authored
+  artifacts drifted from the schema, use `reduce_run.py --lenient` as a
+  recovery path and treat its warnings as follow-up work, not validation.
+- Ask active lanes for short progress pings every few minutes: current focus,
+  candidate count, blocker if any, and rough ETA.
 
 ## Commands
 
@@ -105,4 +121,10 @@ Reduce a run:
 
 ```bash
 python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile <selected-profile>
+```
+
+Lenient recovery reduce:
+
+```bash
+python3 ${AUDITLANES_PLUGIN_ROOT}/scripts/reduce_run.py auditlanes/out/runs/<run-id> --profile <selected-profile> --lenient
 ```
