@@ -74,9 +74,11 @@ Install the plugin, reload plugins, then run a scan from the target repository:
 /auditlanes:scan .
 ```
 
-For a larger repository, choose the **recommended** scan unless you deliberately
-want to pay for a deeper pass. The advisor will usually resolve that to
-`invariant-audit` with risk-ranked coverage.
+For Claude Code, choose the **recommended** scan unless you deliberately want to
+pay for a deeper pass. The advisor will usually resolve that to
+`invariant-audit` with risk-ranked coverage. For Codex, a plain AuditLanes
+security-audit request defaults to the complete pre-fix security protocol and
+must pass the `--complete` gate before handoff.
 
 If you want the safest default posture, tell the agent:
 
@@ -146,8 +148,10 @@ Then open:
 /plugins
 ```
 
-Install or enable **AuditLanes**, then ask Codex to run an AuditLanes security
-audit or invoke the plugin explicitly with `@auditlanes`.
+Install or enable **AuditLanes**, then ask Codex to run a complete AuditLanes
+security audit or invoke the plugin explicitly with `@auditlanes`. Codex should
+use advisor output as calibration input and continue automatically through the
+completion gate unless you explicitly ask for a preview or profile choices.
 
 For a deliberately pinned install, use `/plugin marketplace add
 jellestoel/auditlanes@v0.4.16` in Claude Code or `codex plugin marketplace add

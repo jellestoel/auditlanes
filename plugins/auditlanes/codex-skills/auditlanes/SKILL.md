@@ -13,17 +13,22 @@ structured audit. The stable runnable profile is `security`.
 `architecture` is experimental metadata only and should not be run as a
 production audit mode until its `profile.yaml` sets `implemented: true`.
 
-If the operator invokes a scan without an explicit profile, present a profile
-choice first. Recommend `security` when no recent security run exists.
-Recommend `production-integrity` after security when the operator wants a
-launch/no-go review for durable state, generated commitments, lifecycle
-recovery, cutover controls, and assurance evidence. For the stable security
-path, default to requested `profile: security`, `strategy: auto`, and
-`overlays: [auto]`; for production-integrity, default to
-`strategy: production-gate`. Calibration must resolve profile strategy, overlay
-set, coverage mode, suggested checks, and agent-discretion flags in
-`state/relevance-plan.yaml`. Suggested checks frame the review; they do not
-bound reviewer judgment.
+If the operator asks Codex for an AuditLanes scan, security audit,
+vulnerability review, or full codebase audit without explicitly asking for
+choices, start the complete pre-fix security protocol by default. Do not stop
+to present profile or strategy choices. Use `profile: security`,
+`strategy: auto`, `overlays: [auto]`, `mode: subagent` when available, and run
+through the `--complete` gate before operator handoff.
+
+Only present choices when the operator explicitly asks to choose a profile,
+compare strategies, preview options, or run a non-security profile. Recommend
+`security` when no recent security run exists. Recommend `production-integrity`
+after security when the operator wants a launch/no-go review for durable state,
+generated commitments, lifecycle recovery, cutover controls, and assurance
+evidence. For production-integrity, default to `strategy: production-gate`.
+Calibration must resolve profile strategy, overlay set, coverage mode,
+suggested checks, and agent-discretion flags in `state/relevance-plan.yaml`.
+Suggested checks frame the review; they do not bound reviewer judgment.
 
 ## Plugin Root
 
@@ -103,8 +108,10 @@ unavailable in this host and continue with `subagent` mode when supported.
   `incidental_leads`, `risk_signals`, `proof_updates`,
   `regression_recommendations`, and the profile-specific workflow/invariant/
   side-effect/lifecycle/evidence update arrays.
-- No-argument or under-specified scan requests should run `scan_advisor.py`
-  first and present its recommendation before starting a long audit.
+- No-argument or under-specified Codex scan requests should run
+  `scan_advisor.py` first as calibration input, then continue automatically
+  into the complete pre-fix security protocol. Present advisor choices only
+  when the operator explicitly asks for a preview, planning, or options.
 - Agents may add run-local checks for unmodeled risks when they cite the trigger
   evidence and explain how scope or regression recommendations change.
 - Run `reduce_run.py` after each completed batch and `validate_run.py` before

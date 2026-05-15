@@ -1,6 +1,6 @@
 {
   "name": "auditlanes",
-  "version": "0.4.18",
+  "version": "0.4.19",
   "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
   "author": {
     "name": "AuditLanes"
@@ -24,7 +24,7 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Run an AuditLanes security audit for this repo.",
+      "Run a complete AuditLanes security audit for this repo through the --complete gate.",
       "Show the available AuditLanes audit profiles for this repo.",
       "Validate the latest AuditLanes run."
     ],
