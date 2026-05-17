@@ -1,0 +1,118 @@
+version: 1
+id: static-capacity-sweep
+profile: performance
+status: experimental
+description: "Static and modeled runtime performance/capacity review across budgets, hot paths, data access, async throughput, saturation, client-edge behavior, and evidence gaps."
+recommended_default: true
+allowed_modes:
+  - budget-surface
+  - hot-path-sweep
+  - data-access-sweep
+  - async-capacity-sweep
+  - resource-saturation-sweep
+  - client-edge-sweep
+  - evidence-gap-fill
+  - runtime-safe
+  - post-fix-resweep
+  - capacity-gate-synthesis
+  - bottleneck-chain-synthesis
+batch_shape:
+  batch-01:
+    expected_families: profile_lanes
+    status: ran
+    mode: hot-path-sweep
+  batch-02:
+    expected_families:
+      - capacity-gate-synthesis
+      - bottleneck-chain-synthesis
+    status: optional
+    modes_by_family:
+      capacity-gate-synthesis: capacity-gate-synthesis
+      bottleneck-chain-synthesis: bottleneck-chain-synthesis
+required_sidecar_fields:
+  - strategy
+  - overlays
+  - performance_workflow_inventory_updates
+  - performance_budget_updates
+  - hot_path_map_updates
+  - data_access_ledger_updates
+  - async_capacity_ledger_updates
+  - resource_saturation_ledger_updates
+  - dependency_amplification_ledger_updates
+  - client_edge_ledger_updates
+  - performance_evidence_map_updates
+  - performance_coverage_gap_updates
+  - risk_signals
+  - incidental_leads
+  - proof_updates
+  - regression_recommendations
+required_state_artifacts:
+  - state/relevance-plan.yaml
+  - state/performance-workflow-inventory.jsonl
+  - state/performance-budgets.jsonl
+  - state/hot-path-map.jsonl
+  - state/data-access-ledger.jsonl
+  - state/async-capacity-ledger.jsonl
+  - state/resource-saturation-ledger.jsonl
+  - state/dependency-amplification-ledger.jsonl
+  - state/client-edge-ledger.jsonl
+  - state/performance-evidence-map.jsonl
+  - state/performance-coverage-gaps.jsonl
+  - state/proof-ledger.jsonl
+  - state/incidental-leads.jsonl
+  - state/risk-signals.jsonl
+  - state/run-local-checks.jsonl
+  - state/regression-plan.jsonl
+  - state/launch-gates.jsonl
+review_requirements:
+  - "Build a workflow, entrypoint, budget, and cardinality inventory before confirming performance findings."
+  - "Every confirmed finding must identify trigger load condition, bottleneck class, resource dimension, root cause location, impact boundary, proof level, and existing controls checked."
+  - "Do not report generic slowness or micro-optimization advice."
+  - "Do not claim p95 or p99 failure unless supported by modeled, runtime-safe, benchmark, APM, or regression evidence."
+  - "Treat missing load tests as coverage gaps unless tied to a named budget, critical workflow, or launch gate."
+  - "Performance-triggered correctness, recovery, reconciliation, or cutover failures should be exported as production-integrity leads rather than duplicated."
+finding_fields:
+  - owner_family
+  - workflow_id
+  - entrypoint_id
+  - budget_id
+  - budget_dimension
+  - bottleneck_class
+  - resource_dimension
+  - root_cause_location
+  - trigger_load_condition
+  - demand_assumption
+  - cardinality_driver
+  - growth_model
+  - amplification_factor
+  - failure_mode
+  - impacted_budget
+  - impact_boundary
+  - affected_users_or_tenants
+  - existing_controls_checked
+  - degradation_behavior
+  - detectability
+  - proof_level
+  - confidence
+  - severity
+  - launch_gate_effect
+  - evidence_refs
+  - files
+  - entrypoints
+  - related_findings
+  - recommended_regression
+launch_gate_effect_values:
+  - none
+  - go-with-controls
+  - module-gated
+  - no-go
+  - external-integrity-gate
+  - external-security-gate
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true
+  broad_sanity_pass_recommended: true
+  strategy_may_prioritize_but_not_exclude_issue_classes: true
+  overlays_may_add_focus_but_not_hide_unrelated_high_severity_findings: true
+  final_report_must_include_unresolved_incidental_leads: true

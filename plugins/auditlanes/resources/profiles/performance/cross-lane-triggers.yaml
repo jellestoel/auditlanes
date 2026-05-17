@@ -1,0 +1,68 @@
+version: 1
+profile: performance
+triggers:
+  - id: data-hot-path-budget-risk
+    description: "N+1, missing index, unbounded scan, or expensive aggregation evidence should notify budget modeling and assurance."
+    when:
+      patterns:
+        - n+1
+        - missing index
+        - unbounded scan
+        - pagination
+        - aggregate
+        - query plan
+        - prisma
+        - sqlalchemy
+        - django orm
+    notify:
+      - workload-budget-model
+      - data-access-scaling
+      - performance-assurance
+
+  - id: async-backlog-risk
+    description: "Queue, worker, retry, cron, import, export, or batch evidence should notify async throughput, resource saturation, and assurance lanes."
+    when:
+      patterns:
+        - queue
+        - worker
+        - retry
+        - cron
+        - import
+        - export
+        - batch
+        - backlog
+        - drain
+    notify:
+      - async-throughput-backlog
+      - resource-saturation-degradation
+      - performance-assurance
+
+  - id: remote-fanout-risk
+    description: "Third-party API fanout, rate limit, timeout, and circuit-breaker evidence should notify synchronous hot paths and resource/degradation lanes."
+    when:
+      patterns:
+        - rate limit
+        - timeout
+        - third-party
+        - external api
+        - fanout
+        - circuit breaker
+    notify:
+      - synchronous-hot-paths
+      - resource-saturation-degradation
+      - performance-assurance
+
+  - id: client-edge-budget-risk
+    description: "Bundle, hydration, asset, CDN, cache, and web-vitals evidence should notify client-edge performance and assurance."
+    when:
+      patterns:
+        - bundle
+        - hydration
+        - web vitals
+        - cdn
+        - asset
+        - lighthouse
+        - cache-control
+    notify:
+      - client-edge-performance
+      - performance-assurance

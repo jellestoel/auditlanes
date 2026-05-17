@@ -14,6 +14,7 @@ VALIDATE_SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 CANDIDATE_DUPES_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-candidate-dupes"
 PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
+PERFORMANCE_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-performance"
 
 
 def read_jsonl(path: Path):
@@ -103,6 +104,22 @@ class ReduceRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         summary = json.loads(result.stdout)
         self.assertEqual(summary["records"], 1)
+
+    def test_performance_reducer_assigns_bottleneck_ids(self):
+        run_copy, summary = self.run_reducer(PERFORMANCE_RUN, "--profile", "performance")
+        self.assertEqual(summary["records"], 1)
+        self.assertEqual(summary["risk_signals"], 1)
+        records = read_jsonl(run_copy / "state" / "finding-inventory.jsonl")
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        self.assertRegex(record["finding_id"], r"^F-data-access-scaling-[0-9a-f]{12}$")
+        self.assertRegex(record["root_cause_id"], r"^RC-data-access-scaling-[0-9a-f]{12}$")
+        self.assertEqual(record["bottleneck_class"], "n-plus-one")
+        self.assertEqual(record["resource_dimension"], "database")
+        self.assertEqual(record["budget_dimension"], "p95-latency")
+        self.assertEqual(record["launch_gate_effect"], "module-gated")
+        proof = read_jsonl(run_copy / "state" / "proof-ledger.jsonl")
+        self.assertRegex(proof[0]["subject_id"], r"^F-data-access-scaling-[0-9a-f]{12}$")
 
     def test_reducer_is_idempotent_for_same_inputs(self):
         run_copy, _ = self.run_reducer(VALID_RUN)

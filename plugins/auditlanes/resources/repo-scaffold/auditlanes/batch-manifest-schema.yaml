@@ -31,10 +31,19 @@ family_modes:
   - invariant-gap-fill
   - control-clonehunt
   - scenario-probe
+  - budget-surface
+  - hot-path-sweep
+  - data-access-sweep
+  - async-capacity-sweep
+  - resource-saturation-sweep
+  - client-edge-sweep
+  - evidence-gap-fill
   - runtime-safe
   - post-fix-resweep
   - launch-gate-synthesis
   - failure-scenario-synthesis
+  - capacity-gate-synthesis
+  - bottleneck-chain-synthesis
   - exploit-synthesis
   - parked
 

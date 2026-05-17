@@ -1,0 +1,15 @@
+version: 1
+id: multi-tenant
+profile: performance
+status: experimental
+description: "Projects where one tenant, organization, workspace, customer, or region can affect shared runtime resources."
+priority_surfaces:
+  - noisy-neighbor
+  - tenant-cardinality
+  - shared-pool-pressure
+  - per-tenant-budgets
+maps_to_lanes:
+  workload-budget-model:
+    - tenant-demand-assumptions
+  resource-saturation-degradation:
+    - noisy-neighbor-controls

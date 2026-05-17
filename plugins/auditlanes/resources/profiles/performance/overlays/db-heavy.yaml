@@ -1,0 +1,21 @@
+version: 1
+id: db-heavy
+profile: performance
+status: experimental
+description: "Projects with ORM usage, SQL migrations, reporting queries, analytics tables, or growing relational datasets."
+priority_surfaces:
+  - n-plus-one
+  - missing-indexes
+  - unbounded-scans
+  - pagination
+  - expensive-aggregation
+  - database-pool-pressure
+maps_to_lanes:
+  data-access-scaling:
+    - query-shape
+    - index-coverage
+    - growth-cardinality
+  synchronous-hot-paths:
+    - request-query-fanout
+  performance-assurance:
+    - query-regression-evidence

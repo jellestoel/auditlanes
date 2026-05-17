@@ -29,9 +29,13 @@ SEVERITY_RANK = {
 PROOF_LEVEL_RANK = {
     "P0-lead": 0,
     "P1-candidate": 1,
+    "P1-static-structural": 1,
     "P2-static-confirmed": 2,
+    "P2-modeled": 2,
     "P3-reachability-confirmed": 3,
+    "P3-runtime-safe-observed": 3,
     "P4-runtime-confirmed": 4,
+    "P4-benchmark-or-apm-backed": 4,
     "P5-regression-backed": 5,
 }
 PROVISIONAL_ID_PREFIXES = ("PF-", "CAND-")
@@ -59,6 +63,16 @@ TOP_LEVEL_ARRAY_FIELDS = (
     "proof_updates",
     "regression_recommendations",
     "run_local_checks",
+    "performance_workflow_inventory_updates",
+    "performance_budget_updates",
+    "hot_path_map_updates",
+    "data_access_ledger_updates",
+    "async_capacity_ledger_updates",
+    "resource_saturation_ledger_updates",
+    "dependency_amplification_ledger_updates",
+    "client_edge_ledger_updates",
+    "performance_evidence_map_updates",
+    "performance_coverage_gap_updates",
     "next_batch_recommendations",
 )
 TOP_LEVEL_COLLECTION_ALIASES = {
@@ -380,7 +394,13 @@ def coerce_top_level_sidecar(
     coerced["family"] = family
     coerced["mode"] = mode
     coerced["profile"] = coerce_string(coerced.get("profile"), profile)
-    coerced["strategy"] = coerce_string(coerced.get("strategy") or plan_strategy, "invariant-audit" if profile == "security" else "production-gate")
+    if profile == "security":
+        default_strategy = "invariant-audit"
+    elif profile == "performance":
+        default_strategy = "static-capacity-sweep"
+    else:
+        default_strategy = "production-gate"
+    coerced["strategy"] = coerce_string(coerced.get("strategy") or plan_strategy, default_strategy)
     overlays = string_list(coerced.get("overlays")) or plan_overlays or ["auto"]
     coerced["overlays"] = overlays
     coerced["sidecar_id"] = coerce_string(coerced.get("sidecar_id") or coerced.get("id"), f"sidecar-{batch_id}-{family}-{stable_hash([report_path.as_posix()])}")
@@ -624,7 +644,19 @@ def coerce_sidecar_for_reduce(
 
 def root_cause_id(finding: dict[str, Any]) -> str:
     key = finding["dedupe_key"]
-    if "control_objective" in key:
+    if "bottleneck_class" in key:
+        short = stable_hash([
+            key["owner_family"],
+            key["bottleneck_class"],
+            key["resource_dimension"],
+            key["root_cause_location"],
+            key.get("workflow_id_or_entrypoint_id"),
+            key["trigger_load_condition"],
+            key["budget_dimension"],
+            key["cardinality_driver"],
+            key["impact_boundary"],
+        ])
+    elif "control_objective" in key:
         short = stable_hash([
             key["owner_family"],
             key["control_objective"],
@@ -647,7 +679,7 @@ def finding_id(finding: dict[str, Any], rc_id: str) -> str:
     key = finding["dedupe_key"]
     short = stable_hash([
         rc_id,
-        key.get("entrypoint") or finding.get("entrypoint") or finding.get("entrypoints", []),
+        key.get("workflow_id_or_entrypoint_id") or key.get("entrypoint") or finding.get("entrypoint") or finding.get("entrypoints", []),
         finding.get("files", []),
         key["impact_boundary"],
     ])
@@ -656,13 +688,25 @@ def finding_id(finding: dict[str, Any], rc_id: str) -> str:
 
 def candidate_id(candidate: dict[str, Any]) -> str:
     key = candidate["candidate_dedupe_key"]
-    short = stable_hash([
-        key["proposed_owner_family"],
-        key["summary"],
-        key["files"],
-        key.get("suspected_missing_guard") or key.get("suspected_missing_control"),
-        key.get("impact_boundary"),
-    ])
+    if "bottleneck_class" in key:
+        short = stable_hash([
+            key["proposed_owner_family"],
+            key["summary"],
+            key["files"],
+            key.get("bottleneck_class"),
+            key.get("resource_dimension"),
+            key.get("root_cause_location"),
+            key.get("trigger_load_condition"),
+            key.get("impact_boundary"),
+        ])
+    else:
+        short = stable_hash([
+            key["proposed_owner_family"],
+            key["summary"],
+            key["files"],
+            key.get("suspected_missing_guard") or key.get("suspected_missing_control"),
+            key.get("impact_boundary"),
+        ])
     return f"C-{key['proposed_owner_family']}-{short}"
 
 
@@ -1058,7 +1102,10 @@ def sidecar_from_candidate_file(
         "family": family,
         "mode": default_mode_for_batch(batch_id or "batch-01", family, selected_profile),
         "profile": profile,
-        "strategy": coerce_string(item.get("strategy"), "invariant-audit" if profile == "security" else "production-gate"),
+        "strategy": coerce_string(
+            item.get("strategy"),
+            "invariant-audit" if profile == "security" else ("static-capacity-sweep" if profile == "performance" else "production-gate"),
+        ),
         "overlays": string_list(item.get("overlays") or item.get("overlays_relevant")) or ["auto"],
         "baseline_commit": None,
         "reviewed_artifacts": files_from_item(item),
@@ -1266,6 +1313,21 @@ def confirmed_record(sidecar: dict[str, Any], finding: dict[str, Any], report_pa
         "detectability": finding.get("detectability"),
         "recoverability": finding.get("recoverability"),
         "launch_gate_effect": finding.get("launch_gate_effect"),
+        "entrypoint_id": finding.get("entrypoint_id"),
+        "budget_id": finding.get("budget_id"),
+        "budget_dimension": finding.get("budget_dimension"),
+        "bottleneck_class": finding.get("bottleneck_class"),
+        "resource_dimension": finding.get("resource_dimension"),
+        "root_cause_location": finding.get("root_cause_location"),
+        "trigger_load_condition": finding.get("trigger_load_condition"),
+        "demand_assumption": finding.get("demand_assumption"),
+        "cardinality_driver": finding.get("cardinality_driver"),
+        "growth_model": finding.get("growth_model"),
+        "amplification_factor": finding.get("amplification_factor"),
+        "impacted_budget": finding.get("impacted_budget"),
+        "affected_users_or_tenants": finding.get("affected_users_or_tenants"),
+        "degradation_behavior": finding.get("degradation_behavior"),
+        "proof_level": finding.get("proof_level"),
         "existing_controls_checked": finding.get("existing_controls_checked", []),
         "recommended_regression": finding.get("recommended_regression"),
         "severity_rationale": finding["severity_rationale"],
@@ -1320,6 +1382,17 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
         "detectability": candidate.get("detectability"),
         "recoverability": candidate.get("recoverability"),
         "launch_gate_effect": candidate.get("launch_gate_effect"),
+        "entrypoint_id": candidate.get("entrypoint_id"),
+        "budget_id": candidate.get("budget_id"),
+        "budget_dimension": candidate.get("budget_dimension"),
+        "bottleneck_class": candidate.get("bottleneck_class"),
+        "resource_dimension": candidate.get("resource_dimension"),
+        "root_cause_location": candidate.get("root_cause_location"),
+        "trigger_load_condition": candidate.get("trigger_load_condition"),
+        "demand_assumption": candidate.get("demand_assumption"),
+        "cardinality_driver": candidate.get("cardinality_driver"),
+        "impacted_budget": candidate.get("impacted_budget"),
+        "proof_level": candidate.get("proof_level"),
         "severity_rationale": None,
         "candidate_blocker": candidate["blocker_to_confirmation"],
         "runtime_status": None,

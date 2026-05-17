@@ -1,0 +1,1 @@
+{"schema_version":1,"budget_id":"budget.invoice-list.p95","workflow_id":"wf.invoice-list","budget_dimension":"p95-latency","target":"p95 under 500ms for normal tenant invoice lists."}

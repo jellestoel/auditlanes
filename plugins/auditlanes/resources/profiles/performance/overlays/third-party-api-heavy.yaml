@@ -1,0 +1,15 @@
+version: 1
+id: third-party-api-heavy
+profile: performance
+status: experimental
+description: "Projects with synchronous external API fanout, remote rate limits, or third-party latency amplification."
+priority_surfaces:
+  - remote-fanout
+  - rate-limits
+  - timeout-budget
+  - circuit-breakers
+maps_to_lanes:
+  synchronous-hot-paths:
+    - remote-latency-amplification
+  resource-saturation-degradation:
+    - degradation-controls

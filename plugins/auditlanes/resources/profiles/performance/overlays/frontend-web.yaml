@@ -1,0 +1,18 @@
+version: 1
+id: frontend-web
+profile: performance
+status: experimental
+description: "Browser-facing apps with bundle, hydration, client data loading, static asset, CDN, cache, or web vitals concerns."
+priority_surfaces:
+  - bundle-size
+  - hydration
+  - render-waterfalls
+  - client-data-loading
+  - static-assets
+  - cdn-cache
+maps_to_lanes:
+  client-edge-performance:
+    - browser-load-budget
+    - asset-cache-behavior
+  performance-assurance:
+    - frontend-regression-evidence

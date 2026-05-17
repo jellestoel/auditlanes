@@ -1,0 +1,17 @@
+version: 1
+id: serverless-cold-start
+profile: performance
+status: experimental
+description: "Serverless or scale-to-zero projects with cold start, warmup, deploy readiness, or burst-concurrency risks."
+priority_surfaces:
+  - cold-start
+  - warmup
+  - burst-concurrency
+  - deploy-readiness
+maps_to_lanes:
+  synchronous-hot-paths:
+    - cold-request-latency
+  resource-saturation-degradation:
+    - burst-capacity
+  performance-assurance:
+    - cold-start-evidence

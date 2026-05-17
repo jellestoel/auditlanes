@@ -1,0 +1,24 @@
+version: 1
+profile: performance
+lanes:
+  - id: workload-budget-model
+    owns: "Critical workflows, entrypoints, user journeys, demand assumptions, tenant and cardinality drivers, latency budgets, throughput targets, backlog limits, and missing budget evidence."
+  - id: synchronous-hot-paths
+    owns: "Request/response latency, API fanout, synchronous I/O, serialization, third-party calls, blocking work, p95/p99 risk, and deadline-sensitive request paths."
+  - id: data-access-scaling
+    owns: "N+1 queries, missing indexes, query-plan risk, pagination, unbounded scans, expensive aggregation, data growth, database locking, and database pool pressure."
+  - id: async-throughput-backlog
+    owns: "Queues, workers, cron jobs, async pipelines, retry storms, worker concurrency, backlog growth, batch jobs, imports, exports, and drain-rate assumptions."
+  - id: resource-saturation-degradation
+    owns: "CPU, memory, file descriptors, connection pools, cold starts, warmup, cache stampedes, degradation controls, backpressure, rate limits, and noisy-neighbor risks."
+  - id: client-edge-performance
+    owns: "Frontend bundle size, static assets, rendering waterfalls, client-side data loading, CDN/cache behavior, and user-visible load budgets."
+  - id: performance-assurance
+    owns: "Benchmarks, load tests, APM/trace evidence, performance regression tests, synthetic checks, dashboards, alert thresholds, and missing performance proof."
+specialists:
+  - id: capacity-gate-synthesis
+    owns: "Cross-lane capacity blockers, performance launch gates, budget breach grouping, residual risk, and go/no-go synthesis."
+    mode: capacity-gate-synthesis
+  - id: bottleneck-chain-synthesis
+    owns: "Multi-resource bottleneck chains spanning request paths, database, queues, caches, third parties, and degradation controls."
+    mode: bottleneck-chain-synthesis

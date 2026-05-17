@@ -1,0 +1,32 @@
+schema_version: 1
+profile: performance
+requested_strategy: static-capacity-sweep
+resolved_strategy: static-capacity-sweep
+resolved_overlays:
+  - db-heavy
+coverage_mode: risk-ranked
+resolution_reason: "Fixture performance profile run."
+runtime_validation: false
+output_style: structured
+repo_observations:
+  languages:
+    - typescript
+  approximate_loc: 5000
+  detected_frameworks:
+    - nextjs
+  detected_surfaces:
+    - database
+  inferred_archetypes:
+    - db-heavy
+selected_checks: []
+deprioritized_checks: []
+universal_checks_enabled: true
+agent_discretion_enabled: true
+uncertainty: []
+coverage_gaps: []
+advisor:
+  target_root: "/fixture/performance-app"
+  git_detected: true
+  prior_auditlanes_runs_detected: false
+  config_files:
+    - package.json

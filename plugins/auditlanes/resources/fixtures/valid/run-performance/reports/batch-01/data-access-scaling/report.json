@@ -1,0 +1,134 @@
+{
+  "schema_version": 4,
+  "sidecar_id": "sidecar-data-access-scaling-001",
+  "generated_at": "2026-05-17T00:00:00Z",
+  "run_id": "run-performance",
+  "batch_id": "batch-01",
+  "family": "data-access-scaling",
+  "mode": "hot-path-sweep",
+  "profile": "performance",
+  "strategy": "static-capacity-sweep",
+  "overlays": ["db-heavy"],
+  "baseline_commit": null,
+  "reviewed_artifacts": ["src/invoices.ts", "prisma/schema.prisma"],
+  "reviewed_files_routes_helpers": ["src/invoices.ts"],
+  "coverage_units_touched": ["workflow:wf.invoice-list", "entrypoint:GET /api/invoices"],
+  "confirmed_findings": [
+    {
+      "provisional_finding_id": "PF-performance-001",
+      "dedupe_key": {
+        "owner_family": "data-access-scaling",
+        "bottleneck_class": "n-plus-one",
+        "resource_dimension": "database",
+        "root_cause_location": "src/invoices.ts:loadInvoiceList",
+        "workflow_id_or_entrypoint_id": "wf.invoice-list",
+        "trigger_load_condition": "Tenant invoice list contains hundreds of invoices with line items.",
+        "budget_dimension": "p95-latency",
+        "cardinality_driver": "invoice count per tenant",
+        "impact_boundary": "invoice list latency grows linearly with tenant invoice count"
+      },
+      "owner_family": "data-access-scaling",
+      "workflow_id": "wf.invoice-list",
+      "entrypoint_id": "GET /api/invoices",
+      "budget_id": "budget.invoice-list.p95",
+      "budget_dimension": "p95-latency",
+      "bottleneck_class": "n-plus-one",
+      "resource_dimension": "database",
+      "root_cause_location": "src/invoices.ts:loadInvoiceList",
+      "trigger_load_condition": "Tenant invoice list contains hundreds of invoices with line items.",
+      "demand_assumption": "Normal tenants can accumulate hundreds of invoices.",
+      "cardinality_driver": "invoice count per tenant",
+      "growth_model": "O(N) extra line-item queries after the invoice list query.",
+      "amplification_factor": "one additional line-item query per invoice row",
+      "failure_mode": "Invoice list p95 latency and database query count grow linearly with tenant invoice count.",
+      "impacted_budget": "budget.invoice-list.p95",
+      "impact_boundary": "invoice list latency grows linearly with tenant invoice count",
+      "affected_users_or_tenants": "tenants with large invoice histories",
+      "existing_controls_checked": ["prisma/schema.prisma"],
+      "degradation_behavior": "No pagination or eager-loading bound is visible in the fixture.",
+      "detectability": "dashboard-or-log-visible",
+      "proof_level": "P2-modeled",
+      "status": "confirmed-static",
+      "confidence": "probable",
+      "severity": "high",
+      "launch_gate_effect": "module-gated",
+      "summary": "Invoice list performs per-invoice line-item loading in the fixture.",
+      "entrypoint": "GET /api/invoices",
+      "entrypoints": ["GET /api/invoices"],
+      "files": ["src/invoices.ts"],
+      "evidence_refs": [
+        {
+          "path": "src/invoices.ts",
+          "line_start": 20,
+          "line_end": 45,
+          "symbol": "loadInvoiceList",
+          "evidence_type": "service_function",
+          "snippet_hash": null,
+          "rationale": "Fixture evidence for per-invoice line-item loading."
+        }
+      ],
+      "recommended_regression": "Add a benchmark threshold for invoice list query count and p95 latency.",
+      "severity_rationale": "A core operational workflow can breach latency budget for normal large tenants under a concrete cardinality model.",
+      "why_confirmed": "The fixture intentionally models a static N+1 data access root cause with a concrete workflow and cardinality driver.",
+      "introduced_after_batch_01": false
+    }
+  ],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "incidental_leads": [],
+  "risk_signals": [
+    {
+      "signal_id": "RISK-performance-001",
+      "category": "n-plus-one",
+      "path": "src/invoices.ts",
+      "line_start": 20,
+      "description": "Invoice list fixture has per-row line-item loading.",
+      "recommended_owner": "data-access-scaling",
+      "status": "needs-triage"
+    }
+  ],
+  "proof_updates": [
+    {
+      "subject_id": "PF-performance-001",
+      "proof_level": "P2-modeled",
+      "evidence_summary": "Static fixture evidence plus cardinality model identifies per-invoice query growth.",
+      "evidence_refs": [
+        {
+          "path": "src/invoices.ts",
+          "line_start": 20,
+          "line_end": 45,
+          "symbol": "loadInvoiceList",
+          "evidence_type": "service_function",
+          "snippet_hash": null,
+          "rationale": "Fixture evidence for proof update."
+        }
+      ]
+    }
+  ],
+  "regression_recommendations": [
+    {
+      "finding_id": "PF-performance-001",
+      "recommended_regression": "benchmark threshold",
+      "test_name": "bench_invoice_list_query_count",
+      "guard_asserted": "invoice list query count remains bounded for large tenants",
+      "automation_status": "proposed",
+      "owner_hint": "backend"
+    }
+  ],
+  "performance_workflow_inventory_updates": [],
+  "performance_budget_updates": [],
+  "hot_path_map_updates": [],
+  "data_access_ledger_updates": [],
+  "async_capacity_ledger_updates": [],
+  "resource_saturation_ledger_updates": [],
+  "dependency_amplification_ledger_updates": [],
+  "client_edge_ledger_updates": [],
+  "performance_evidence_map_updates": [],
+  "performance_coverage_gap_updates": [],
+  "next_batch_recommendations": []
+}

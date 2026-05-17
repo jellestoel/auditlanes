@@ -33,9 +33,15 @@ profiles:
     overlays_root: "resources/profiles/production-integrity/overlays"
     cross_lane_triggers_file: "resources/profiles/production-integrity/cross-lane-triggers.yaml"
   - id: performance
-    status: planned
-    implemented: false
-    description: "Performance and scalability audit profile."
+    status: experimental
+    implemented: true
+    description: "Experimental runtime performance and capacity profile for latency, throughput, saturation, backlog, degradation, and performance evidence risks."
+    profile_root: "resources/profiles/performance"
+    profile_file: "resources/profiles/performance/profile.yaml"
+    lanes_file: "resources/profiles/performance/lanes.yaml"
+    strategies_root: "resources/profiles/performance/strategies"
+    overlays_root: "resources/profiles/performance/overlays"
+    cross_lane_triggers_file: "resources/profiles/performance/cross-lane-triggers.yaml"
   - id: reliability
     status: planned
     implemented: false

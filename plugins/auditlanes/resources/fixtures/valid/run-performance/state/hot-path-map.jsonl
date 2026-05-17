@@ -1,0 +1,1 @@
+{"schema_version":1,"entrypoint_id":"GET /api/invoices","path":"src/invoices.ts","lane":"data-access-scaling"}

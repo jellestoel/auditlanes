@@ -1,0 +1,1 @@
+{"schema_version":1,"path":"src/invoices.ts","finding_hint":"N+1 line-item load in invoice list fixture."}

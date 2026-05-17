@@ -1,0 +1,50 @@
+schema_version: 1
+run_id: run-performance
+batch_id: batch-01
+generated_at: "2026-05-17T00:00:00Z"
+producer: orchestrator
+manifest_status: completed
+expected_families:
+  - workload-budget-model
+  - synchronous-hot-paths
+  - data-access-scaling
+  - async-throughput-backlog
+  - resource-saturation-degradation
+  - client-edge-performance
+  - performance-assurance
+families:
+  - family: workload-budget-model
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/workload-budget-model/report.md"
+    json: "${RUN_DIR}/reports/batch-01/workload-budget-model/report.json"
+  - family: synchronous-hot-paths
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/synchronous-hot-paths/report.md"
+    json: "${RUN_DIR}/reports/batch-01/synchronous-hot-paths/report.json"
+  - family: data-access-scaling
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/data-access-scaling/report.md"
+    json: "${RUN_DIR}/reports/batch-01/data-access-scaling/report.json"
+  - family: async-throughput-backlog
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/async-throughput-backlog/report.md"
+    json: "${RUN_DIR}/reports/batch-01/async-throughput-backlog/report.json"
+  - family: resource-saturation-degradation
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/resource-saturation-degradation/report.md"
+    json: "${RUN_DIR}/reports/batch-01/resource-saturation-degradation/report.json"
+  - family: client-edge-performance
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/client-edge-performance/report.md"
+    json: "${RUN_DIR}/reports/batch-01/client-edge-performance/report.json"
+  - family: performance-assurance
+    status: ran
+    mode: hot-path-sweep
+    markdown: "${RUN_DIR}/reports/batch-01/performance-assurance/report.md"
+    json: "${RUN_DIR}/reports/batch-01/performance-assurance/report.json"

@@ -1,0 +1,37 @@
+version: 1
+id: performance
+status: experimental
+implemented: true
+report_sidecar_schema: performance-report-sidecar.schema.json
+lane_source: lanes.yaml
+strategy_source: strategies
+overlay_source: overlays
+cross_lane_trigger_source: cross-lane-triggers.yaml
+default_strategy: static-capacity-sweep
+default_overlays:
+  - auto
+description: "Runtime performance and capacity review for latency, throughput, resource saturation, backlog growth, degradation behavior, and performance evidence."
+default_execution_mode: agent-team
+execution_fallback_order:
+  - subagent
+  - single-session
+stability_notes:
+  - "Experimental runnable profile; static and modeled by default."
+  - "Does not replace benchmarks, APM, profilers, database query-plan tools, browser performance tooling, or load testing."
+  - "High and critical findings require a concrete workflow, trigger load condition, root cause, affected budget or resource, and proof level."
+non_goals:
+  - "Generic micro-optimization advice."
+  - "Broad SRE maturity assessment."
+  - "Cloud cost review unless cost is caused by a concrete capacity or amplification risk."
+  - "Security denial-of-service review except as incidental security leads."
+  - "Production correctness, reconciliation, recovery, and cutover findings except as incidental production-integrity leads."
+  - "Claiming exact p95 or p99 latency without modeled, runtime-safe, benchmark, APM, or regression-backed evidence."
+external_gate_exports:
+  - target_profile: production-integrity
+    export_severities:
+      - critical
+      - high
+    export_launch_gate_effects:
+      - module-gated
+      - no-go
+    export_as: launch-gates

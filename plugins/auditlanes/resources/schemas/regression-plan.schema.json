@@ -27,6 +27,12 @@
       "enum": [
         "unit test",
         "integration test",
+        "scenario test",
+        "e2e or smoke test",
+        "benchmark threshold",
+        "load test",
+        "APM/synthetic check",
+        "runtime check",
         "policy test",
         "configuration assertion",
         "custom static rule",

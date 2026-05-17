@@ -10,8 +10,9 @@ Run the AuditLanes multi-lane audit protocol for the target repository.
 Use this skill only when the operator explicitly asks for AuditLanes or for a
 structured audit. The stable runnable profile is `security`.
 `production-integrity` is an experimental runnable profile for launch integrity.
-`architecture` is experimental metadata only and should not be run as a
-production audit mode until its `profile.yaml` sets `implemented: true`.
+`performance` is an experimental runnable profile for runtime performance and
+capacity risks. `architecture` is experimental metadata only and should not be
+run as a production audit mode until its `profile.yaml` sets `implemented: true`.
 
 If the operator asks Codex for an AuditLanes scan, security audit,
 vulnerability review, or full codebase audit without explicitly asking for
@@ -26,6 +27,7 @@ compare strategies, preview options, or run a non-security profile. Recommend
 after security when the operator wants a launch/no-go review for durable state,
 generated commitments, lifecycle recovery, cutover controls, and assurance
 evidence. For production-integrity, default to `strategy: production-gate`.
+For performance, default to `strategy: static-capacity-sweep`.
 Calibration must resolve profile strategy, overlay set, coverage mode,
 suggested checks, and agent-discretion flags in `state/relevance-plan.yaml`.
 Suggested checks frame the review; they do not bound reviewer judgment.

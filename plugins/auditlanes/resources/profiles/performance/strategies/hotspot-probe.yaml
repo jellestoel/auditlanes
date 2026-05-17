@@ -1,0 +1,21 @@
+version: 1
+id: hotspot-probe
+profile: performance
+status: experimental
+description: "Focused performance review of known or suspected slow workflows, endpoints, jobs, reports, or resource bottlenecks."
+allowed_modes:
+  - hot-path-sweep
+  - data-access-sweep
+  - async-capacity-sweep
+  - resource-saturation-sweep
+  - client-edge-sweep
+  - runtime-safe
+  - evidence-gap-fill
+  - capacity-gate-synthesis
+review_requirements:
+  - "Tie every confirmed hotspot to a named workflow, entrypoint, trigger load condition, and budget or resource dimension."
+  - "Use runtime-safe mode only when the operator has approved runtime validation or supplied existing traces, APM, benchmark, or log evidence."
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true

@@ -1,0 +1,19 @@
+version: 1
+id: queue-heavy
+profile: performance
+status: experimental
+description: "Projects with background jobs, workers, event pipelines, scheduled tasks, async side effects, or queue drain-rate risk."
+priority_surfaces:
+  - queue-backlog
+  - worker-concurrency
+  - retry-storms
+  - drain-rate
+  - batch-window
+maps_to_lanes:
+  async-throughput-backlog:
+    - backlog-growth
+    - retry-amplification
+  resource-saturation-degradation:
+    - worker-resource-pressure
+  performance-assurance:
+    - drain-rate-evidence

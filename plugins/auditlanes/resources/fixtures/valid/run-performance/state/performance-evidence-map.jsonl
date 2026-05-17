@@ -1,0 +1,1 @@
+{"schema_version":1,"subject_id":"PF-performance-001","proof_level":"P2-modeled","summary":"Fixture static model links invoice count to per-row query growth."}

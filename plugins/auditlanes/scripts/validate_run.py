@@ -876,13 +876,34 @@ def validate_sidecar_profile(
         if isinstance(dedupe_owner, str) and dedupe_owner not in lanes:
             issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].dedupe_key.owner_family", f"owner family {dedupe_owner!r} is not a lane in profile {profile_id!r}"))
         dedupe_key = finding.get("dedupe_key") if isinstance(finding.get("dedupe_key"), dict) else {}
-        if profile_id == "production-integrity":
+        if profile_id == "performance":
+            mirror_fields = (
+                "owner_family",
+                "bottleneck_class",
+                "resource_dimension",
+                "root_cause_location",
+                "trigger_load_condition",
+                "budget_dimension",
+                "cardinality_driver",
+                "impact_boundary",
+            )
+        elif profile_id == "production-integrity":
             mirror_fields = ("owner_family", "control_objective", "failure_mode", "missing_control", "impact_boundary")
         else:
             mirror_fields = ("owner_family", "security_invariant", "missing_guard", "entrypoint", "impact_boundary")
         for field in mirror_fields:
             if field in finding and field in dedupe_key and finding[field] != dedupe_key[field]:
                 issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].dedupe_key.{field}", f"must mirror confirmed_finding.{field} exactly"))
+        if profile_id == "performance":
+            proof_level = finding.get("proof_level")
+            severity = finding.get("severity")
+            static_exception = finding.get("static_proof_exception") is True
+            if severity in {"critical", "high"} and proof_level in {"P0-lead", "P1-candidate", "P1-static-structural"} and not static_exception:
+                issues.append(ValidationIssue(
+                    sidecar_path,
+                    f"$.confirmed_findings[{index}].proof_level",
+                    "high/critical performance findings require P2-or-stronger proof unless static_proof_exception=true",
+                ))
         if sidecar.get("batch_id") == "batch-01" and finding.get("introduced_after_batch_01") is True:
             issues.append(ValidationIssue(sidecar_path, f"$.confirmed_findings[{index}].introduced_after_batch_01", "batch-01 findings must not be marked introduced_after_batch_01"))
 
@@ -927,7 +948,18 @@ def validate_sidecar_profile(
         if isinstance(dedupe_owner, str) and dedupe_owner not in lanes:
             issues.append(ValidationIssue(sidecar_path, f"$.candidate_findings[{index}].candidate_dedupe_key.proposed_owner_family", f"owner family {dedupe_owner!r} is not a lane in profile {profile_id!r}"))
         dedupe_key = candidate.get("candidate_dedupe_key") if isinstance(candidate.get("candidate_dedupe_key"), dict) else {}
-        if profile_id == "production-integrity":
+        if profile_id == "performance":
+            mirror_fields = (
+                "proposed_owner_family",
+                "summary",
+                "files",
+                "bottleneck_class",
+                "resource_dimension",
+                "root_cause_location",
+                "trigger_load_condition",
+                "impact_boundary",
+            )
+        elif profile_id == "production-integrity":
             mirror_fields = ("proposed_owner_family", "summary", "files", "suspected_missing_control", "impact_boundary")
         else:
             mirror_fields = ("proposed_owner_family", "summary", "files", "suspected_missing_guard", "impact_boundary")

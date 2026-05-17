@@ -1,0 +1,1 @@
+{"schema_version":1,"workflow_id":"wf.invoice-list","entrypoint_id":"GET /api/invoices","summary":"Fixture invoice list workflow with growing tenant cardinality."}

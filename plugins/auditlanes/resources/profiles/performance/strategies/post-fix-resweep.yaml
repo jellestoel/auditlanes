@@ -1,0 +1,17 @@
+version: 1
+id: post-fix-resweep
+profile: performance
+status: experimental
+description: "Focused resweep after performance/capacity fixes, checking root-cause closure, proof upgrades, and regression coverage."
+allowed_modes:
+  - post-fix-resweep
+  - runtime-safe
+  - capacity-gate-synthesis
+review_requirements:
+  - "Re-read changed code paths and original evidence, not only patch summaries."
+  - "Confirm fixes close the root bottleneck instead of only handling the demonstrated sample."
+  - "Require a modeled, benchmark, runtime-safe, APM, or regression-backed proof update for fixed high/critical findings."
+anti_tunnel:
+  universal_reportability: true
+  reviewers_may_emit_out_of_lane_leads: true
+  reducer_assigns_final_owner: true

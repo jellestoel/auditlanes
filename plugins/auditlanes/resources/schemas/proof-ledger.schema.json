@@ -21,9 +21,13 @@
       "enum": [
         "P0-lead",
         "P1-candidate",
+        "P1-static-structural",
         "P2-static-confirmed",
+        "P2-modeled",
         "P3-reachability-confirmed",
+        "P3-runtime-safe-observed",
         "P4-runtime-confirmed",
+        "P4-benchmark-or-apm-backed",
         "P5-regression-backed"
       ]
     },

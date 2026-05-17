@@ -1,0 +1,18 @@
+version: 1
+id: large-batch
+profile: performance
+status: experimental
+description: "Projects with imports, exports, reports, backfills, migrations, generated documents, or batch reconciliation workloads."
+priority_surfaces:
+  - batch-window
+  - report-generation
+  - import-export-throughput
+  - backfill-duration
+  - generated-document-throughput
+maps_to_lanes:
+  async-throughput-backlog:
+    - batch-drain-rate
+  data-access-scaling:
+    - report-query-shape
+  performance-assurance:
+    - batch-regression-evidence

@@ -1,0 +1,13 @@
+version: 1
+id: auto
+profile: performance
+status: experimental
+description: "Calibration-selected performance overlays. The advisor should replace this with concrete overlays when profile-aware performance calibration is implemented."
+selection_rules:
+  - "Select `db-heavy` when ORM usage, migrations, SQL, reporting queries, analytics tables, or growing relational datasets are present."
+  - "Select `queue-heavy` when queues, workers, cron jobs, event pipelines, scheduled tasks, imports, exports, or async side effects are present."
+  - "Select `frontend-web` when browser-facing bundles, hydration, client-side routing, or web vitals concerns are present."
+  - "Select `multi-tenant` when tenants, organizations, workspaces, customers, or regions can affect shared resources."
+  - "Select `third-party-api-heavy` when synchronous external API fanout, rate limits, or remote dependency latency are core workflow risks."
+  - "Select `large-batch` when imports, exports, reports, backfills, migrations, generated documents, or batch reconciliation are present."
+  - "Select `serverless-cold-start` when serverless functions, scale-to-zero services, cold-start paths, or deploy warmup risk are present."

@@ -94,6 +94,30 @@ class SidecarCompatibilityTests(unittest.TestCase):
         self.assertIn("money-documents-workflows", profile["overlays"])
         self.assertTrue(profile["cross_lane_triggers"])
 
+    def test_performance_profile_loads_as_experimental_runnable(self):
+        validator = load_validator_module()
+        profile = validator.load_profile("performance", PLUGIN_ROOT / "resources" / "profiles")
+        self.assertTrue(profile["implemented"])
+        self.assertEqual(profile["report_sidecar_schema"], "performance-report-sidecar.schema.json")
+        self.assertEqual(profile["default_strategy"], "static-capacity-sweep")
+        self.assertEqual(
+            profile["lane_order"],
+            [
+                "workload-budget-model",
+                "synchronous-hot-paths",
+                "data-access-scaling",
+                "async-throughput-backlog",
+                "resource-saturation-degradation",
+                "client-edge-performance",
+                "performance-assurance",
+            ],
+        )
+        self.assertIn("capacity-gate-synthesis", profile["specialists"])
+        self.assertIn("bottleneck-chain-synthesis", profile["specialists"])
+        self.assertIn("static-capacity-sweep", profile["strategies"])
+        self.assertIn("db-heavy", profile["overlays"])
+        self.assertTrue(profile["cross_lane_triggers"])
+
 
 if __name__ == "__main__":
     unittest.main()

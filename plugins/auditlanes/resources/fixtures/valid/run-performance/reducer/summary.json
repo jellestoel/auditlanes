@@ -1,0 +1,16 @@
+{
+  "chains": 0,
+  "events": 1,
+  "family_directives": 0,
+  "incidental_leads": 0,
+  "lenient_warnings": 0,
+  "profile_feedback": 0,
+  "proof_updates": 1,
+  "records": 1,
+  "regression_recommendations": 1,
+  "rejected": 0,
+  "risk_signals": 1,
+  "run_local_checks": 0,
+  "runtime_updates": 0,
+  "security_smells": 0
+}
