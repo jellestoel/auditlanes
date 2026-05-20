@@ -328,7 +328,7 @@ def files_from_item(item: dict[str, Any], sidecar: dict[str, Any] | None = None)
         value = item.get(field)
         if isinstance(value, str) and value:
             files.append(validate_run.repo_path_without_line_suffix(value))
-    refs = item.get("evidence_refs") or item.get("evidence") or item.get("refs") or []
+    refs = item.get("evidence_refs") or item.get("evidence") or item.get("refs") or item.get("source_refs") or []
     for ref in as_list(refs):
         if isinstance(ref, str):
             path, _ = path_line_from_string(ref)
@@ -1411,21 +1411,35 @@ def candidate_record(sidecar: dict[str, Any], candidate: dict[str, Any], report_
 def incidental_lead_record(sidecar: dict[str, Any], lead: dict[str, Any], report_path: Path) -> dict[str, Any]:
     batch_id = sidecar["batch_id"]
     family = sidecar["family"]
+    files = files_from_item(lead, sidecar)
+    summary = coerce_string(lead.get("summary") or lead.get("title") or lead.get("description"), "Unspecified incidental lead.")
+    noticed_by = coerce_string(lead.get("noticed_by_family") or lead.get("source_family") or lead.get("family"), family)
+    proposed_owner = coerce_string(
+        lead.get("proposed_owner_family") or lead.get("owner_family") or lead.get("recommended_owner"),
+        noticed_by,
+    )
+    lead_id = coerce_string(
+        lead.get("lead_id") or lead.get("id"),
+        f"LEAD-{noticed_by}-{stable_hash([sidecar.get('sidecar_id'), summary, files])}",
+    )
     return {
         "schema_version": STATE_SCHEMA_VERSION,
-        "lead_id": lead["lead_id"],
-        "noticed_by_family": lead["noticed_by_family"],
-        "proposed_owner_family": lead["proposed_owner_family"],
-        "source_reports": [source_report(batch_id, family, report_path, lead["lead_id"])],
+        "lead_id": lead_id,
+        "noticed_by_family": noticed_by,
+        "proposed_owner_family": proposed_owner,
+        "source_reports": [source_report(batch_id, family, report_path, lead_id)],
         "first_seen_batch": batch_id,
         "last_touched_batch": batch_id,
-        "severity_hint": lead["severity_hint"],
-        "confidence": lead["confidence"],
-        "summary": lead["summary"],
+        "severity_hint": coerce_enum(lead.get("severity_hint") or lead.get("severity"), SEVERITIES, "medium"),
+        "confidence": coerce_enum(lead.get("confidence"), CONFIDENCES, "speculative"),
+        "summary": summary,
         "why_noticed": lead.get("why_noticed"),
-        "blocker_to_confirmation": lead["blocker_to_confirmation"],
-        "files": lead.get("files", []),
-        "evidence_refs": lead.get("evidence_refs", []),
+        "blocker_to_confirmation": coerce_string(
+            lead.get("blocker_to_confirmation") or lead.get("blocker"),
+            "Needs owner-lane confirmation.",
+        ),
+        "files": files,
+        "evidence_refs": coerce_evidence_refs(lead, files, "Reducer imported incidental lead evidence."),
         "status": "needs-triage",
     }
 
@@ -1452,19 +1466,34 @@ def security_smell_record(sidecar: dict[str, Any], smell: dict[str, Any], report
 def risk_signal_record(sidecar: dict[str, Any], signal: dict[str, Any], report_path: Path) -> dict[str, Any]:
     batch_id = sidecar["batch_id"]
     family = sidecar["family"]
+    files = files_from_item(signal, sidecar)
+    description = coerce_string(
+        signal.get("description") or signal.get("summary") or signal.get("title"),
+        "Unspecified risk signal.",
+    )
+    signal_id = coerce_string(
+        signal.get("signal_id") or signal.get("risk_id") or signal.get("id"),
+        f"RISK-{stable_hash([sidecar.get('sidecar_id'), description, files])}",
+    )
     return {
         "schema_version": STATE_SCHEMA_VERSION,
-        "signal_id": signal["signal_id"],
-        "category": signal["category"],
+        "signal_id": signal_id,
+        "category": coerce_string(signal.get("category") or signal.get("risk_type"), "general"),
         "source_family": family,
-        "source_reports": [source_report(batch_id, family, report_path, signal["signal_id"])],
+        "source_reports": [source_report(batch_id, family, report_path, signal_id)],
         "first_seen_batch": batch_id,
         "last_touched_batch": batch_id,
-        "path": signal["path"],
-        "line_start": signal.get("line_start"),
-        "description": signal["description"],
-        "recommended_owner": signal["recommended_owner"],
-        "status": signal["status"],
+        "path": coerce_string(signal.get("path") or (files[0] if files else None), "unknown"),
+        "line_start": coerce_int(signal.get("line_start") or signal.get("line"), 0) or None,
+        "description": description,
+        "recommended_owner": coerce_string(
+            signal.get("recommended_owner")
+            or signal.get("owner_family_hint")
+            or signal.get("owner_family")
+            or signal.get("source_family"),
+            family,
+        ),
+        "status": coerce_enum(signal.get("status"), {"needs-triage", "promoted", "rejected"}, "needs-triage"),
     }
 
 
@@ -2296,19 +2325,20 @@ def reduce_run(
                 raise
         for lead in sidecar.get("incidental_leads", []):
             try:
-                incidental_leads.append(incidental_lead_record(sidecar, lead, relative_report_path))
+                lead_record = incidental_lead_record(sidecar, lead, relative_report_path)
+                incidental_leads.append(lead_record)
             except Exception as exc:  # noqa: BLE001
                 if lenient:
                     warn_lenient(lenient_warnings, f"{report_path}: skipped incidental lead during import: {exc}")
                     continue
                 raise
-            if lead.get("noticed_by_family") != lead.get("proposed_owner_family"):
+            if lead_record.get("noticed_by_family") != lead_record.get("proposed_owner_family"):
                 events.append(make_event(
                     "out-of-lane-lead-imported",
                     current_batch,
                     sidecar.get("family"),
                     "info",
-                    f"Imported incidental lead {lead.get('lead_id')} from {lead.get('noticed_by_family')} for {lead.get('proposed_owner_family')}.",
+                    f"Imported incidental lead {lead_record.get('lead_id')} from {lead_record.get('noticed_by_family')} for {lead_record.get('proposed_owner_family')}.",
                     input_hashes,
                 ))
         for smell in sidecar.get("security_smells", []):
@@ -2381,19 +2411,37 @@ def reduce_run(
                 "subsumed_by": claim.get("subsumed_by"),
             })
         for feedback in sidecar.get("profile_feedback", []):
-            if not isinstance(feedback, dict) or not all(key in feedback for key in ("profile_gap_id", "family", "observed_issue", "suggested_change", "urgency")):
+            if not isinstance(feedback, dict):
                 if lenient:
                     warn_lenient(lenient_warnings, f"{report_path}: skipped malformed profile feedback")
                     continue
+                raise TypeError("profile feedback must be an object")
+            observed_issue = coerce_string(
+                feedback.get("observed_issue") or feedback.get("note") or feedback.get("summary") or feedback.get("title"),
+                "Unspecified profile feedback.",
+            )
+            feedback_family = coerce_string(feedback.get("family") or feedback.get("source_family"), sidecar["family"])
+            feedback_id = coerce_string(
+                feedback.get("profile_gap_id") or feedback.get("feedback_id") or feedback.get("id"),
+                f"PG-{feedback_family}-{stable_hash([sidecar.get('sidecar_id'), observed_issue])}",
+            )
+            files = files_from_item(feedback, sidecar)
             profile_feedback.append({
                 "schema_version": STATE_SCHEMA_VERSION,
-                "profile_gap_id": feedback["profile_gap_id"],
-                "family": feedback["family"],
-                "affected_families": feedback.get("affected_families", []),
-                "observed_issue": feedback["observed_issue"],
-                "suggested_change": feedback["suggested_change"],
-                "evidence_refs": feedback.get("evidence_refs", []),
-                "urgency": feedback["urgency"],
+                "profile_gap_id": feedback_id,
+                "family": feedback_family,
+                "affected_families": [
+                    family
+                    for family in (normalize_text(item) for item in as_list(feedback.get("affected_families")))
+                    if family
+                ],
+                "observed_issue": observed_issue,
+                "suggested_change": coerce_string(
+                    feedback.get("suggested_change") or feedback.get("recommendation"),
+                    "Review the profile contract for this lane output shape.",
+                ),
+                "evidence_refs": coerce_evidence_refs(feedback, files, "Reducer imported profile feedback evidence."),
+                "urgency": coerce_enum(feedback.get("urgency"), {"high", "medium", "low"}, "medium"),
                 "reducer_status": "deferred",
                 "reducer_reason": "v0.4 reducer records profile feedback but does not mutate scope.",
             })

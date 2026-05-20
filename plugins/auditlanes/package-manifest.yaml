@@ -1,4 +1,4 @@
-version: 0.4.21
+version: 0.4.22
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -169,7 +169,7 @@ validator_status:
     - "resources/schemas/scenario-observation.schema.json"
     - "resources/schemas/workflow-score-row.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.21 ships a direct profile-aware validator script with single-sidecar, grouped-output, state-only, and security completion-gate modes."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.22 ships a direct profile-aware validator script with single-sidecar, grouped-output, state-only, and security completion-gate modes."
 
 advisor_status:
   current_release: "minimal-script"
@@ -195,7 +195,7 @@ reducer_status:
     - "same-ID status transition guard"
     - "lenient recovery mode with persisted summary, reducer warning events, and pre-repair state snapshots"
     - "optional normalized sidecar rewrite after lenient coercion"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.21 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.22 reduces valid sidecars into deterministic state files, emits basic follow-up directives, imports compact workflow-evidence auxiliary records without lenient mode, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
 
 profile_status:
   implemented:

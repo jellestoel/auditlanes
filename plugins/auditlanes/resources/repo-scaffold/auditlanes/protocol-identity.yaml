@@ -3,7 +3,7 @@ name: auditlanes-protocol-identity
 
 package:
   name: auditlanes
-  version: "0.4.21"
+  version: "0.4.22"
   profile: security
 
 trust_model:

@@ -15,6 +15,7 @@ VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 CANDIDATE_DUPES_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-candidate-dupes"
 PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
 PERFORMANCE_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-performance"
+WORKFLOW_EVIDENCE_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-workflow-evidence"
 
 
 def read_jsonl(path: Path):
@@ -413,6 +414,73 @@ class ReduceRunTests(unittest.TestCase):
         self.assertTrue(any(event["event_type"] == "out-of-lane-lead-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "run-local-check-imported" for event in events))
         self.assertTrue(any(event["event_type"] == "cross-lane-trigger-matched" for event in events))
+
+    def test_workflow_evidence_reducer_imports_compact_incidental_leads_strictly(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / WORKFLOW_EVIDENCE_RUN.name
+        shutil.copytree(WORKFLOW_EVIDENCE_RUN, run_copy)
+        sidecar_path = run_copy / "reports" / "batch-01" / "static-topology" / "report.json"
+        sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        sidecar["incidental_leads"] = [{
+            "lead_id": "lead-static-topology-001",
+            "summary": "Static workflow atlas needs read-only enrichment before usage ranking.",
+            "source_refs": ["resources/profiles/workflow-evidence/profile.yaml"],
+            "route_hint": "backlog-synthesis",
+        }]
+        sidecar["risk_signals"] = [{
+            "risk_id": "risk-static-topology-001",
+            "severity": "medium",
+            "category": "static-only-confidence-cap",
+            "title": "Static atlas observations must not be counted as real usage.",
+            "source_refs": ["resources/profiles/workflow-evidence/strategies/static-atlas.yaml"],
+            "recommendation": "Run read-only enrichment before ranking workflow usage.",
+        }]
+        sidecar["profile_feedback"] = [{
+            "note": "Workflow-evidence compact profile feedback should reduce without lenient mode.",
+        }]
+        sidecar_path.write_text(json.dumps(sidecar, indent=2), encoding="utf-8")
+
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), str(run_copy), "--profile", "workflow-evidence"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        summary = json.loads(result.stdout)
+        self.assertEqual(summary["incidental_leads"], 1)
+        self.assertEqual(summary["risk_signals"], 1)
+        self.assertEqual(summary["profile_feedback"], 1)
+
+        validate_result = subprocess.run(
+            [sys.executable, str(VALIDATE_SCRIPT), str(run_copy), "--profile", "workflow-evidence"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(validate_result.returncode, 0, validate_result.stderr)
+
+        leads = read_jsonl(run_copy / "state" / "incidental-leads.jsonl")
+        self.assertEqual(leads[0]["lead_id"], "lead-static-topology-001")
+        self.assertEqual(leads[0]["noticed_by_family"], "static-topology")
+        self.assertEqual(leads[0]["proposed_owner_family"], "static-topology")
+        self.assertEqual(leads[0]["severity_hint"], "medium")
+        self.assertEqual(leads[0]["confidence"], "speculative")
+        self.assertEqual(leads[0]["blocker_to_confirmation"], "Needs owner-lane confirmation.")
+        self.assertEqual(leads[0]["files"], ["resources/profiles/workflow-evidence/profile.yaml"])
+        risks = read_jsonl(run_copy / "state" / "risk-signals.jsonl")
+        self.assertEqual(risks[0]["signal_id"], "risk-static-topology-001")
+        self.assertEqual(risks[0]["recommended_owner"], "static-topology")
+        self.assertEqual(risks[0]["path"], "resources/profiles/workflow-evidence/strategies/static-atlas.yaml")
+        self.assertEqual(risks[0]["status"], "needs-triage")
+        feedback = read_jsonl(run_copy / "state" / "profile-feedback.jsonl")
+        self.assertEqual(feedback[0]["family"], "static-topology")
+        self.assertEqual(feedback[0]["urgency"], "medium")
+        self.assertEqual(
+            feedback[0]["observed_issue"],
+            "Workflow-evidence compact profile feedback should reduce without lenient mode.",
+        )
 
     def test_reducer_repairs_stale_extra_fields_in_owned_state(self):
         tmp = tempfile.TemporaryDirectory()
