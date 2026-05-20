@@ -1,6 +1,6 @@
 {
   "name": "auditlanes",
-  "version": "0.4.19",
+  "version": "0.4.20",
   "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
   "skills": "./skills/",
   "author": {
@@ -11,6 +11,7 @@
     "security",
     "audit",
     "vulnerability-review",
-    "agent-workflow"
+    "agent-workflow",
+    "workflow-evidence"
   ]
 }

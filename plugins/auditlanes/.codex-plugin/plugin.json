@@ -1,6 +1,6 @@
 {
   "name": "auditlanes",
-  "version": "0.4.19",
+  "version": "0.4.20",
   "description": "Run an agent-assisted multi-lane codebase audit workflow with structured reports and reducer state.",
   "author": {
     "name": "AuditLanes"
@@ -10,13 +10,14 @@
     "security",
     "audit",
     "vulnerability-review",
-    "agent-workflow"
+    "agent-workflow",
+    "workflow-evidence"
   ],
   "skills": "./codex-skills/",
   "interface": {
     "displayName": "AuditLanes",
     "shortDescription": "Structured multi-lane codebase audits",
-    "longDescription": "Coordinates calibrated audit lanes, structured JSON sidecars, reducer state, and final audit reports. Security is the stable bundled profile; production-integrity is experimental runnable; architecture is metadata-only.",
+    "longDescription": "Coordinates calibrated audit lanes, structured JSON sidecars, reducer state, and final audit reports. Security is the stable bundled profile; production-integrity, performance, and workflow-evidence are experimental runnable; architecture is metadata-only.",
     "developerName": "AuditLanes",
     "category": "Developer Tools",
     "capabilities": [
