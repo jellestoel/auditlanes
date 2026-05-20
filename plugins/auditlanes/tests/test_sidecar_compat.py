@@ -118,6 +118,31 @@ class SidecarCompatibilityTests(unittest.TestCase):
         self.assertIn("db-heavy", profile["overlays"])
         self.assertTrue(profile["cross_lane_triggers"])
 
+    def test_workflow_evidence_profile_loads_as_experimental_runnable(self):
+        validator = load_validator_module()
+        profile = validator.load_profile("workflow-evidence", PLUGIN_ROOT / "resources" / "profiles")
+        self.assertTrue(profile["implemented"])
+        self.assertEqual(profile["report_sidecar_schema"], "workflow-evidence-report-sidecar.schema.json")
+        self.assertEqual(profile["default_strategy"], "static-atlas")
+        self.assertEqual(
+            profile["lane_order"],
+            [
+                "static-topology",
+                "tenant-segmentation",
+                "business-completion",
+                "runtime-side-effects",
+                "fixture-readiness",
+                "backlog-synthesis",
+            ],
+        )
+        self.assertIn("evidence-atlas-synthesis", profile["specialists"])
+        self.assertIn("release-test-selection", profile["specialists"])
+        self.assertIn("static-atlas", profile["strategies"])
+        self.assertIn("read-only-enrichment", profile["strategies"])
+        self.assertIn("multi-tenant-workflow-atlas", profile["overlays"])
+        self.assertIn("django-legacy-gae", profile["overlays"])
+        self.assertTrue(profile["cross_lane_triggers"])
+
 
 if __name__ == "__main__":
     unittest.main()

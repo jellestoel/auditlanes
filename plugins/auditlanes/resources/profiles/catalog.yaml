@@ -42,6 +42,16 @@ profiles:
     strategies_root: "resources/profiles/performance/strategies"
     overlays_root: "resources/profiles/performance/overlays"
     cross_lane_triggers_file: "resources/profiles/performance/cross-lane-triggers.yaml"
+  - id: workflow-evidence
+    status: experimental
+    implemented: true
+    description: "Experimental workflow evidence atlas profile for mapping customer workflows, scenario observations, fixture readiness, and release-risk E2E tier recommendations."
+    profile_root: "resources/profiles/workflow-evidence"
+    profile_file: "resources/profiles/workflow-evidence/profile.yaml"
+    lanes_file: "resources/profiles/workflow-evidence/lanes.yaml"
+    strategies_root: "resources/profiles/workflow-evidence/strategies"
+    overlays_root: "resources/profiles/workflow-evidence/overlays"
+    cross_lane_triggers_file: "resources/profiles/workflow-evidence/cross-lane-triggers.yaml"
   - id: reliability
     status: planned
     implemented: false
@@ -56,7 +66,7 @@ profiles:
     description: "Privacy and data governance audit profile."
 
 rules:
-  - "AuditLanes bundles the security profile as stable runnable and production-integrity as experimental runnable."
+  - "AuditLanes bundles the security profile as stable runnable and production-integrity, performance, and workflow-evidence as experimental runnable profiles."
   - "Experimental profile metadata may exist to exercise core/profile loading, but only profiles with implemented:true are runnable audit modes."
   - "Executable validators derive lane and specialist IDs from the selected profile instead of hardcoding them in report schemas."
   - "Executable validators derive strategy and overlay IDs from the selected profile instead of hardcoding them in report schemas."

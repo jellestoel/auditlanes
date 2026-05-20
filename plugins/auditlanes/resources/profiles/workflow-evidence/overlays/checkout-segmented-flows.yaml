@@ -1,0 +1,12 @@
+id: checkout-segmented-flows
+profile: workflow-evidence
+status: experimental
+runnable: true
+description: "Overlay for checkout, stock, subscription, broadband, Telecombinatie, Phone House, Allservices, whitelabel, retail Synergie, and Exact-enabled workflow segmentation."
+required_artifacts:
+  - state/scenario-observations.jsonl
+  - state/workflow-score-matrix.jsonl
+recommended_lanes:
+  - tenant-segmentation
+  - business-completion
+  - backlog-synthesis

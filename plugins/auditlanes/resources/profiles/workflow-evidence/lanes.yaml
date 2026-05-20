@@ -1,0 +1,22 @@
+version: 1
+profile: workflow-evidence
+lanes:
+  - id: static-topology
+    owns: "Repo-static routes, API dispatch, frontend surfaces, menu/package/permission gates, models, namespace hints, tasks, cron, integrations, primitive tags, scenario rules, static topology evidence, and candidate classification."
+  - id: tenant-segmentation
+    owns: "Read-only tenant/package/product-list segment mapping, namespace confidence, strategic customer segments, and tenant capability matrices."
+  - id: business-completion
+    owns: "Read-only business aggregate evidence for completed workflows, product/order mix, sale item flavors, stock behavior, invoice/payment/reconciliation status, and product-list catalog context."
+  - id: runtime-side-effects
+    owns: "Read-only request logs, task logs, cron logs, integration side-effect evidence, task success/failure distinction, and pain/instability signals."
+  - id: fixture-readiness
+    owns: "Safe fixture candidates, test users, packages, menus, product/stock/subscription/broadband/COS/ZOS/finance data, integration safety, and reset/seed readiness."
+  - id: backlog-synthesis
+    owns: "Scenario observation normalization, candidate/attempted/completed match levels, confidence caps, tiered test backlog, workflow score matrix, high-priority gaps, first release core slice, agent-readable cards, and release-impact test selection."
+specialists:
+  - id: evidence-atlas-synthesis
+    owns: "Cross-lane atlas merge, stable IDs, contradictions, confidence penalties, and final workflow evidence cards."
+    mode: atlas-synthesis
+  - id: release-test-selection
+    owns: "Release-specific changed-file to workflow impact mapping and targeted test selection."
+    mode: release-selection

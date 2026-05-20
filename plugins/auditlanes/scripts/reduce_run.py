@@ -73,6 +73,15 @@ TOP_LEVEL_ARRAY_FIELDS = (
     "client_edge_ledger_updates",
     "performance_evidence_map_updates",
     "performance_coverage_gap_updates",
+    "workflow_entity_updates",
+    "workflow_edge_updates",
+    "workflow_evidence_updates",
+    "scenario_observation_updates",
+    "workflow_score_updates",
+    "workflow_card_updates",
+    "segment_card_updates",
+    "fixture_card_updates",
+    "workflow_unknown_updates",
     "next_batch_recommendations",
 )
 TOP_LEVEL_COLLECTION_ALIASES = {

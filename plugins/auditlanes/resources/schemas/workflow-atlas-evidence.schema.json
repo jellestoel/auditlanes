@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/workflow-atlas-evidence.schema.json",
+  "title": "AuditLanes workflow atlas evidence JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "evidence_type",
+    "source_system",
+    "source_refs",
+    "entity_ids",
+    "observed_value",
+    "pii_safe",
+    "confidence",
+    "confidence_reason",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "evidence_id": { "type": "string", "minLength": 1 },
+    "evidence_type": {
+      "enum": [
+        "static_repo",
+        "gcp_request_log",
+        "task_log",
+        "cron_log",
+        "sentry_issue",
+        "ndb_aggregate",
+        "fixture_audit",
+        "manual_validation"
+      ]
+    },
+    "source_system": { "type": "string", "minLength": 1 },
+    "source_namespace": { "type": ["string", "null"] },
+    "time_window": { "type": ["string", "null"] },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "entity_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "observed_value": { "type": "object" },
+    "pii_safe": { "type": "boolean" },
+    "confidence": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "confidence_reason": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 }
+  }
+}

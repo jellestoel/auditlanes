@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/workflow-atlas-edge.schema.json",
+  "title": "AuditLanes workflow atlas edge JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "edge_id",
+    "src_entity_id",
+    "relation",
+    "dst_entity_id",
+    "evidence_ids",
+    "confidence",
+    "confidence_reason",
+    "status",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "edge_id": { "type": "string", "minLength": 1 },
+    "src_entity_id": { "type": "string", "minLength": 1 },
+    "relation": { "type": "string", "minLength": 1 },
+    "dst_entity_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": ["string", "null"] },
+    "owner_family": { "type": ["string", "null"] },
+    "evidence_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "confidence": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "confidence_reason": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["confirmed", "probable", "inferred", "speculative", "contradicted"]
+    },
+    "run_id": { "type": "string", "minLength": 1 }
+  }
+}

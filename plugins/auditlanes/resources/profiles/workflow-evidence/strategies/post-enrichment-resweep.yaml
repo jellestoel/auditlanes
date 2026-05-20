@@ -1,0 +1,15 @@
+id: post-enrichment-resweep
+profile: workflow-evidence
+status: experimental
+runnable: true
+description: "Resweep workflow evidence, fixture readiness, and tier recommendations after adding or correcting evidence sources."
+allowed_modes:
+  - evidence-gap-fill
+  - fixture-audit
+  - backlog-synthesis
+  - release-selection
+  - atlas-synthesis
+  - parked
+required_state_artifacts:
+  - state/scenario-observations.jsonl
+  - state/workflow-score-matrix.jsonl

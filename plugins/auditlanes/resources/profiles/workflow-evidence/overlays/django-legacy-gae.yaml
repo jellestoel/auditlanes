@@ -1,0 +1,12 @@
+id: django-legacy-gae
+profile: workflow-evidence
+status: experimental
+runnable: true
+description: "Overlay for Django plus legacy GAE apps with dynamic API dispatch, Cloud NDB namespaces, Cloud Tasks/Pub/Sub shims, cron, and mixed Vue/template/jQuery frontends."
+required_artifacts:
+  - state/workflow-atlas-entities.jsonl
+  - state/workflow-atlas-edges.jsonl
+  - state/workflow-atlas-evidence.jsonl
+recommended_lanes:
+  - static-topology
+  - runtime-side-effects

@@ -11,8 +11,11 @@ Use this skill only when the operator explicitly asks for AuditLanes or for a
 structured audit. The stable runnable profile is `security`.
 `production-integrity` is an experimental runnable profile for launch integrity.
 `performance` is an experimental runnable profile for runtime performance and
-capacity risks. `architecture` is experimental metadata only and should not be
-run as a production audit mode until its `profile.yaml` sets `implemented: true`.
+capacity risks. `workflow-evidence` is an experimental runnable profile for
+typed workflow evidence atlases, scenario observations, fixture readiness, and
+release-risk E2E tier recommendations. `architecture` is experimental metadata
+only and should not be run as a production audit mode until its `profile.yaml`
+sets `implemented: true`.
 
 If the operator asks Codex for an AuditLanes scan, security audit,
 vulnerability review, or full codebase audit without explicitly asking for
@@ -28,6 +31,8 @@ after security when the operator wants a launch/no-go review for durable state,
 generated commitments, lifecycle recovery, cutover controls, and assurance
 evidence. For production-integrity, default to `strategy: production-gate`.
 For performance, default to `strategy: static-capacity-sweep`.
+For workflow-evidence, default to `strategy: static-atlas` unless the operator
+has explicitly approved read-only data/log enrichment.
 Calibration must resolve profile strategy, overlay set, coverage mode,
 suggested checks, and agent-discretion flags in `state/relevance-plan.yaml`.
 Suggested checks frame the review; they do not bound reviewer judgment.
@@ -50,6 +55,22 @@ ${AUDITLANES_PLUGIN_ROOT}/scripts/scan_advisor.py
 ```
 
 Generated outputs go under `auditlanes/out/` in the target repository.
+
+## Post-Audit PDF Handoff
+
+When the operator asks after a completed AuditLanes run for a PDF handoff,
+findings table, printable security report, or "same layout" report, treat it as
+post-processing of reducer output, not as a new scan. Load and follow:
+
+```text
+${AUDITLANES_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/a3-pdf-findings-report-template.md
+```
+
+Use the same A3 landscape styling, Dutch wording, row detail, and traceable ID
+format described in that template. Prefer merged or reducer-owned findings
+state, and keep canonical AuditLanes IDs searchable in the PDF. When possible,
+run `${AUDITLANES_PLUGIN_ROOT}/scripts/render_a3_findings_pdf.py` instead of
+recreating the layout manually.
 
 ## Modes
 
@@ -110,6 +131,11 @@ unavailable in this host and continue with `subagent` mode when supported.
   `incidental_leads`, `risk_signals`, `proof_updates`,
   `regression_recommendations`, and the profile-specific workflow/invariant/
   side-effect/lifecycle/evidence update arrays.
+- Every workflow-evidence sidecar must include `strategy`, `overlays`,
+  `workflow_entity_updates`, `workflow_edge_updates`,
+  `workflow_evidence_updates`, `scenario_observation_updates`,
+  `workflow_score_updates`, and the workflow/segment/fixture card update
+  arrays.
 - No-argument or under-specified Codex scan requests should run
   `scan_advisor.py` first as calibration input, then continue automatically
   into the complete pre-fix security protocol. Present advisor choices only

@@ -52,6 +52,7 @@ class ClaudeSkillContractTests(unittest.TestCase):
         self.assertIn("profile choice before strategy choices", text)
         self.assertIn("`security` - stable runnable profile", text)
         self.assertIn("`production-integrity` - experimental runnable profile", text)
+        self.assertIn("`workflow-evidence` - experimental runnable profile", text)
         self.assertIn("After the profile is selected, present strategy choices", text)
 
     def test_codex_manifest_uses_codex_specific_skill_entrypoint(self):

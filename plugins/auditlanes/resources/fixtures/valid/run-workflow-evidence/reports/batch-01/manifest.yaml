@@ -1,0 +1,14 @@
+schema_version: 1
+run_id: run-workflow-evidence
+batch_id: batch-01
+generated_at: "2026-05-20T00:00:00Z"
+producer: orchestrator
+manifest_status: completed
+expected_families:
+  - static-topology
+families:
+  - family: static-topology
+    status: ran
+    mode: static-scout
+    markdown: "${RUN_DIR}/reports/batch-01/static-topology/report.md"
+    json: "${RUN_DIR}/reports/batch-01/static-topology/report.json"

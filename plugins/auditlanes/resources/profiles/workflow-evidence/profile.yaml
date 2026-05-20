@@ -1,0 +1,32 @@
+version: 1
+id: workflow-evidence
+status: experimental
+implemented: true
+report_sidecar_schema: workflow-evidence-report-sidecar.schema.json
+lane_source: lanes.yaml
+strategy_source: strategies
+overlay_source: overlays
+cross_lane_trigger_source: cross-lane-triggers.yaml
+default_strategy: static-atlas
+default_overlays:
+  - multi-tenant-workflow-atlas
+description: "Experimental workflow evidence atlas profile for mapping customer workflows, scenario observations, fixture readiness, and release-risk E2E test tiers."
+default_execution_mode: agent-team
+execution_fallback_order:
+  - subagent
+  - single-session
+stability_notes:
+  - "Experimental runnable profile for evidence atlas extraction, not a security scan."
+  - "Static lanes build candidate topology; read-only data/log lanes must be separately approved."
+  - "Prior reports can seed leads, but current repo/data/log evidence owns claims."
+non_goals:
+  - "Writing browser tests."
+  - "Adding frontend usage tracking or live instrumentation."
+  - "Querying or mutating production data without explicit approval."
+  - "Security vulnerability review except importing unresolved high/critical security findings as external gates."
+external_gate_sources:
+  - profile: security
+    import_severities:
+      - critical
+      - high
+    import_as: release-risk-gates

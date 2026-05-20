@@ -14,6 +14,7 @@ SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 VALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good"
 PRODUCTION_INTEGRITY_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-production-integrity"
 PERFORMANCE_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-performance"
+WORKFLOW_EVIDENCE_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-workflow-evidence"
 INVALID_RUN = PLUGIN_ROOT / "resources" / "fixtures" / "invalid" / "run-missing-evidence"
 
 
@@ -264,6 +265,10 @@ class ValidateRunCliTests(unittest.TestCase):
 
     def test_performance_fixture_passes(self):
         result = self.run_validator(PERFORMANCE_RUN, "--profile", "performance")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_workflow_evidence_fixture_passes(self):
+        result = self.run_validator(WORKFLOW_EVIDENCE_RUN, "--profile", "workflow-evidence")
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_batch_01_requires_all_security_lanes(self):

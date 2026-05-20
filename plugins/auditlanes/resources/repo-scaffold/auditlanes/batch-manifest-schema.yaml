@@ -45,6 +45,17 @@ family_modes:
   - capacity-gate-synthesis
   - bottleneck-chain-synthesis
   - exploit-synthesis
+  - static-scout
+  - static-classify
+  - fixture-gap-scout
+  - tenant-segment-sweep
+  - business-aggregate-sweep
+  - runtime-log-sweep
+  - task-side-effect-sweep
+  - fixture-audit
+  - backlog-synthesis
+  - release-selection
+  - atlas-synthesis
   - parked
 
 family_item:

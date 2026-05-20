@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/workflow-atlas-entity.schema.json",
+  "title": "AuditLanes workflow atlas entity JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "entity_id",
+    "entity_type",
+    "canonical_name",
+    "source_refs",
+    "evidence_ids",
+    "confidence",
+    "confidence_reason",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "entity_id": { "type": "string", "minLength": 1 },
+    "entity_type": { "type": "string", "minLength": 1 },
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "owner_family": { "type": ["string", "null"] },
+    "customer_segment_hint": { "type": ["string", "null"] },
+    "namespace_hint": { "type": ["string", "null"] },
+    "primitive_tags": { "type": "object" },
+    "source_refs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "confidence": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "confidence_reason": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 }
+  }
+}

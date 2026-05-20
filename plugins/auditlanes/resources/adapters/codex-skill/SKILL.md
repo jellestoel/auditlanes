@@ -18,3 +18,10 @@ control files only when the operator explicitly requested repo-local scaffolding
 or provenance is verified.
 
 Generated outputs go under `auditlanes/out/`.
+
+For post-audit PDF handoffs, findings tables, printable security reports, or
+requests for the same A3 layout, load and follow
+`${AUDITLANES_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/a3-pdf-findings-report-template.md`.
+Treat this as report generation from reducer/merged output, not a new scan.
+When possible, run `${AUDITLANES_PLUGIN_ROOT}/scripts/render_a3_findings_pdf.py`
+instead of recreating the layout manually.

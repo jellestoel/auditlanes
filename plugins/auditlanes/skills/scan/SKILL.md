@@ -14,7 +14,8 @@ The default stable runnable profile is `security`. Profile metadata is bundled a
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/catalog.yaml`.
 
 This release supports `security` as the stable runnable profile and
-`production-integrity` and `performance` as experimental runnable profiles.
+`production-integrity`, `performance`, and `workflow-evidence` as experimental
+runnable profiles.
 Profile lane catalogs are bundled under
 `${CLAUDE_PLUGIN_ROOT}/resources/profiles/<profile>/`. `architecture` remains
 experimental metadata only and should not be run as a production audit profile.
@@ -31,6 +32,9 @@ profile choice before strategy choices:
 - `performance` - experimental runnable profile for runtime performance and
   capacity risks: latency budgets, throughput, resource saturation, backlog,
   degradation behavior, and performance evidence gaps.
+- `workflow-evidence` - experimental runnable profile for workflow evidence
+  atlas work: typed entities/edges/evidence, scenario observations, fixture
+  readiness, and release-risk E2E tier recommendations.
 - `architecture` - experimental metadata only.
 
 After the profile is selected, present strategy choices from that profile.
@@ -47,6 +51,7 @@ Treat `$ARGUMENTS` as the operator request. Recognized forms:
 - `scan <target-root> --profile security --strategy invariant-audit --overlay webapp --overlay multi-tenant-saas`
 - `scan <target-root> --profile production-integrity --strategy production-gate`
 - `scan <target-root> --profile performance --strategy static-capacity-sweep`
+- `scan <target-root> --profile workflow-evidence --strategy static-atlas`
 - `scan <target-root> --mode single-session`
 - `scan <target-root> --mode subagent`
 - `scan <target-root> --mode agent-team`
@@ -117,6 +122,22 @@ When running from the plugin without repo-local scaffolding, resolve
 `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/<control-file>`.
 Generated outputs still go under `auditlanes/out/` in the target repo.
 
+## Post-Audit PDF Handoff
+
+When the operator asks after a completed AuditLanes run for a PDF handoff,
+findings table, printable security report, or "same layout" report, treat it as
+post-processing of reducer output, not as a new scan. Load and follow:
+
+```text
+${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/a3-pdf-findings-report-template.md
+```
+
+Use the same A3 landscape styling, Dutch wording, row detail, and traceable ID
+format described in that template. Prefer merged or reducer-owned findings
+state, and keep canonical AuditLanes IDs searchable in the PDF. When possible,
+run `${CLAUDE_PLUGIN_ROOT}/scripts/render_a3_findings_pdf.py` instead of
+recreating the layout manually.
+
 Use this root split:
 
 - `PROTOCOL_ROOT` = `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes`
@@ -172,6 +193,15 @@ For `performance`:
 - `resource-saturation-degradation`
 - `client-edge-performance`
 - `performance-assurance`
+
+For `workflow-evidence`:
+
+- `static-topology`
+- `tenant-segmentation`
+- `business-completion`
+- `runtime-side-effects`
+- `fixture-readiness`
+- `backlog-synthesis`
 
 Use the team shared task list and direct teammate messaging. Each teammate owns
 one family report and may message other teammates when findings, chains, or

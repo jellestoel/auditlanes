@@ -1,0 +1,48 @@
+version: 1
+profile: workflow-evidence
+triggers:
+  - id: backend-without-business-completion
+    description: "High-pain workflow has backend/API/task static evidence but no completed business observation."
+    when:
+      patterns:
+        - backend without business completion
+        - no completed observation
+        - static api evidence
+    notify:
+      - business-completion
+      - backlog-synthesis
+  - id: task-edge-without-success-evidence
+    description: "Workflow has task enqueue or task route evidence but no task/integration success evidence."
+    when:
+      patterns:
+        - task enqueue
+        - task route
+        - no task success
+        - no integration success
+    notify:
+      - runtime-side-effects
+      - backlog-synthesis
+  - id: fixture-name-without-readiness
+    description: "Connection or demo name suggests fixture use but package/data/integration safety is unaudited."
+    when:
+      patterns:
+        - fixture name
+        - demo connection
+        - integration safety unknown
+        - unaudited fixture
+    notify:
+      - fixture-readiness
+      - backlog-synthesis
+  - id: segment-flattening-risk
+    description: "Phone House, Telecombinatie, Allservices, whitelabel, or Retail Synergie evidence is collapsed into generic checkout."
+    when:
+      patterns:
+        - generic checkout
+        - phone house
+        - telecombinatie
+        - allservices
+        - whitelabel
+        - retail synergie
+    notify:
+      - tenant-segmentation
+      - backlog-synthesis

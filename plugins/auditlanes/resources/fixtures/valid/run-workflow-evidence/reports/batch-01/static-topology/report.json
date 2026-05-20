@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "sidecar_id": "sidecar-workflow-evidence-static-topology-001",
+  "generated_at": "2026-05-20T00:00:00Z",
+  "run_id": "run-workflow-evidence",
+  "batch_id": "batch-01",
+  "family": "static-topology",
+  "mode": "static-scout",
+  "profile": "workflow-evidence",
+  "strategy": "static-atlas",
+  "overlays": [
+    "multi-tenant-workflow-atlas"
+  ],
+  "baseline_commit": null,
+  "reviewed_artifacts": [
+    "resources/profiles/workflow-evidence/profile.yaml",
+    "resources/profiles/workflow-evidence/strategies/static-atlas.yaml"
+  ],
+  "reviewed_files_routes_helpers": [
+    "reports/e2e_discovery/config/workflow_scenario_rules.yml"
+  ],
+  "shared_context_inputs": [],
+  "coverage_units_touched": [
+    "workflow:sale.product.serial_number.complete"
+  ],
+  "coverage_units_not_touched": [],
+  "patterns_searched": [
+    "scenario rule fixture"
+  ],
+  "intentionally_excluded": [],
+  "confirmed_findings": [],
+  "candidate_findings": [],
+  "rejected_claims": [],
+  "clone_maps": [],
+  "runtime_updates": [],
+  "chain_candidates": [],
+  "coverage_gaps": [],
+  "profile_feedback": [],
+  "incidental_leads": [],
+  "risk_signals": [],
+  "proof_updates": [],
+  "regression_recommendations": [],
+  "run_local_checks": [],
+  "workflow_entity_updates": [
+    {
+      "entity_id": "workflow:sale.product.serial_number.complete",
+      "entity_type": "workflow",
+      "confidence": 35
+    }
+  ],
+  "workflow_edge_updates": [
+    {
+      "edge_id": "edge-static-serial-rule",
+      "relation": "DERIVED_FROM_RULE",
+      "status": "inferred"
+    }
+  ],
+  "workflow_evidence_updates": [
+    {
+      "evidence_id": "ev-static-serial-sale-rule",
+      "evidence_type": "static_repo"
+    }
+  ],
+  "scenario_observation_updates": [],
+  "workflow_score_updates": [],
+  "workflow_card_updates": [],
+  "segment_card_updates": [],
+  "fixture_card_updates": [],
+  "workflow_unknown_updates": [
+    {
+      "workflow_id": "sale.product.serial_number.complete",
+      "unknown_type": "usage",
+      "description": "Static atlas fixture cannot prove attempted, completed, or side-effect-completed usage."
+    }
+  ],
+  "next_batch_recommendations": [
+    "Add read-only business aggregate observations before ranking release-core scenarios."
+  ]
+}

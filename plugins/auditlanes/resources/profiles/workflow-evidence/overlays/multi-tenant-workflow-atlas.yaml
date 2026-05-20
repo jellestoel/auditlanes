@@ -1,0 +1,13 @@
+id: multi-tenant-workflow-atlas
+profile: workflow-evidence
+status: experimental
+runnable: true
+description: "Default overlay for multi-tenant workflow evidence mapping across packages, namespaces, customer segments, and fixture candidates."
+required_artifacts:
+  - state/workflow-atlas-entities.jsonl
+  - state/workflow-atlas-edges.jsonl
+  - state/workflow-atlas-evidence.jsonl
+recommended_lanes:
+  - static-topology
+  - tenant-segmentation
+  - fixture-readiness

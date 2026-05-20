@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/workflow-score-row.schema.json",
+  "title": "AuditLanes workflow score matrix JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "score_row_id",
+    "workflow_id",
+    "scenario_id",
+    "customer_segment",
+    "usage_score",
+    "pain_if_broken_score",
+    "evidence_confidence_score",
+    "fixture_readiness_score",
+    "priority_score",
+    "recommended_tier",
+    "score_reason",
+    "evidence_ids",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "score_row_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "customer_segment": { "type": "string", "minLength": 1 },
+    "usage_score": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "pain_if_broken_score": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "evidence_confidence_score": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "fixture_readiness_score": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "priority_score": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "recommended_tier": {
+      "enum": [
+        "tier_0_preflight",
+        "tier_1_browser",
+        "tier_2_segment_browser",
+        "tier_3_nightly_browser",
+        "tier_4_api_integration",
+        "tier_5_unit_rule"
+      ]
+    },
+    "score_reason": { "type": "string", "minLength": 1 },
+    "known_gaps": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "evidence_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "run_id": { "type": "string", "minLength": 1 }
+  }
+}

@@ -37,7 +37,12 @@ STATE_ARTIFACT_SCHEMAS = {
     "risk-signals.jsonl": "risk-signal.schema.json",
     "security-invariants.jsonl": "security-invariant.schema.json",
     "security-smells.jsonl": "security-smell.schema.json",
+    "scenario-observations.jsonl": "scenario-observation.schema.json",
     "unowned-surfaces.jsonl": "unowned-surface.schema.json",
+    "workflow-atlas-edges.jsonl": "workflow-atlas-edge.schema.json",
+    "workflow-atlas-entities.jsonl": "workflow-atlas-entity.schema.json",
+    "workflow-atlas-evidence.jsonl": "workflow-atlas-evidence.schema.json",
+    "workflow-score-matrix.jsonl": "workflow-score-row.schema.json",
 }
 STATE_LANE_FIELDS = {
     "attack-surface-graph.jsonl": ("owner_family",),
@@ -46,6 +51,8 @@ STATE_LANE_FIELDS = {
     "risk-signals.jsonl": ("recommended_owner",),
     "security-invariants.jsonl": ("owner_family",),
     "security-smells.jsonl": ("recommended_owner",),
+    "workflow-atlas-edges.jsonl": ("owner_family",),
+    "workflow-atlas-entities.jsonl": ("owner_family",),
 }
 STATE_LANE_LIST_FIELDS = {
     "attack-surface-graph.jsonl": ("secondary_families",),

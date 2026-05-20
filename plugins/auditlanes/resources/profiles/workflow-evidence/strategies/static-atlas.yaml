@@ -1,0 +1,15 @@
+id: static-atlas
+profile: workflow-evidence
+status: experimental
+runnable: true
+description: "Repo-static atlas extraction and scenario candidate mapping without runtime or production data access."
+allowed_modes:
+  - static-scout
+  - static-classify
+  - fixture-gap-scout
+  - atlas-synthesis
+  - parked
+required_state_artifacts:
+  - state/workflow-atlas-entities.jsonl
+  - state/workflow-atlas-edges.jsonl
+  - state/workflow-atlas-evidence.jsonl

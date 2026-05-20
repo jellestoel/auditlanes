@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auditlanes.local/schemas/scenario-observation.schema.json",
+  "title": "AuditLanes scenario observation JSONL row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "scenario_id",
+    "workflow_id",
+    "match_level",
+    "observation_source",
+    "time_window",
+    "event_count",
+    "evidence_ids",
+    "evidence_confidence",
+    "evidence_reason",
+    "run_id"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "observation_id": { "type": "string", "minLength": 1 },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "workflow_id": { "type": "string", "minLength": 1 },
+    "match_level": {
+      "enum": [
+        "candidate",
+        "attempted",
+        "completed",
+        "completed_with_side_effects",
+        "pain_signal"
+      ]
+    },
+    "observation_source": {
+      "enum": [
+        "static_repo",
+        "ndb_business_aggregate",
+        "gcp_request_log",
+        "task_log",
+        "cron_log",
+        "sentry",
+        "fixture_audit",
+        "manual_validation"
+      ]
+    },
+    "time_window": { "type": "string", "minLength": 1 },
+    "environment": { "type": ["string", "null"] },
+    "customer_segment": { "type": ["string", "null"] },
+    "tenant_archetype": { "type": ["string", "null"] },
+    "source_namespace": { "type": ["string", "null"] },
+    "canonical_endpoint": { "type": ["string", "null"] },
+    "task_function_path": { "type": ["string", "null"] },
+    "business_object_type": { "type": ["string", "null"] },
+    "event_count": { "type": "integer", "minimum": 0 },
+    "success_count": { "type": ["integer", "null"], "minimum": 0 },
+    "failure_count": { "type": ["integer", "null"], "minimum": 0 },
+    "last_seen_at": { "type": ["string", "null"] },
+    "primitive_tags": { "type": "object" },
+    "evidence_ids": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "evidence_confidence": { "type": ["integer", "number"], "minimum": 0, "maximum": 100 },
+    "evidence_reason": { "type": "string", "minLength": 1 },
+    "missing_tags_for_higher_confidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "run_id": { "type": "string", "minLength": 1 }
+  }
+}
