@@ -68,6 +68,8 @@
         "backlog-synthesis",
         "release-selection",
         "atlas-synthesis",
+        "evidence-atlas-synthesis",
+        "release-test-selection-specialist",
         "parked"
       ]
     },

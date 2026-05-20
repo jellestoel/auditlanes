@@ -6,6 +6,7 @@ report_sidecar_schema: workflow-evidence-report-sidecar.schema.json
 lane_source: lanes.yaml
 strategy_source: strategies
 overlay_source: overlays
+orchestrator_source: orchestrator.yaml
 cross_lane_trigger_source: cross-lane-triggers.yaml
 default_strategy: static-atlas
 default_overlays:

@@ -49,6 +49,13 @@ class ValidateRunCliTests(unittest.TestCase):
         shutil.copytree(PRODUCTION_INTEGRITY_RUN, run_copy)
         return run_copy
 
+    def copied_workflow_evidence_run(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run_copy = Path(tmp.name) / "run-workflow-evidence"
+        shutil.copytree(WORKFLOW_EVIDENCE_RUN, run_copy)
+        return run_copy
+
     def make_complete_security_run(self) -> Path:
         run_copy = self.copied_run()
         lanes = [
@@ -269,6 +276,43 @@ class ValidateRunCliTests(unittest.TestCase):
 
     def test_workflow_evidence_fixture_passes(self):
         result = self.run_validator(WORKFLOW_EVIDENCE_RUN, "--profile", "workflow-evidence")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_workflow_evidence_backlog_synthesis_can_review_lane_outputs(self):
+        run_copy = self.copied_workflow_evidence_run()
+        family_dir = run_copy / "reports" / "batch-01" / "backlog-synthesis"
+        family_dir.mkdir()
+        base = json.loads((run_copy / "reports" / "batch-01" / "static-topology" / "report.json").read_text(encoding="utf-8"))
+        base.update({
+            "sidecar_id": "sidecar-workflow-evidence-backlog-synthesis-001",
+            "family": "backlog-synthesis",
+            "mode": "atlas-synthesis",
+            "reviewed_artifacts": [
+                "auditlanes/out/runs/run-workflow-evidence/reports/batch-01/static-topology/report.json"
+            ],
+            "reviewed_files_routes_helpers": [
+                "auditlanes/out/runs/run-workflow-evidence/reports/batch-01/static-topology/report.md"
+            ],
+            "workflow_entity_updates": [],
+            "workflow_edge_updates": [],
+            "workflow_evidence_updates": [],
+            "scenario_observation_updates": [],
+            "workflow_score_updates": [],
+            "workflow_card_updates": [],
+            "segment_card_updates": [],
+            "fixture_card_updates": [],
+            "workflow_unknown_updates": [],
+        })
+        (family_dir / "report.json").write_text(json.dumps(base, indent=2), encoding="utf-8")
+        (family_dir / "report.md").write_text("# Backlog Synthesis\n", encoding="utf-8")
+
+        result = self.run_validator(
+            run_copy,
+            "--profile",
+            "workflow-evidence",
+            "--sidecar",
+            "reports/batch-01/backlog-synthesis/report.json",
+        )
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_batch_01_requires_all_security_lanes(self):

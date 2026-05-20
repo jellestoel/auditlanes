@@ -136,6 +136,10 @@ unavailable in this host and continue with `subagent` mode when supported.
   `workflow_evidence_updates`, `scenario_observation_updates`,
   `workflow_score_updates`, and the workflow/segment/fixture card update
   arrays.
+- Set `profile_version` to `null` unless the exact installed plugin package
+  version is known. Do not use profile status words such as `experimental`.
+- `intentionally_excluded` must be an array of objects with `path` and
+  `reason`, not a list of strings.
 - No-argument or under-specified Codex scan requests should run
   `scan_advisor.py` first as calibration input, then continue automatically
   into the complete pre-fix security protocol. Present advisor choices only

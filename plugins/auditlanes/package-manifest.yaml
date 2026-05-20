@@ -1,4 +1,4 @@
-version: 0.4.20
+version: 0.4.21
 name: auditlanes
 
 target_directory: "auditlanes"
@@ -28,6 +28,7 @@ product_shape:
     - "experimental runnable production-integrity profile"
     - "experimental runnable performance profile"
     - "experimental runnable workflow-evidence profile"
+    - "workflow-evidence profile-specific static atlas orchestration guidance"
     - "agent/reducer contract files"
     - "executable JSON Schema for security, production-integrity, performance, and workflow-evidence report sidecars, batch manifests, and core state artifacts"
     - "minimal validate-run script"
@@ -168,7 +169,7 @@ validator_status:
     - "resources/schemas/scenario-observation.schema.json"
     - "resources/schemas/workflow-score-row.schema.json"
   script: "scripts/validate_run.py"
-  note: "A packaged auditlanes CLI command is still planned; v0.4.19 ships a direct profile-aware validator script with single-sidecar, grouped-output, state-only, and security completion-gate modes."
+  note: "A packaged auditlanes CLI command is still planned; v0.4.21 ships a direct profile-aware validator script with single-sidecar, grouped-output, state-only, and security completion-gate modes."
 
 advisor_status:
   current_release: "minimal-script"
@@ -194,7 +195,7 @@ reducer_status:
     - "same-ID status transition guard"
     - "lenient recovery mode with persisted summary, reducer warning events, and pre-repair state snapshots"
     - "optional normalized sidecar rewrite after lenient coercion"
-  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.19 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
+  note: "A full orchestration reducer and candidate-to-confirmed transition crosswalk remain future work; v0.4.21 reduces valid sidecars into deterministic state files, emits basic follow-up directives, and provides --lenient as an explicit recovery path for schema-drifted agent runs with reducer artifacts preserved under reducer/."
 
 profile_status:
   implemented:
@@ -322,6 +323,7 @@ plugin_files:
   - "resources/profiles/workflow-evidence/lanes.yaml"
   - "resources/profiles/workflow-evidence/cross-lane-triggers.yaml"
   - "resources/profiles/workflow-evidence/README.md"
+  - "resources/profiles/workflow-evidence/orchestrator.yaml"
   - "resources/profiles/workflow-evidence/strategies/static-atlas.yaml"
   - "resources/profiles/workflow-evidence/strategies/read-only-enrichment.yaml"
   - "resources/profiles/workflow-evidence/strategies/post-enrichment-resweep.yaml"

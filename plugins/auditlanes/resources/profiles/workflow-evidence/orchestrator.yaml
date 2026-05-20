@@ -1,0 +1,59 @@
+version: 1
+profile: workflow-evidence
+purpose: "Profile-specific phase map for first-pass workflow evidence atlas runs."
+
+batch_01:
+  strategy: static-atlas
+  mode: agent-team
+  primary_lanes:
+    - family: static-topology
+      mode: static-scout
+      output_focus:
+        - workflow-atlas-entities
+        - workflow-atlas-edges
+        - workflow-atlas-evidence
+        - static candidate tags
+    - family: tenant-segmentation
+      mode: static-classify
+      output_focus:
+        - package/menu/permission segment hints
+        - namespace confidence gaps
+    - family: business-completion
+      mode: static-classify
+      output_focus:
+        - completion predicates
+        - model mutation signals
+        - evidence gaps for read-only data enrichment
+    - family: runtime-side-effects
+      mode: static-scout
+      output_focus:
+        - task/cron/integration side-effect candidates
+        - runtime/log query gaps
+    - family: fixture-readiness
+      mode: fixture-gap-scout
+      output_focus:
+        - fixture candidates
+        - integration safety gaps
+        - reset/seed readiness gaps
+    - family: backlog-synthesis
+      mode: atlas-synthesis
+      output_focus:
+        - scenario-observations
+        - workflow-score-matrix
+        - workflow/segment/fixture cards
+        - tiered static backlog
+
+lane_brief_delivery:
+  preferred: file-backed-briefs
+  reason: "Native teammate message queues can race; file-backed briefs keep lane contracts durable."
+  write_location: "auditlanes/out/runs/<run-id>/briefs/<batch-id>/<family>.md"
+
+host_write_fallback:
+  rule: "If teammate writes are blocked, teammates return complete report.json and report.md inline."
+  lead_responsibility: "Persist inline artifacts under the canonical reports path before validation."
+
+safety:
+  - "static-atlas is repo/static-only and must not query production data."
+  - "Do not add frontend tracking."
+  - "Do not enqueue tasks or call providers."
+  - "Static observations must remain match_level=candidate and observation_source=static_repo."

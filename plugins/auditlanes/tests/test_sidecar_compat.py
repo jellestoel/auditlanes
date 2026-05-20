@@ -7,7 +7,9 @@ from pathlib import Path
 PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = PLUGIN_ROOT / "scripts" / "validate_run.py"
 SCHEMA = PLUGIN_ROOT / "resources" / "schemas" / "report-sidecar.schema.json"
+WORKFLOW_EVIDENCE_SCHEMA = PLUGIN_ROOT / "resources" / "schemas" / "workflow-evidence-report-sidecar.schema.json"
 SIDECAR = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-good" / "reports" / "batch-01" / "session-auth" / "report.json"
+WORKFLOW_EVIDENCE_SIDECAR = PLUGIN_ROOT / "resources" / "fixtures" / "valid" / "run-workflow-evidence" / "reports" / "batch-01" / "static-topology" / "report.json"
 
 
 def load_validator_module():
@@ -32,6 +34,21 @@ class SidecarCompatibilityTests(unittest.TestCase):
         sidecar.pop("schema_version")
         errors = validator.validate_schema(sidecar, schema)
         self.assertTrue(any("schema_version" in error for error in errors), errors)
+
+    def test_workflow_evidence_intentionally_excluded_requires_objects(self):
+        validator = load_validator_module()
+        sidecar = json.loads(WORKFLOW_EVIDENCE_SIDECAR.read_text(encoding="utf-8"))
+        schema = json.loads(WORKFLOW_EVIDENCE_SCHEMA.read_text(encoding="utf-8"))
+        sidecar["intentionally_excluded"] = ["auditlanes/out"]
+        errors = validator.validate_schema(sidecar, schema)
+        self.assertTrue(any("intentionally_excluded" in error for error in errors), errors)
+
+        sidecar["intentionally_excluded"] = [{
+            "path": "auditlanes/out",
+            "reason": "run output is control-plane data, not application evidence",
+            "scope_source": None,
+        }]
+        self.assertEqual(validator.validate_schema(sidecar, schema), [])
 
     def test_specialist_mode_validation_uses_profile_catalog(self):
         validator = load_validator_module()

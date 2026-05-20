@@ -259,6 +259,11 @@ host blocks a lane worker from writing required `.md` or `.json` artifacts, the
 lane worker must return the report content inline and the lead must persist it
 under the canonical path.
 
+Set `profile_version` to `null` unless the exact installed plugin package
+version is known. Do not use profile status words such as `experimental`.
+`intentionally_excluded` must be an array of objects with `path` and `reason`,
+not a list of strings.
+
 Before spawning lane workers, the lead must include the report contract and the
 state append contract in the lane brief. Give each lane the minimal JSON shape
 from `${CLAUDE_PLUGIN_ROOT}/resources/repo-scaffold/auditlanes/report-sidecar-template.json`

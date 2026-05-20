@@ -7,7 +7,7 @@
   "family": "session-auth",
   "mode": "canonical-sweep",
   "profile": "security",
-  "profile_version": "0.4.19",
+  "profile_version": null,
   "strategy": "invariant-audit",
   "overlays": [
     "authn-session"

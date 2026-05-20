@@ -462,7 +462,35 @@ def repo_path_without_line_suffix(value: str) -> str:
     return re.sub(r":[0-9]+(?::[0-9]+)?$", "", value)
 
 
-def validate_repo_relative_path_value(path: Path, location: str, value: Any) -> list[ValidationIssue]:
+def is_allowed_auditlanes_run_input_path(raw: str) -> bool:
+    candidate = Path(raw)
+    parts = candidate.parts
+    if len(parts) < 6:
+        return False
+    if parts[:3] != ("auditlanes", "out", "runs"):
+        return False
+    if "reports" not in parts[4:] and "state" not in parts[4:] and "final" not in parts[4:]:
+        return False
+    return candidate.name in {
+        "manifest.yaml",
+        "manifest.yml",
+        "report.json",
+        "report.md",
+        "shared-context-summary.md",
+        "workflow-atlas-entities.jsonl",
+        "workflow-atlas-edges.jsonl",
+        "workflow-atlas-evidence.jsonl",
+        "scenario-observations.jsonl",
+        "workflow-score-matrix.jsonl",
+    }
+
+
+def validate_repo_relative_path_value(
+    path: Path,
+    location: str,
+    value: Any,
+    allow_auditlanes_run_input: bool = False,
+) -> list[ValidationIssue]:
     if not isinstance(value, str) or not value:
         return []
 
@@ -476,6 +504,8 @@ def validate_repo_relative_path_value(path: Path, location: str, value: Any) -> 
     if ".." in candidate.parts:
         return [ValidationIssue(path, location, "path must not contain '..'")]
     if len(candidate.parts) >= 2 and candidate.parts[0] == "auditlanes" and candidate.parts[1] == "out":
+        if allow_auditlanes_run_input and is_allowed_auditlanes_run_input_path(raw):
+            return []
         return [ValidationIssue(path, location, "evidence/reviewed paths must not point into auditlanes/out")]
     return []
 
@@ -1017,19 +1047,39 @@ def validate_evidence_refs(
     return issues
 
 
-def validate_path_list(sidecar_path: Path, location: str, values: Any) -> list[ValidationIssue]:
+def validate_path_list(
+    sidecar_path: Path,
+    location: str,
+    values: Any,
+    allow_auditlanes_run_input: bool = False,
+) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
     if not isinstance(values, list):
         return issues
     for index, value in enumerate(values):
-        issues.extend(validate_repo_relative_path_value(sidecar_path, f"{location}[{index}]", value))
+        issues.extend(validate_repo_relative_path_value(
+            sidecar_path,
+            f"{location}[{index}]",
+            value,
+            allow_auditlanes_run_input=allow_auditlanes_run_input,
+        ))
     return issues
 
 
 def validate_sidecar_repo_paths(sidecar_path: Path, sidecar: dict[str, Any]) -> list[ValidationIssue]:
     issues: list[ValidationIssue] = []
+    allow_auditlanes_run_input = (
+        sidecar.get("profile") == "workflow-evidence"
+        and sidecar.get("family") == "backlog-synthesis"
+        and sidecar.get("mode") == "atlas-synthesis"
+    )
     for field in ("reviewed_artifacts", "reviewed_files_routes_helpers"):
-        issues.extend(validate_path_list(sidecar_path, f"$.{field}", sidecar.get(field)))
+        issues.extend(validate_path_list(
+            sidecar_path,
+            f"$.{field}",
+            sidecar.get(field),
+            allow_auditlanes_run_input=allow_auditlanes_run_input,
+        ))
 
     for collection_name in ("confirmed_findings", "candidate_findings", "incidental_leads"):
         collection = sidecar.get(collection_name, [])

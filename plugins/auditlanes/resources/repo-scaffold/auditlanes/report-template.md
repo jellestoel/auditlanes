@@ -42,7 +42,13 @@ only by lenient recovery tooling.
 - `coverage_units_touched`:
 - `coverage_units_not_touched`:
 - `patterns_searched`:
-- `intentionally_excluded`:
+- `intentionally_excluded`: array of objects, never bare strings:
+  `{"path": "repo/relative/path", "reason": "why excluded", "scope_source": null}`.
+  Use `[]` when nothing was intentionally excluded.
+
+For `profile_version`, use `null` unless the lead provides the exact installed
+AuditLanes package version. Do not use profile status values such as
+`experimental`.
 
 ## Confirmed Findings
 

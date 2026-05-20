@@ -16,7 +16,7 @@ lanes:
 specialists:
   - id: evidence-atlas-synthesis
     owns: "Cross-lane atlas merge, stable IDs, contradictions, confidence penalties, and final workflow evidence cards."
-    mode: atlas-synthesis
+    mode: evidence-atlas-synthesis
   - id: release-test-selection
     owns: "Release-specific changed-file to workflow impact mapping and targeted test selection."
-    mode: release-selection
+    mode: release-test-selection-specialist

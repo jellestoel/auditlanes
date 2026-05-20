@@ -63,6 +63,8 @@
         "backlog-synthesis",
         "release-selection",
         "atlas-synthesis",
+        "evidence-atlas-synthesis",
+        "release-test-selection-specialist",
         "parked"
       ]
     },
@@ -80,7 +82,10 @@
     "coverage_units_touched": { "$ref": "#/$defs/stringList" },
     "coverage_units_not_touched": { "$ref": "#/$defs/stringList" },
     "patterns_searched": { "$ref": "#/$defs/stringList" },
-    "intentionally_excluded": { "$ref": "#/$defs/objectList" },
+    "intentionally_excluded": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/intentionallyExcluded" }
+    },
     "confirmed_findings": { "$ref": "#/$defs/objectList" },
     "candidate_findings": { "$ref": "#/$defs/objectList" },
     "rejected_claims": { "$ref": "#/$defs/objectList" },
@@ -118,6 +123,16 @@
     "objectList": {
       "type": "array",
       "items": { "type": "object" }
+    },
+    "intentionallyExcluded": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 },
+        "scope_source": { "type": ["string", "null"] }
+      }
     }
   }
 }

@@ -51,9 +51,9 @@ Default flow:
 4. Run the first family batch.
 5. Run the reducer after every batch.
 
-For v0.4.19, `security` is the stable runnable profile and
-`production-integrity` is an experimental runnable profile. The default
-requested strategy is `auto` and the default overlay is `auto`. Calibration
+For v0.4.21, `security` is the stable runnable profile and
+`production-integrity`, `performance`, and `workflow-evidence` are experimental
+runnable profiles. The default requested strategy is `auto` and the default overlay is `auto`. Calibration
 must write `state/relevance-plan.yaml` with the resolved strategy, overlays,
 coverage mode, and suggested checks before audit work starts. The relevance plan
 frames the audit; it does not bound reviewer judgment. Agents may add
